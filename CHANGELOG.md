@@ -13,25 +13,7 @@ in [ROADMAP.md](ROADMAP.md).
 
 ### Fixed
 
-- The extensions menu now shows its actions in the selected interface language.
-- An extension's content script now runs inside a page's embedded data:
-  document, as in Chrome: importing a module from the extension's own folder
-  failed there, which left Immersive Translate unable to translate pages that
-  embed one. The data: URL itself is still not a site an extension is given.
-- Opening tabs and navigating with many tabs takes less work in the top tab
-  bar and the sidebar's ungrouped rows.
-- An extension's popup opened from the sidebar no longer grows and shrinks
-  as its initial scrollbars settle, or repeatedly changes size on static pages
-  with overflow.
-- A window can be dragged by its strip on the first click when another app
-  is in front. The Mac's Move & Resize shortcuts with Control, Command or
-  Option also work while the pointer is over the tab area.
-- Installing or updating a Chrome Web Store extension uses less memory. Search downloads the package to disk and checks its signature without making extra copies of the ZIP. Verification, unpacking, and script preparation run off the main thread.
-- Search rejects truncated CRX3 metadata and can read a signed package with unfamiliar protobuf metadata before its proof.
-- Preparing an extension after installation or a shim update reads each JavaScript file once to collect its events and list its bundled scripts.
-- Pages that talk to extensions reuse the same connection script until the set of loaded extensions changes. Opening another page no longer rereads each extension's manifest to build that script.
-- The top tab bar does less repeated work with many tabs, and collapsing a group saves the session with fewer repeated lookups.
-- Copying large images from a page's blob URLs is quicker and uses less memory in the page's process.
+- SoundCloud's Sign in works with Privacy Badger on. Privacy Badger blocks soundcloud.com everywhere but on SoundCloud's own pages; Safari's engine judged a frame by the frame itself, still empty when it starts loading, rather than by the page holding it, as Chrome does, so SoundCloud's own sign-in frame was blocked on soundcloud.com and the button did nothing. An extension's rule for some sites' requests now treats frames as Chrome does, which also blocks frames a rule names that got through before. `python3 Tests/extension_initiator_frames.py` checks it.
 - Signing in with a passkey from 1Password no longer leaves the site on its sign-in page when you take more than a few seconds to pick it. While 1Password showed its menu or a prompt in another tab, that tab answered for 1Password after ten seconds, with nothing; the passkey you then picked never reached the site. Any extension's long answer, a password manager's or another's, now waits for the extension itself.
 - Giving an extension a permission it asks for, or changing where it runs, no longer runs its scripts a second time in the pages you have open (doubled buttons and listeners). An extension that gives back access to every website now really stops running on the sites it no longer has, and keeps the ones its manifest names.
 - Claude in Chrome's side panel is no longer blank once you're signed in with a paid plan. Its panel is now claude.ai itself in a frame, and WebKit sends a frame inside an extension's page none of claude.ai's session cookies, so the frame stayed signed out and empty while the panel thought you were signed in. Search now gives the panel the message claude.ai sends when it can't be shown there, and the panel shows its own chat instead, signed in as the extension is. `python3 Tests/claude_panel_frame.py` checks it.
