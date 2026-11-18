@@ -710,8 +710,12 @@ struct SpaceDot: View {
         .onHover { hovering = $0 }
         .animation(Motion.quick, value: browser.space.look)
         .help(browser.prefs.sidebar
-              ? Language.shared.format("space.switch.sideways", fallback: "%1$@ — ⌃1–⌃9, or two fingers sideways over the tabs, to switch", browser.space.name)
-              : Language.shared.format("space.switch.vertical", fallback: "%1$@ — ⌃1–⌃9, or two fingers up or down over the tabs, to switch", browser.space.name))
+              ? (KeyCombo.spacesOnCommand
+                 ? Language.shared.format("space.switch.sideways_command", fallback: "%1$@ — ⌘1–⌘9, or two fingers sideways over the tabs, to switch", browser.space.name)
+                 : Language.shared.format("space.switch.sideways", fallback: "%1$@ — ⌃1–⌃9, or two fingers sideways over the tabs, to switch", browser.space.name))
+              : (KeyCombo.spacesOnCommand
+                 ? Language.shared.format("space.switch.vertical_command", fallback: "%1$@ — ⌘1–⌘9, or two fingers up or down over the tabs, to switch", browser.space.name)
+                 : Language.shared.format("space.switch.vertical", fallback: "%1$@ — ⌃1–⌃9, or two fingers up or down over the tabs, to switch", browser.space.name)))
         .onChange(of: key) { _, now in
             let symbol = symbol
             DispatchQueue.main.async {

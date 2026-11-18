@@ -377,11 +377,13 @@ struct SettingsPanel: View {
         let title = title(of: item)
         let need = counts ? "" : SettingsIndex.needs(item)
         let detail = counts ? detail(of: item) : language.text(need, fallback: need)
+        // The switch that swaps ⌘1–⌘9 and ⌃1–⌃9 names both as they were.
+        let relabel: (String) -> String = item.id == "spaces.commandNumbers" ? { $0 } : shortcuts.relabel
         return SettingRow(
             icon: item.icon,
-            title: shortcuts.relabel(title == item.title ? item.localizedTitle : title),
-            detail: shortcuts.relabel(detail == item.detail ? item.localizedDetail : detail),
-            more: counts ? item.localizedMore.map(shortcuts.relabel) : nil,
+            title: relabel(title == item.title ? item.localizedTitle : title),
+            detail: relabel(detail == item.detail ? item.localizedDetail : detail),
+            more: counts ? item.localizedMore.map(relabel) : nil,
             wide: item.kind == .wide,
             lit: lit == item.id
         ) {
@@ -433,6 +435,8 @@ struct SettingsPanel: View {
     private func title(of item: SettingsItem) -> String {
         switch item.id {
         case "updates.version": return versionTitle
+        // ⌃ while it picks the tabs (Settings › Spaces & Pins).
+        case "tabs.shortcuts" where prefs.usesSpaces && prefs.spacesOnCommand: return "Show tab numbers while ⌃ is held"
         default: return item.title
         }
     }
@@ -751,6 +755,7 @@ struct SettingsPanel: View {
                 .disabled(!arcHere)
                 .opacity(arcHere ? 1 : 0.4)
         case "spaces": Switch(on: $prefs.usesSpaces)
+        case "spaces.commandNumbers": Switch(on: $prefs.spacesOnCommand)
         case "profiles": Pill("ui.new_profile") { ProfileMenu.askNew() }
         case "profiles.oneWindow": Switch(on: $prefs.profilesInOneWindow)
         case "spaces.links": Switch(on: $prefs.sendsLinksToSpaces)
