@@ -60,6 +60,9 @@ final class Extensions: NSObject, ObservableObject {
     }
 
     let controller: WKWebExtensionController
+    /// When `controller` was made: WebKit counts its first five seconds as
+    /// the browser starting (see `installReason`).
+    private let controllerMade: Date
     @Published private(set) var installed: [Installed] = []
     /// The loaded ones, by id.
     @Published private(set) var contexts: [String: WKWebExtensionContext] = [:] {
@@ -225,6 +228,7 @@ final class Extensions: NSObject, ObservableObject {
         Web.backspaceStays(views.preferences)
         configuration.webViewConfiguration = views
         controller = WKWebExtensionController(configuration: configuration)
+        controllerMade = Date()
         super.init()
         controller.delegate = self
         installed = (try? JSONDecoder().decode([Installed].self, from: Data(contentsOf: Extensions.list))) ?? []
@@ -680,7 +684,7 @@ final class Extensions: NSObject, ObservableObject {
             do { try controller.load(context) }
             catch { undoRecovery(); throw error }
             watch(context)
-            if contexts[item.id] == nil, loadsThisRun.contains(item.id) { loadedBefore.insert(item.id) }
+            if contexts[item.id] == nil, loadsThisRun.contains(item.id) { loadedBefore.insert(item.id); installing.remove(item.id) }
             loadsThisRun.insert(item.id)
             contexts[item.id] = context
             openAside(in: context)
@@ -940,6 +944,25 @@ final class Extensions: NSObject, ObservableObject {
     /// ticket is still the latest once it is done waiting.
     private var loadTickets: [String: Int] = [:]
     private(set) var loadedBefore: Set<String> = []
+    /// Installed in this run, its worker not yet told so.
+    private var installing: Set<String> = []
+
+    /// What runtime.onInstalled says, for an "install" WebKit reports. WebKit
+    /// doesn't go by whether it has seen the extension before: a load in the
+    /// controller's first five seconds is the browser starting (onStartup,
+    /// nothing installed), and any later load of the same version is an
+    /// "install". An extension that loaded later than that at launch — many
+    /// installed, a slow Mac, one switched on in Settings — was told it had
+    /// just been installed on every launch, and opened its welcome or setup
+    /// tab again (Raindrop, Dark Reader, Grammarly). Search knows which it is:
+    /// "install" once, for one it just installed; "update" for one taken up
+    /// again in this run (a Reload, a worker brought back), as Chrome says on
+    /// a Reload; nothing at all otherwise — Chrome fires no onInstalled when
+    /// the browser starts. A new version WebKit reports as "update" itself.
+    func installReason(_ id: String) -> String? {
+        if installing.remove(id) != nil { return "install" }
+        return loadedBefore.contains(id) ? "update" : nil
+    }
 
     @discardableResult
     func revive(_ id: String, because reason: String) -> Bool {
@@ -957,6 +980,7 @@ final class Extensions: NSObject, ObservableObject {
         // unload and load the same instance, keeping its prepared resources.
         do {
             loadedBefore.insert(id)
+            installing.remove(id)
             try controller.load(context)
             contexts[id] = context
             openAside(in: context)
@@ -1061,6 +1085,12 @@ final class Extensions: NSObject, ObservableObject {
         installed.removeAll { $0.id == id }
         installed.append(item)
         save()
+        // Loaded in WebKit's first five seconds, a new extension would be
+        // told the browser started, and never that it was installed.
+        let early = 5.5 - Date().timeIntervalSince(controllerMade)
+        if early > 0 { try? await Task.sleep(for: .seconds(early)) }
+        guard installed.contains(where: { $0.id == id }) else { return }
+        installing.insert(id)
         if await load(item) {
             browser?.announce("\(name) is installed", localizedKey: "announcement.extension_installed", arguments: [name])
         } else {
@@ -1076,6 +1106,7 @@ final class Extensions: NSObject, ObservableObject {
         Store.settings.removeObject(forKey: "extensions.granted.\(id)")
         loadsThisRun.remove(id)
         loadedBefore.remove(id)
+        installing.remove(id)
         Store.settings.removeObject(forKey: "extensions.newtab.\(id)")
         Store.settings.removeObject(forKey: "extensions.private.\(id)")
         SiteAccess.forget(id)
