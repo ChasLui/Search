@@ -1,0 +1,15 @@
+version = 1
+name = "Search"
+
+[setup]
+script = "xcrun --sdk macosx --show-sdk-path && swift package dump-package >/dev/null"
+
+[[actions]]
+name = "Build"
+icon = "tool"
+command = "swift build"
+
+[[actions]]
+name = "Test"
+icon = "test"
+command = "python3 Tests/run-ci-tests.py"
