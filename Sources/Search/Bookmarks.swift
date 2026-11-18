@@ -234,6 +234,31 @@ final class Bookmarks {
         return walk(roots)
     }
 
+    /// The folder last picked on a bookmark's card (BookmarkCard): the
+    /// next page bookmarked goes there too, as in Safari and Chrome. One
+    /// for each profile, as its bookmarks are. Nil for the top level, and
+    /// once that folder is gone.
+    var lastFolder: Bookmark.ID? {
+        get {
+            Store.settings.string(forKey: lastFolderKey).flatMap(UUID.init)
+                .flatMap { id in bookmark(id)?.isFolder == true ? id : nil }
+        }
+        set {
+            if let newValue { Store.settings.set(newValue.uuidString, forKey: lastFolderKey) }
+            else { Store.settings.removeObject(forKey: lastFolderKey) }
+        }
+    }
+
+    /// Named after its file, which is the profile's.
+    private var lastFolderKey: String { "bookmarks.lastFolder." + fileName }
+
+    /// Filed in `folder` (the top level for nil) from its card, and the
+    /// next page bookmarked goes there too.
+    func file(_ id: Bookmark.ID, into folder: Bookmark.ID?) {
+        move(id, into: folder)
+        lastFolder = folder
+    }
+
     // MARK: - changing
 
     /// The page, at the end of the list. Nothing is asked first: the title
@@ -1161,21 +1186,20 @@ struct BookmarkCard: View {
     private var folder: some View {
         let here = bookmarks.path(to: id)?.last
         return Menu {
-            Button { bookmarks.move(id, into: nil) } label: { Text("ui.top_level", bundle: Language.resources) }
+            Button { file(into: nil) } label: { Text("ui.top_level", bundle: Language.resources) }
             let folders = Bookmarks.folders(bookmarks.roots)
             if !folders.isEmpty {
                 Divider()
                 ForEach(folders, id: \.node.id) { target in
                     Button(String(repeating: "   ", count: target.depth) + target.node.title) {
-                        bookmarks.move(id, into: target.node.id)
+                        file(into: target.node.id)
                     }
                 }
             }
             Divider()
             Button {
                 Ask.name("New Folder", placeholder: "Name", localizePlaceholder: true, confirm: "Create") { name in
-                    let made = bookmarks.insert(.folder(name, []), into: nil)
-                    bookmarks.move(id, into: made.id)
+                    file(into: bookmarks.insert(.folder(name, []), into: nil).id)
                 }
             } label: { Text("New Folder…", bundle: Language.resources) }
         } label: {
@@ -1201,6 +1225,8 @@ struct BookmarkCard: View {
         .buttonStyle(.plain)
         .menuIndicator(.hidden)
     }
+
+    private func file(into folder: Bookmark.ID?) { bookmarks.file(id, into: folder) }
 
     private func line(_ name: String, @ViewBuilder _ control: () -> some View) -> some View {
         HStack(spacing: 10) {
