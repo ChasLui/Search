@@ -152,7 +152,7 @@ final class PinDragTests: XCTestCase {
         let browser = makeBrowser(count: 5)
         let t = browser.tabs
         browser.pin(t[0]); browser.pin(t[1])
-        browser.select(t[2])
+        try await browser.selectLoadedPinForDrag(t[0])
         let window = makeWindow(browser)
         try await settle()
         let room = browser.prefs.sideWidth - 20
@@ -173,7 +173,7 @@ final class PinDragTests: XCTestCase {
         let browser = makeBrowser(count: 20)
         let t = browser.tabs
         browser.pin(t[0]); browser.pin(t[1])
-        browser.select(t[2])
+        try await browser.selectLoadedPinForDrag(t[0])
         let window = makeWindow(browser)
         try await settle()
         let room = browser.prefs.sideWidth - 20
@@ -406,5 +406,22 @@ final class PinDragTests: XCTestCase {
         window.sendEvent(event)
         // Keep the synthetic drag below the tooltip delay for the stationary mouse.
         try await Task.sleep(for: .milliseconds(10))
+    }
+}
+
+@MainActor
+extension Browser {
+    func selectLoadedPinForDrag(_ tab: Search.Tab) async throws {
+        let address = try XCTUnwrap(tab.address)
+        select(tab)
+        let page = tab.web
+        // A restored tab waits for a window before loading. In a sidebar-only
+        // fixture that load can start during the drag and cancel the gesture.
+        let deadline = ContinuousClock.now + .seconds(5)
+        while (page.url != address || page.isLoading || tab.loading), ContinuousClock.now < deadline {
+            try await Task.sleep(for: .milliseconds(20))
+        }
+        XCTAssertEqual(page.url, address)
+        XCTAssertFalse(page.isLoading || tab.loading)
     }
 }
