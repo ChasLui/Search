@@ -68,7 +68,11 @@ final class Language: ObservableObject {
     }
 
     private static func bundle(for language: InterfaceLanguage) -> Bundle {
-        let path = resources.path(forResource: language.rawValue, ofType: "lproj")
+        // SwiftPM can lowercase the directory name, so use the casing in the bundle.
+        let localization = resources.localizations.first {
+            $0.caseInsensitiveCompare(language.rawValue) == .orderedSame
+        }
+        let path = localization.flatMap { resources.path(forResource: $0, ofType: "lproj") }
         return path.flatMap(Bundle.init(path:)) ?? resources
     }
 

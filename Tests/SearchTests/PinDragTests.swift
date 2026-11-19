@@ -404,6 +404,7 @@ final class PinDragTests: XCTestCase {
             pressure: type == .leftMouseUp ? 0 : 1
         ))
         window.sendEvent(event)
-        try await Task.sleep(for: .milliseconds(30))
+        // Keep the synthetic drag below the tooltip delay for the stationary mouse.
+        try await Task.sleep(for: .milliseconds(10))
     }
 }
