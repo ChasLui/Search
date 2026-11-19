@@ -257,6 +257,25 @@ final class SplitManyTests: XCTestCase {
         }
     }
 
+    func testSessionRefreshesBothVisibleSplitPages() throws {
+        try withBrowser { browser, tabs in
+            browser.pair(tabs[2], with: tabs[1], onLeft: false)
+            browser.activeID = tabs[2].id
+            let old = Date(timeIntervalSince1970: 1)
+            for tab in tabs[0...2] { tab.touch(at: old) }
+
+            let shape = browser.session(browser.tabs, active: browser.activeID, groups: browser.tabGroups, splits: browser.splits)
+            @MainActor func touched(_ tab: Tab) throws -> Date {
+                let url = try XCTUnwrap(tab.address?.absoluteString)
+                let entry = try XCTUnwrap(shape.tabs.first { $0.url == url })
+                return try XCTUnwrap(entry.touched)
+            }
+            XCTAssertEqual(try touched(tabs[0]), old)
+            XCTAssertGreaterThan(try touched(tabs[1]), old)
+            XCTAssertGreaterThan(try touched(tabs[2]), old)
+        }
+    }
+
     private func withBrowser(_ body: (Browser, [Tab]) throws -> Void) rethrows {
         _ = NSApplication.shared
         NSApp.setActivationPolicy(.prohibited)

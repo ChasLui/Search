@@ -13,6 +13,8 @@ in [ROADMAP.md](ROADMAP.md).
 
 ### Fixed
 
+- The top tab bar does less repeated work with many tabs, and collapsing a group saves the session with fewer repeated lookups.
+- Copying large images from a page's blob URLs is quicker and uses less memory in the page's process.
 - Signing in with a passkey from 1Password no longer leaves the site on its sign-in page when you take more than a few seconds to pick it. While 1Password showed its menu or a prompt in another tab, that tab answered for 1Password after ten seconds, with nothing; the passkey you then picked never reached the site. Any extension's long answer, a password manager's or another's, now waits for the extension itself.
 - An extension that downloads a file into a folder, as "photos/2026/a.jpg", gets that folder inside Downloads, as in Chrome, where only the file's name was kept.
 - Cosmos's window now opens, from its button in the toolbar and from the one on an image. Its background loads a common add-on (webextension-polyfill) that, in Search, cut it off from your clicks.

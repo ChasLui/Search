@@ -63,6 +63,29 @@ final class TabGroupDropTests: XCTestCase {
         XCTAssertEqual(browser.groupedTabRow.groups[1].tabs.map(\.id), [tabs[1].id, tabs[2].id, tabs[3].id])
     }
 
+    func testSessionKeepsOnlyGroupsWithSavedTabs() throws {
+        _ = NSApplication.shared
+        NSApp.setActivationPolicy(.prohibited)
+        let browser = Browser(record: WindowRecord())
+        defer { browser.closeAll() }
+        let kept = try XCTUnwrap(browser.tabs.first)
+        kept.restore(url: URL(string: "https://kept.example/")!, title: "Kept")
+        let savedGroup = TabGroup(id: UUID(), name: "Saved", collapsed: false)
+        let privateGroup = TabGroup(id: UUID(), name: "Private", collapsed: false)
+        let emptyGroup = TabGroup(id: UUID(), name: "Empty", collapsed: false)
+        kept.groupID = savedGroup.id
+        browser.activeID = kept.id
+
+        let privateTab = Tab(shy: true)
+        privateTab.restore(url: URL(string: "https://private.example/")!, title: "Private")
+        privateTab.groupID = privateGroup.id
+        let shape = browser.session([kept, privateTab], active: kept.id, groups: [privateGroup, savedGroup, emptyGroup])
+
+        XCTAssertEqual(shape.tabs.map(\.url), ["https://kept.example/"])
+        XCTAssertEqual(shape.groups?.map(\.id), [savedGroup.id])
+        XCTAssertNotNil(shape.tabs.first?.touched)
+    }
+
     func testPositionalMovesAndSourceCleanup() throws {
         _ = NSApplication.shared
         NSApp.setActivationPolicy(.prohibited)

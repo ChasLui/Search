@@ -277,6 +277,72 @@ final class SpeedBenchTests: XCTestCase {
         try await measureStrip(tabs: 200, groups: 10, grouped: false)
     }
 
+    /// The pieces of saving a large row, including a second window whose
+    /// session is written with the windows rather than to its own file.
+    func testSessionWriteCosts() throws {
+        Session.write(now: true, Session.Shape(tabs: [], active: 0))
+        let primary = makeBrowser(tabs: 600, record: nil)
+        Browsers.register(primary)
+        Browsers.restoreOnce()
+        let other = makeBrowser(tabs: 600)
+        Browsers.register(other)
+        defer {
+            Browsers.discard(other)
+            Browsers.discard(primary)
+            Session.write(now: true, Session.Shape(tabs: [], active: 0))
+        }
+        XCTAssertTrue(primary.usesFiles)
+        XCTAssertFalse(other.usesFiles)
+        primary.prefs.usesTabGroups = true
+        primary.prefs.splitView = true
+
+        for browser in [primary, other] {
+            let tabs = browser.tabs
+            browser.tabGroups = (0..<30).map { TabGroup(id: UUID(), name: "Group \($0)", collapsed: false) }
+            for (index, group) in browser.tabGroups.enumerated() {
+                for tab in tabs[(index * 20)..<(index * 20 + 15)] { tab.groupID = group.id }
+                browser.pair(tabs[index * 20], with: tabs[index * 20 + 1], onLeft: true)
+            }
+            XCTAssertEqual(browser.splits.count, 30)
+        }
+
+        for (name, browser) in [("primary", primary), ("other", other)] {
+            var snapshotTimes: [Double] = []
+            var encodeTimes: [Double] = []
+            var diskTimes: [Double] = []
+            var saveTimes: [Double] = []
+            let file = Store.file("speed-session-\(name).json")
+            for iteration in 0..<33 {
+                var start = CACurrentMediaTime()
+                let shape = browser.session(browser.tabs, active: browser.activeID, groups: browser.tabGroups, splits: browser.splits)
+                let snapshot = (CACurrentMediaTime() - start) * 1000
+                XCTAssertEqual(shape.tabs.count, 600)
+                XCTAssertEqual(shape.groups?.count, 30)
+
+                start = CACurrentMediaTime()
+                let data = try JSONEncoder().encode(shape)
+                let encode = (CACurrentMediaTime() - start) * 1000
+                start = CACurrentMediaTime()
+                Disk.write(file, now: true) { data }
+                let disk = (CACurrentMediaTime() - start) * 1000
+                start = CACurrentMediaTime()
+                browser.writeSession(now: true)
+                let save = (CACurrentMediaTime() - start) * 1000
+
+                if iteration >= 3 {
+                    snapshotTimes.append(snapshot)
+                    encodeTimes.append(encode)
+                    diskTimes.append(disk)
+                    saveTimes.append(save)
+                }
+            }
+            record("session.\(name).snapshot", LoopClock.summary(snapshotTimes))
+            record("session.\(name).encode", LoopClock.summary(encodeTimes))
+            record("session.\(name).disk", LoopClock.summary(diskTimes))
+            record("session.\(name).save", LoopClock.summary(saveTimes))
+        }
+    }
+
     /// The real strip in a window, brought up to date and drawn after each
     /// action. The run-loop clock also records later Core Animation work.
     private func measureStrip(tabs count: Int, groups countGroups: Int, grouped: Bool) async throws {

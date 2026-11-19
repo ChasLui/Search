@@ -3868,17 +3868,20 @@ final class Browser: NSObject, ObservableObject {
         // pin) coming to the front next time.
         var active = id == nil ? -1 : 0
         var indices: [Tab.ID: Int] = [:]
+        let visible = visibleTabIDs
+        var keptGroupIDs = Set<UUID>()
         for tab in tabs {
             guard kept(tab), let url = tab.pending ?? tab.address ?? tab.page?.url else { continue }
             if tab.id == id { active = entries.count }
             indices[tab.id] = entries.count
+            if let group = tab.groupID { keptGroupIDs.insert(group) }
             entries.append(Session.Entry(
                 url: url.absoluteString, title: tab.title, pin: tab.pin, name: tab.name,
                 home: tab.pin == nil ? nil : tab.home?.absoluteString, groupID: tab.groupID,
                 pinID: tab.pin == nil ? nil : tab.pinID,
                 // A page on screen is being looked at now, not when it was
                 // arrived at: quitting on it is leaving it.
-                touched: visibleTabIDs.contains(tab.id) ? Date() : tab.touched,
+                touched: visible.contains(tab.id) ? Date() : tab.touched,
                 letGo: tab.pin == nil ? tab.letGo : nil,
                 listed: tab.pin != nil && tab.listed ? true : nil,
                 muted: tab.muted,
@@ -3898,9 +3901,7 @@ final class Browser: NSObject, ObservableObject {
         if let id, let at = tabs.firstIndex(where: { $0.id == id }), indices[id] == nil {
             active = tabs[at].isBlank && !tabs[at].shy ? -1 : max(0, tabs[..<at].filter(kept).count - 1)
         }
-        let keptGroups = groups?.filter { group in
-            entries.contains { $0.groupID == group.id }
-        }
+        let keptGroups = groups?.filter { keptGroupIDs.contains($0.id) }
         // The pages of a split that are in the file: an empty page, or a
         // private one, isn't written. Two or more left stay a split, their
         // shares made up between them; one alone comes back as a tab.
