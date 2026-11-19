@@ -822,7 +822,7 @@ final class PaneDivider: NSView {
         let all = (stage?.pageCount ?? 2) > 2 ? "Close All" : "Close Both"
         for (title, action) in [("Swap Pages", PaneStage.Action.swap), ("Even Out", .even),
                                 ("Separate", .separate), (all, .closeBoth)] {
-            let item = NSMenuItem(title: title, action: #selector(chose(_:)), keyEquivalent: "")
+            let item = NSMenuItem(title: Language.shared.text(title, fallback: title), action: #selector(chose(_:)), keyEquivalent: "")
             item.target = self
             item.representedObject = action
             menu.addItem(item)
@@ -1077,10 +1077,12 @@ private final class FindHost: NSHostingView<FindBar> {
 /// it went to the page. Pinned to the top-left, the offset is from there.
 struct FromTopLeft<Content: View>: View {
     static var space: String { "PaneStage.card" }
+    @ObservedObject private var language = Language.shared
     let content: Content
 
     var body: some View {
         content
+            .environment(\.locale, language.locale)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             .coordinateSpace(.named(Self.space))
     }

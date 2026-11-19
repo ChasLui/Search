@@ -20,10 +20,10 @@ struct AtRestLine: View {
                     Image(systemName: "lock.open")
                         .font(.system(size: size - 2, weight: .medium))
                         .foregroundStyle(dim)
-                        .help("Not secure")
+                        .help(Text("ui.not_secure", bundle: Language.resources))
                     Text(" ")
                 } else {
-                    Text("Not secure")
+                    Text("ui.not_secure", bundle: Language.resources)
                         .foregroundStyle(dim)
                         .fixedSize()
                     Text("  ")

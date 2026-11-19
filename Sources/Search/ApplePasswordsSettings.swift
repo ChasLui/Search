@@ -20,8 +20,8 @@ struct ApplePasswordsCard: View {
                 }
             } else {
                 Card {
-                    Line("Passwords from Apple's Passwords app",
-                         "Accounts and verification codes saved in the Passwords app, under their box. Unofficial: Search talks to the helper Apple made for its Chrome extension, as that extension. Never in private tabs.") {
+                    Line("ui.passwords_from_apple_s_passwords_app",
+                         "ui.accounts_and_verification_codes_saved_in_the_passwords_", localizedTitle: true, localizedDetail: true) {
                         Switch(on: $prefs.applePasswords)
                     }
                     if prefs.applePasswords {
@@ -40,13 +40,13 @@ struct ApplePasswordsCard: View {
     @ViewBuilder private var pairing: some View {
         switch apple.state {
         case .idle:
-            Line(apple.trouble ?? "Not connected", "Your Mac shows a code, and you type it here. Once per launch of Search, and only when you first want an account: under a sign-in box, Connect Apple Passwords… asks for it there.") {
-                Pill("Connect…") { Task { await apple.connect() } }
+            Line(apple.trouble ?? "Not connected", "ui.your_mac_shows_a_code_and_you_type_it_here_once_per_lau", localizedTitle: true, localizedDetail: true) {
+                Pill("ui.connect") { Task { await apple.connect() } }
             }
         case .starting:
-            Line("Connecting…", "Waiting for your Mac to show a code") { EmptyView() }
+            Line("ui.connecting", "ui.waiting_for_your_mac_to_show_a_code", localizedTitle: true, localizedDetail: true) { EmptyView() }
         case .code, .checking:
-            Line("Enter the code your Mac shows", apple.state == .checking ? "Checking…" : "Six digits, from the Passwords window") {
+            Line("ui.enter_the_code_your_mac_shows", apple.state == .checking ? "Checking…" : "Six digits, from the Passwords window", localizedTitle: true, localizedDetail: true) {
                 HStack(spacing: 8) {
                     TextField("000000", text: $code)
                         .textFieldStyle(.plain)
@@ -64,13 +64,13 @@ struct ApplePasswordsCard: View {
                         }
                         .onSubmit(send)
                         .disabled(apple.state == .checking)
-                    Pill("OK", filled: true, action: send)
-                    Pill("Cancel") { apple.disconnect() }
+                    Pill("ui.ok", filled: true, action: send)
+                    Pill("ui.cancel") { apple.disconnect() }
                 }
             }
         case .paired:
-            Line("Connected", "Until Search quits. Accounts show under sign-in boxes, marked Apple Passwords; macOS may ask for Touch ID before one is filled.") {
-                Pill("Disconnect") { apple.disconnect() }
+            Line("ui.connected", "ui.until_search_quits_accounts_show_under_sign_in_boxes_ma", localizedTitle: true, localizedDetail: true) {
+                Pill("ui.disconnect") { apple.disconnect() }
             }
         }
     }
@@ -103,10 +103,10 @@ struct ApplePairingCard: View {
                     .frame(width: 22, height: 22)
                     .background(Palette.wash, in: RoundedRectangle(cornerRadius: 6, style: .continuous))
                 VStack(alignment: .leading, spacing: 1) {
-                    Text(title)
+                    Text(LocalizedStringKey(title), bundle: Language.resources)
                         .font(.system(size: 12.5))
                         .foregroundStyle(Palette.ink)
-                    Text(detail)
+                    Text(LocalizedStringKey(detail), bundle: Language.resources)
                         .font(.system(size: 10.5))
                         .foregroundStyle(Palette.muted)
                         .lineLimit(2)
@@ -132,10 +132,10 @@ struct ApplePairingCard: View {
                         }
                         .onSubmit(send)
                 } else if apple.state == .idle {
-                    Pill("Try again", filled: true) { Task { await apple.connect() } }
+                    Pill("ui.try_again_042c86", filled: true) { Task { await apple.connect() } }
                 }
                 Spacer(minLength: 0)
-                Pill("Cancel") { browser.endApplePairing(paired: false) }
+                Pill("ui.cancel") { browser.endApplePairing(paired: false) }
             }
         }
         .padding(10)

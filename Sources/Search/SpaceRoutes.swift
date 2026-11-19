@@ -179,9 +179,9 @@ struct SpaceRouteList: View {
         let choices = SpaceRoutes.choices
         ForEach(prefs.spaceRoutes) { route in
             Rule()
-            Line(route.site, choices.first { $0.id == route.space }.map { "Opens in \($0.name)" }
-                 ?? "Its space is gone, so links open as usual") {
-                Pill("Remove") { SpaceRoutes.remove(route.site) }
+            Line(route.site, choices.first { $0.id == route.space }.map { Language.shared.format("space.opens_in", fallback: "Opens in %1$@", $0.name) }
+                 ?? Language.shared.text("space.missing", fallback: "Its space is gone, so links open as usual")) {
+                Pill("ui.remove") { SpaceRoutes.remove(route.site) }
             }
         }
         Rule()
@@ -194,13 +194,13 @@ struct SpaceRouteList: View {
                 .padding(.vertical, 6)
                 .background(Palette.wash, in: RoundedRectangle(cornerRadius: 9, style: .continuous))
                 .onSubmit(add)
-            Picker("Space", selection: Binding(get: { chosen ?? choices.first?.id }, set: { chosen = $0 })) {
+            Picker(selection: Binding(get: { chosen ?? choices.first?.id }, set: { chosen = $0 })) {
                 ForEach(choices, id: \.id) { Text($0.name).tag(Optional($0.id)) }
-            }
+            } label: { Text("ui.space", bundle: Language.resources) }
             .labelsHidden()
             .pickerStyle(.menu)
             .fixedSize()
-            Pill("Add", action: add)
+            Pill("ui.add", action: add)
                 .disabled(SpaceRoutes.site(typed) == nil)
                 .opacity(SpaceRoutes.site(typed) == nil ? 0.5 : 1)
         }

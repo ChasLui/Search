@@ -11,7 +11,7 @@ struct PasswordsPanel: View {
     @State private var adding = false
 
     var body: some View {
-        Plate("Passwords", width: 620, close: { browser.managing = false }) {
+        Plate("page.passwords", localizedTitle: true, width: 620, close: { browser.managing = false }) {
             VStack(alignment: .leading, spacing: 14) {
                 HStack(spacing: 10) {
                     Hunt(text: $browser.hunting, prompt: "Search sites and accounts", focus: $hunting)
@@ -52,27 +52,27 @@ struct PasswordsPanel: View {
         } foot: {
             VStack(alignment: .leading, spacing: 10) {
                 HStack(spacing: 8) {
-                    Text("Bring in from")
+                    Text("ui.bring_in_from", bundle: Language.resources)
                         .font(.system(size: 12))
                         .foregroundStyle(Palette.muted)
                     // Which browser, which profile and what of it: the sheet.
-                    Pill("Bring in…") { browser.lead(to: InternalPage(.importing)) }
-                    Pill("File…") { browser.importFile() }
+                    Pill("ui.bring_in") { browser.lead(to: InternalPage(.importing)) }
+                    Pill("ui.file") { browser.importFile() }
                     Spacer(minLength: 0)
                     // What the list shows, all of it or what the search
                     // leaves: never more than can be seen (Browser.forgetShown).
                     let shown = browser.shownSites.reduce(0) { $0 + $1.logins.count }
                     if shown > 0 {
-                        Pill(browser.hunting.trimmingCharacters(in: .whitespaces).isEmpty ? "Remove All…" : "Remove \(shown)…") {
+                        Pill(browser.hunting.trimmingCharacters(in: .whitespaces).isEmpty ? "Remove All…" : Language.shared.count("count.remove_shown_button", shown)) {
                             browser.forgetShown()
                         }
                         .disabled(browser.forgetting)
                     }
-                    Text(browser.saved.count == 1 ? "1 password" : "\(browser.saved.count) passwords")
+                    CountText(key: "count.passwords", count: browser.saved.count)
                         .font(.system(size: 12))
                         .foregroundStyle(Palette.muted)
                 }
-                Text("macOS asks once for that browser's keychain key. Nothing is changed there; everything lands in your own keychain, under Search.")
+                Text("ui.macos_asks_once_for_that_browser_s_keychain_key_nothing", bundle: Language.resources)
                     .font(.system(size: 11.5))
                     .foregroundStyle(Palette.muted)
                     .fixedSize(horizontal: false, vertical: true)
@@ -103,7 +103,7 @@ struct PasswordsPanel: View {
                         .foregroundStyle(Palette.ink)
                         .lineLimit(1)
                     if logins.count > 1 {
-                        Text("\(logins.count) accounts")
+                        CountText(key: "count.accounts", count: logins.count)
                             .font(.system(size: 11.5))
                             .foregroundStyle(Palette.muted)
                     } else if let only = logins.first, !only.user.isEmpty, !open {
@@ -145,6 +145,7 @@ struct PasswordsPanel: View {
     /// One account: the name, the password as dots, and the three things to
     /// do with it. Show asks the Mac who you are first.
     private struct Account: View {
+        @ObservedObject private var language = Language.shared
         let login: Kept
         let copy: () -> Void
         let forget: () -> Void
@@ -158,7 +159,7 @@ struct PasswordsPanel: View {
 
         var body: some View {
             HStack(spacing: 10) {
-                Text(login.user.isEmpty ? "No username" : login.user)
+                Text(login.user.isEmpty ? Language.shared.text("password.no_username", fallback: "No username") : login.user)
                     .font(.system(size: 12))
                     .foregroundStyle(login.user.isEmpty ? Palette.faint : Palette.ink)
                     .lineLimit(1)
@@ -197,7 +198,7 @@ struct PasswordsPanel: View {
         }
 
         private func reveal() {
-            Vault.prove("show the password for \(login.host)") { ok in
+            Vault.prove(Language.shared.format("auth.show_password", fallback: "show the password for %1$@", login.host)) { ok in
                 // Read after the Mac has said who this is, not before: the
                 // secret is asked for here and let go with the row.
                 guard ok, let password = Vault.secret(of: login) else { return }
@@ -239,7 +240,7 @@ struct PasswordsPanel: View {
                 HStack(spacing: 8) {
                     ZStack(alignment: .leading) {
                         if password.isEmpty {
-                            Text("Password").foregroundStyle(Palette.ink.opacity(0.3))
+                            Text("ui.password", bundle: Language.resources).foregroundStyle(Palette.ink.opacity(0.3))
                                 .padding(.leading, 10)
                         }
                         SecureField("", text: $password)
@@ -252,7 +253,7 @@ struct PasswordsPanel: View {
                             .padding(.vertical, 7)
                     }
                     .background(Palette.wash, in: RoundedRectangle(cornerRadius: 9, style: .continuous))
-                    Pill("Save", filled: true, action: keep)
+                    Pill("ui.save", filled: true, action: keep)
                         .disabled(Vault.host(of: site).isEmpty || password.isEmpty)
                 }
             }

@@ -36,19 +36,37 @@ enum AddressCommand: Equatable {
 
     /// What you'd type to reach it. The first is what the list shows.
     var aliases: [String] {
+        let english: [String]
         switch self {
-        case .settings: return ["settings", "preferences"]
-        case .newTab: return ["new tab"]
-        case .newPrivateTab: return ["new private tab", "private tab"]
-        case .newSpace: return ["new space"]
-        case .bookmarks: return ["bookmarks"]
-        case .history: return ["history"]
-        case .downloads: return ["downloads"]
-        case .passwords: return ["passwords"]
-        case .toggleSidebar: return ["toggle sidebar", "sidebar"]
-        case .menu(let id): return [Command.named(id)?.title ?? id]
-        case .page(let page): return ["\(page.title) Settings"]
+        case .settings: english = ["settings", "preferences"]
+        case .newTab: english = ["new tab"]
+        case .newPrivateTab: english = ["new private tab", "private tab"]
+        case .newSpace: english = ["new space"]
+        case .bookmarks: english = ["bookmarks"]
+        case .history: english = ["history"]
+        case .downloads: english = ["downloads"]
+        case .passwords: english = ["passwords"]
+        case .toggleSidebar: english = ["toggle sidebar", "sidebar"]
+        case .menu(let id): english = [Command.named(id)?.title ?? id]
+        case .page(let page): english = ["\(page.title) Settings"]
         }
+        guard Language.shared.effective == .simplifiedChinese else { return english }
+        let chinese: [String]
+        switch self {
+        case .settings: chinese = ["设置", "偏好设置"]
+        case .newTab: chinese = ["新建标签页", "新标签页"]
+        case .newPrivateTab: chinese = ["新建无痕标签页", "无痕标签页"]
+        case .newSpace: chinese = ["新建空间"]
+        case .bookmarks: chinese = ["书签"]
+        case .history: chinese = ["历史记录"]
+        case .downloads: chinese = ["下载"]
+        case .passwords: chinese = ["密码"]
+        case .toggleSidebar: chinese = ["切换侧边栏", "侧边栏"]
+        case .menu(let id):
+            chinese = [Command.named(id)?.localizedTitle ?? english[0]]
+        case .page(let page): chinese = ["\(page.localizedTitle)设置"]
+        }
+        return chinese + english
     }
 
     var title: String {
@@ -117,7 +135,8 @@ enum AddressCommand: Equatable {
     /// Downloads. From three letters, and only offered, never run on Return.
     static func near(_ typed: String, in browser: Browser) -> AddressCommand? {
         let needle = typed.trimmingCharacters(in: .whitespaces).lowercased()
-        guard needle.count >= 3, matching(needle, in: browser) == nil else { return nil }
+        let minimum = needle.unicodeScalars.contains { $0.properties.isIdeographic } ? 2 : 3
+        guard needle.count >= minimum, matching(needle, in: browser) == nil else { return nil }
         let letters = Array(needle.utf8)
         let available = allCases.filter { $0.available(in: browser) }
         // Closest match first, then the order above.
@@ -180,7 +199,8 @@ enum AddressCommand: Equatable {
     /// never for an address.
     static func listed(_ typed: String, in browser: Browser, limit: Int = 4) -> [AddressCommand] {
         let needle = typed.trimmingCharacters(in: .whitespaces).lowercased()
-        guard needle.count >= 3, Address.url(from: needle) == nil else { return [] }
+        let minimum = needle.unicodeScalars.contains { $0.properties.isIdeographic } ? 2 : 3
+        guard needle.count >= minimum, Address.url(from: needle) == nil else { return [] }
         let asked = needle.split(separator: " ")
         let taken = Set([matching(needle, in: browser), near(needle, in: browser)].compactMap { $0?.commandID })
         let candidates = Command.all.map { AddressCommand.menu($0.id) }
@@ -188,12 +208,15 @@ enum AddressCommand: Equatable {
         var first: [AddressCommand] = [], rest: [AddressCommand] = []
         for candidate in candidates {
             if let id = candidate.commandID, taken.contains(id) { continue }
-            let name = candidate.title.lowercased().replacingOccurrences(of: "…", with: "")
+            let names = candidate.aliases.map { $0.lowercased().replacingOccurrences(of: "…", with: "") }
             let extra = candidate.commandID.flatMap { alsoCalled[$0] } ?? ""
-            let words = (name + " " + extra).split(separator: " ")
-            guard asked.allSatisfy({ typed in words.contains { $0.hasPrefix(typed) } }),
+            let matches = names.contains { name in
+                let words = (name + " " + extra).split(separator: " ")
+                return asked.allSatisfy { typed in words.contains { $0.hasPrefix(typed) } }
+            }
+            guard matches,
                   candidate.available(in: browser) else { continue }
-            if name.hasPrefix(needle) { first.append(candidate) } else { rest.append(candidate) }
+            if names.contains(where: { $0.hasPrefix(needle) }) { first.append(candidate) } else { rest.append(candidate) }
         }
         return Array((first + rest).prefix(limit))
     }

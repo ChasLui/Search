@@ -924,6 +924,19 @@ final class Tab: ObservableObject, Identifiable {
         return "New Tab"
     }
 
+    /// Localize only Search's own placeholder and internal pages. A name or
+    /// title supplied by a person or a site is kept exactly as it was given.
+    var displayLabel: String {
+        if let name, !name.isEmpty { return name }
+        if let page {
+            return Language.shared.text("page.\(page.kind.rawValue)", fallback: page.title)
+        }
+        if title.isEmpty, address == nil {
+            return Language.shared.text("tab.new", fallback: "New Tab")
+        }
+        return label
+    }
+
     init(shy: Bool = false, bench: Bool = false, configuration: WKWebViewConfiguration? = nil) {
         self.shy = shy
         self.bench = bench
@@ -2392,7 +2405,7 @@ final class PageView: WKWebView {
         if let index = menu.items.firstIndex(where: { $0.identifier?.rawValue == "WKMenuItemIdentifierOpenLinkInNewWindow" }) {
             let item = menu.items[index]
             if let front = item.copy() as? NSMenuItem {
-                front.title = "Open Link in New Tab and Go to It"
+                front.title = Language.shared.text("context.link_front", fallback: "Open Link in New Tab and Go to It")
                 front.keyEquivalentModifierMask = .option
                 front.isAlternate = true
                 menu.insertItem(front, at: index + 1)
@@ -2401,7 +2414,7 @@ final class PageView: WKWebView {
             // as a pair. A copy of WebKit's item, for what WebKit reads off
             // it when the action reaches it.
             if Shared.prefs.splitView, let beside = item.copy() as? NSMenuItem {
-                beside.title = "Open Link in Split View"
+                beside.title = Language.shared.text("context.link_split", fallback: "Open Link in Split View")
                 beside.identifier = NSUserInterfaceItemIdentifier("SearchOpenLinkInSplitView")
                 beside.keyEquivalentModifierMask = []
                 beside.isAlternate = false
@@ -2413,7 +2426,7 @@ final class PageView: WKWebView {
                 menu.insertItem(beside, at: at)
             }
             openLink = (item.target, item.action)
-            item.title = "Open Link in New Tab"
+            item.title = Language.shared.text("context.link_background", fallback: "Open Link in New Tab")
             item.keyEquivalentModifierMask = []
             item.target = self
             item.action = #selector(openLinkBehind(_:))
@@ -2425,7 +2438,7 @@ final class PageView: WKWebView {
             let item = menu.items[index]
             if let clean = item.copy() as? NSMenuItem {
                 copyLink = (item.target, item.action)
-                clean.title = "Copy Clean Link"
+                clean.title = Language.shared.text("context.copy_clean", fallback: "Copy Clean Link")
                 clean.identifier = NSUserInterfaceItemIdentifier("SearchCopyCleanLink")
                 clean.target = self
                 clean.action = #selector(copyCleanLink(_:))
@@ -2433,7 +2446,8 @@ final class PageView: WKWebView {
             }
         } else if let url, CleanLink.clean(url) != url,
                   let index = menu.items.firstIndex(where: { $0.identifier?.rawValue == "WKMenuItemIdentifierReload" }) {
-            let clean = NSMenuItem(title: "Copy Clean Link", action: #selector(copyCleanPage(_:)), keyEquivalent: "")
+            let clean = NSMenuItem(title: Language.shared.text("context.copy_clean", fallback: "Copy Clean Link"),
+                                   action: #selector(copyCleanPage(_:)), keyEquivalent: "")
             clean.identifier = NSUserInterfaceItemIdentifier("SearchCopyCleanLink")
             clean.target = self
             clean.representedObject = url
@@ -2457,8 +2471,11 @@ final class PageView: WKWebView {
         // comes up, the way a hand would choose it, and the menu goes.
         if Store.testing, let title = PageView.picking {
             PageView.picking = nil
+            let localized = Language.shared.text(title, fallback: title)
             RunLoop.main.perform(inModes: [.eventTracking, .default]) {
-                if let index = menu.items.firstIndex(where: { $0.title == title }) { menu.performActionForItem(at: index) }
+                if let index = menu.items.firstIndex(where: { $0.title == title || $0.title == localized }) {
+                    menu.performActionForItem(at: index)
+                }
                 menu.cancelTracking()
             }
         }
@@ -2474,7 +2491,8 @@ final class PageView: WKWebView {
             evaluateJavaScript(PageView.selected, in: nil, in: .defaultClient) { [weak self] result in
                 self?.selection = (try? result.get()) as? String ?? ""
             }
-            item.title = "Search with \(name)"
+            item.title = String(format: Language.shared.text("context.search_with", fallback: "Search with %@"),
+                                locale: Language.shared.locale, name)
             item.target = self
             item.action = #selector(searchSelection(_:))
         }
@@ -2491,8 +2509,11 @@ final class PageView: WKWebView {
     /// nothing while the switch is off.
     func translateItem() -> NSMenuItem? {
         guard PageTranslator.enabled, let on = translating?() else { return nil }
-        let language = PageTranslator.name(PageTranslator.code(PageTranslator.preferredTarget))
-        let item = NSMenuItem(title: on ? "Show Original" : "Translate Page to \(language)", action: #selector(translatePage(_:)), keyEquivalent: "")
+        let language = PageTranslator.displayName(PageTranslator.code(PageTranslator.preferredTarget))
+        let title = on ? Language.shared.text("context.show_original", fallback: "Show Original")
+            : String(format: Language.shared.text("context.translate_to", fallback: "Translate Page to %@"),
+                     locale: Language.shared.locale, language)
+        let item = NSMenuItem(title: title, action: #selector(translatePage(_:)), keyEquivalent: "")
         item.target = self
         return item
     }

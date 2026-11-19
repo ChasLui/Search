@@ -96,7 +96,7 @@ struct SplitTabItem: View {
         }
         .contentShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
         .accessibilityElement(children: .contain)
-        .accessibilityLabel("Split tabs")
+        .accessibilityLabel(Text("ui.split_tabs", bundle: Language.resources))
         .animation(Motion.quick, value: hovered)
     }
 
@@ -153,13 +153,14 @@ struct SplitTabItem: View {
                 }
                 .padding(.trailing, 7)
                 .transition(.opacity)
-                .help(tab.id == pages.first?.id ? "Close the left page"
-                      : tab.id == pages.last?.id ? "Close the right page" : "Close this page")
+                .help(Text(LocalizedStringKey(tab.id == pages.first?.id ? "Close the left page"
+                      : tab.id == pages.last?.id ? "Close the right page" : "Close this page"), bundle: Language.resources))
         }
     }
 }
 
 private struct SplitTabHalf: View {
+    @ObservedObject private var language = Language.shared
     /// A half's grey across the top: a tab's pill, 15 points of mark and 6
     /// above and below.
     static let pillHeight: CGFloat = 28
@@ -190,7 +191,7 @@ private struct SplitTabHalf: View {
     @State private var selectedOnPress = false
 
     private var hovering: Bool { hovered == tab.id }
-    private var title: String { tab.label.isEmpty ? "New Tab" : tab.label }
+    private var title: String { tab.displayLabel }
     private var playing: Bool { !tab.loading && (tab.noisy || tab.muted) }
     private var editing: Bool { browser.editingTab == tab.id }
     /// Where the page is, said on the half you're on (Settings › Tabs › Show
@@ -251,10 +252,10 @@ private struct SplitTabHalf: View {
         handled
             .accessibilityElement(children: editing ? .contain : .ignore)
             .accessibilityLabel(title)
-            .accessibilityValue(focused ? "Focused page" : "")
-            .accessibilityHint(interactive ? "Click to focus this page; right-click for tab actions" : "")
-            .accessibilityAction(named: "Focus page") { browser.focusPane(tab) }
-            .accessibilityAction(named: "Close tab") { if interactive { browser.closeTab(tab) } }
+            .accessibilityValue(Text(LocalizedStringKey(focused ? "Focused page" : ""), bundle: Language.resources))
+            .accessibilityHint(Text(LocalizedStringKey(interactive ? "Click to focus this page; right-click for tab actions" : ""), bundle: Language.resources))
+            .accessibilityAction(named: Text("Focus page", bundle: Language.resources)) { browser.focusPane(tab) }
+            .accessibilityAction(named: Text("Close tab", bundle: Language.resources)) { if interactive { browser.closeTab(tab) } }
             .help(title)
     }
 
@@ -340,7 +341,7 @@ private struct SplitTabHalf: View {
                     Circle()
                         .fill(Palette.muted)
                         .frame(width: 5, height: 5)
-                        .accessibilityLabel("Asking a question")
+                        .accessibilityLabel(Text("ui.asking_a_question", bundle: Language.resources))
                 }
                 if !narrow {
                     TitleAtRest(label: title, rest: rest, shown: atRest, hovering: hovering,

@@ -16,6 +16,7 @@ final class FindState: ObservableObject {
 /// hairline as everything else that floats, and gone the moment it isn't wanted.
 struct FindBar: View {
     @ObservedObject var browser: Browser
+    @ObservedObject private var language = Language.shared
     var availableWidth: CGFloat? = nil
     var onPillFrame: ((CGRect) -> Void)? = nil
     /// The words and the page's answer, which `browser` doesn't announce.
@@ -38,14 +39,14 @@ struct FindBar: View {
         HStack(spacing: 6) {
             ZStack(alignment: .leading) {
                 if browser.needle.isEmpty {
-                    Text("Find on page")
+                    Text("ui.find_on_page", bundle: Language.resources)
                         .foregroundStyle(Palette.ink.opacity(0.3))
                 }
                 TextField("", text: $browser.needle)
                     .textFieldStyle(.plain)
                     .foregroundStyle(Palette.ink)
-                    .accessibilityLabel("Find on page")
-                    .accessibilityHint("Type text to search this page. Press Return to find the next match.")
+                    .accessibilityLabel(Text("ui.find_on_page", bundle: Language.resources))
+                    .accessibilityHint(Text("ui.type_text_to_search_this_page_press_return_to_find_the_", bundle: Language.resources))
                     .focused($focused)
                     .onSubmit { browser.look(forward: true) }
             }
@@ -53,7 +54,7 @@ struct FindBar: View {
             .frame(width: fieldWidth)
 
             // "3 of 17", as the page counted it.
-            if let status = browser.findStatus {
+            if let status = displayStatus {
                 Text(status)
                     .font(.system(size: 10, weight: .medium))
                     .foregroundStyle(browser.missed ? Color.red.opacity(0.8) : Palette.muted)
@@ -75,11 +76,11 @@ struct FindBar: View {
             }
 
             Menu {
-                Toggle("Match case", isOn: $browser.matchCase)
-                    .help("Match uppercase and lowercase letters exactly.")
-                Toggle("Whole words", isOn: $browser.wholeWords)
+                Toggle(isOn: $browser.matchCase) { Text("ui.match_case", bundle: Language.resources) }
+                    .help(Text("ui.match_uppercase_and_lowercase_letters_exactly", bundle: Language.resources))
+                Toggle(isOn: $browser.wholeWords) { Text("ui.whole_words", bundle: Language.resources) }
                     .disabled(browser.findResult?.nativeFallback == true && !browser.wholeWords)
-                    .help("Match complete words. This option is unavailable for PDF pages.")
+                    .help(Text("ui.match_complete_words_this_option_is_unavailable_for_pdf", bundle: Language.resources))
             } label: {
                 Image(systemName: "ellipsis")
                     .font(.system(size: 10, weight: .semibold))
@@ -90,9 +91,9 @@ struct FindBar: View {
             .menuStyle(.borderlessButton)
             .menuIndicator(.hidden)
             .fixedSize()
-            .accessibilityLabel("Search options")
-            .accessibilityHint("Choose whether to match case or whole words.")
-            .help("Search options")
+            .accessibilityLabel(Text("ui.search_options", bundle: Language.resources))
+            .accessibilityHint(Text("ui.choose_whether_to_match_case_or_whole_words", bundle: Language.resources))
+            .help(Text("ui.search_options", bundle: Language.resources))
 
             step("xmark", label: "Close Find on Page", help: "Close the find field and clear its selection.") {
                 browser.closeFind()
@@ -117,9 +118,21 @@ struct FindBar: View {
         .frame(maxWidth: availableWidth == nil ? nil : .infinity,
                maxHeight: availableWidth == nil ? nil : .infinity, alignment: .topTrailing)
         .coordinateSpace(name: "find")
+        .environment(\.locale, language.locale)
         .animation(Motion.quick, value: browser.missed)
         .onAppear(perform: focus)
         .onChange(of: browser.findFocus) { _, _ in focus() }
+    }
+
+    private var displayStatus: String? {
+        guard browser.findStatus != nil, let result = browser.findResult else { return nil }
+        guard result.available else { return language.text("find.unavailable", fallback: "Search unavailable") }
+        if result.nativeFallback {
+            if browser.wholeWords && !result.wholeWordsAvailable { return language.text("find.whole_words_unavailable", fallback: "Whole words unavailable") }
+            return result.found ? language.text("find.match_found", fallback: "Match found") : language.text("find.no_matches", fallback: "No matches")
+        }
+        guard let index = result.index, let count = result.count, count > 0 else { return language.text("find.no_matches", fallback: "No matches") }
+        return language.format("find.result", fallback: "%1$@ of %2$@", index.formatted(), count.formatted() + (result.more ? "+" : ""))
     }
 
     /// Into the field, and once more a moment later if it didn't take: as
@@ -147,8 +160,8 @@ struct FindBar: View {
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .accessibilityLabel(label)
-        .accessibilityHint(help)
-        .help(help)
+        .accessibilityLabel(Text(LocalizedStringKey(label), bundle: Language.resources))
+        .accessibilityHint(Text(LocalizedStringKey(help), bundle: Language.resources))
+        .help(Text(LocalizedStringKey(help), bundle: Language.resources))
     }
 }

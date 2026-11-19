@@ -163,8 +163,8 @@ final class Sync: ObservableObject {
         panel.canChooseDirectories = true
         panel.canChooseFiles = false
         panel.canCreateDirectories = true
-        panel.message = "Choose a folder your Macs share, in iCloud Drive or Dropbox for example. Turn on sync with the same folder in Search on each Mac."
-        panel.prompt = "Sync Here"
+        panel.message = Language.shared.text("panel.sync.message", fallback: "Choose a folder your Macs share, in iCloud Drive or Dropbox for example. Turn on sync with the same folder in Search on each Mac.")
+        panel.prompt = Language.shared.text("panel.sync.prompt", fallback: "Sync Here")
         let drive = FileManager.default.homeDirectoryForCurrentUser
             .appendingPathComponent("Library/Mobile Documents/com~apple~CloudDocs", isDirectory: true)
         if FileManager.default.fileExists(atPath: drive.path) { panel.directoryURL = drive }
@@ -412,10 +412,16 @@ final class Sync: ObservableObject {
         let drive = NSHomeDirectory() + "/Library/Mobile Documents/com~apple~CloudDocs"
         if place.hasPrefix(drive) { place = "iCloud Drive" + place.dropFirst(drive.count) }
         place = place.replacingOccurrences(of: NSHomeDirectory(), with: "~")
-        if let problem { return "\(place): \(problem.lowercased())" }
+        if let problem {
+            let language = Language.shared
+            let reason = language.effective == .english ? problem.lowercased() : language.text(problem, fallback: problem)
+            return language.format("sync.problem", fallback: "%1$@: %2$@", place, reason)
+        }
         guard let lastSynced else { return place }
-        let when = RelativeDateTimeFormatter().localizedString(for: lastSynced, relativeTo: Date())
-        let with = others.isEmpty ? "no other Mac yet" : others.joined(separator: ", ")
-        return "\(place) · \(with) · \(when)"
+        let formatter = RelativeDateTimeFormatter()
+        formatter.locale = Language.shared.locale
+        let when = formatter.localizedString(for: lastSynced, relativeTo: Date())
+        let with = others.isEmpty ? Language.shared.text("sync.no_other_mac", fallback: "no other Mac yet") : others.joined(separator: ", ")
+        return Language.shared.format("sync.summary", fallback: "%1$@ · %2$@ · %3$@", place, with, when)
     }
 }

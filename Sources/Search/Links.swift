@@ -33,10 +33,13 @@ final class Links: NSObject, NSApplicationDelegate {
         askingToQuit = true
         defer { askingToQuit = false }
         let alert = NSAlert()
-        alert.messageText = "Quit Search?"
-        alert.informativeText = "Your windows and tabs will close."
-        alert.addButton(withTitle: "Quit").keyEquivalent = ""
-        let cancel = alert.addButton(withTitle: "Cancel")
+        alert.messageText = Language.shared.text("dialog.quit.title", fallback: "Quit Search?")
+        alert.informativeText = Language.shared.text("dialog.quit.detail", fallback: "Your windows and tabs will close.")
+        let quit = alert.addButton(withTitle: Language.shared.text("dialog.quit.button", fallback: "Quit"))
+        quit.keyEquivalent = ""
+        quit.setAccessibilityIdentifier("quit.confirm")
+        let cancel = alert.addButton(withTitle: Language.shared.text("Cancel", fallback: "Cancel"))
+        cancel.setAccessibilityIdentifier("quit.cancel")
         alert.window.defaultButtonCell = cancel.cell as? NSButtonCell
         // Making Cancel the Return default replaces its Escape equivalent.
         let escape = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
@@ -213,7 +216,8 @@ final class Links: NSObject, NSApplicationDelegate {
     /// New Window in the Dock icon's menu, as every browser has it.
     func applicationDockMenu(_ sender: NSApplication) -> NSMenu? {
         let menu = NSMenu()
-        let item = NSMenuItem(title: "New Window", action: #selector(newWindow), keyEquivalent: "")
+        let item = NSMenuItem(title: Language.shared.text("context.new_window", fallback: "New Window"),
+                              action: #selector(newWindow), keyEquivalent: "")
         item.target = self
         menu.addItem(item)
         return menu

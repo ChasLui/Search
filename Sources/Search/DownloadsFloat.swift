@@ -39,7 +39,7 @@ enum DownloadsFloat {
             .background(Palette.ground)
             .modifier(CardEdge(on: true))
         let presence = Presence()
-        let host = FirstClick(rootView: AnyView(Arrival(presence: presence, edge: edge) { card }))
+        let host = FirstClick(rootView: AnyView(LanguageRoot(content: Arrival(presence: presence, edge: edge) { card })))
         let panel = Panel(contentRect: .zero, styleMask: [.borderless, .nonactivatingPanel],
                           backing: .buffered, defer: false)
         panel.contentView = host

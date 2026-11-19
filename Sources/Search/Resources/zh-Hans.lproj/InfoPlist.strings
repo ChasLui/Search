@@ -1,0 +1,6 @@
+"NSCameraUsageDescription" = "你访问的网站可能会请求使用摄像头。每个网站首次请求时 Search 会征求你的同意并记住选择，你可以在“设置 › 隐私”中清除这些选择。";
+"NSContactsUsageDescription" = "当你在输入框下方选取自己的联系信息后，Search 会用“通讯录”中你的个人名片填写表单。Search 不会读取其他人的名片，也不会保存你的名片副本。";
+"NSDownloadsFolderUsageDescription" = "你下载的文件会保存在“下载”文件夹中。";
+"NSLocationUsageDescription" = "你访问的网站可能会请求获取位置。Search 会在网站每次请求时征求你的同意，除非你为该网站选择“始终允许”。你可以在“设置 › 隐私”中清除这些选择。";
+"NSLocationWhenInUseUsageDescription" = "你访问的网站可能会请求获取位置。Search 会在网站每次请求时征求你的同意，除非你为该网站选择“始终允许”。你可以在“设置 › 隐私”中清除这些选择。";
+"NSMicrophoneUsageDescription" = "你访问的网站可能会请求使用麦克风。每个网站首次请求时 Search 会征求你的同意并记住选择，你可以在“设置 › 隐私”中清除这些选择。";

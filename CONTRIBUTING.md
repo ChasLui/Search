@@ -29,6 +29,13 @@ Fixes and things every browser is expected to do (Tab moving between a form's fi
 - **Matches the existing style.** Comments here explain *why*, not *what the next line does* — read a couple of existing files before adding a new one. No force-unwraps on anything that can plausibly fail (a network response, a file read, a keychain lookup).
 - **Builds clean.** `swift build` with zero warnings you introduced.
 
+Run `python3 Tests/check-localization.py --base <upstream-revision>` when
+merging upstream changes. Review the listed new interface text and English
+wording changes, then update both language resources before shipping. Give new
+strings stable keys that do not change when the English wording does. The CI
+test runner checks that both resources and their format arguments agree. The
+source-text scan is a guide; also review the diff for UI text it cannot detect.
+
 ## What doesn't
 
 - Rewrites of things that already work, for style reasons alone.

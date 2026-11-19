@@ -86,6 +86,7 @@ extension Browser {
 /// The row itself, above the doors at the foot of the sidebar. A card's
 /// hairline rather than a tab's ground, so it never reads as one more tab.
 struct PlayerRow: View {
+    @ObservedObject private var language = Language.shared
     @Environment(\.greys) private var greys
     @ObservedObject var browser: Browser
     @ObservedObject var prefs: Preferences
@@ -96,7 +97,7 @@ struct PlayerRow: View {
     var body: some View {
         HStack(spacing: 8) {
             Mark(icon: tab.icon, letter: tab.monogram, size: prefs.roomyTabs ? 17 : 15)
-            Text(tab.label)
+            Text(tab.displayLabel)
                 .font(.system(size: prefs.sideTitle))
                 .lineLimit(1)
                 .truncationMode(.tail)
@@ -129,7 +130,7 @@ struct PlayerRow: View {
         // to the tab.
         .onTapGesture { browser.select(tab) }
         .onHover { hovering = $0 }
-        .help("Go to the tab")
+        .help(Text("ui.go_to_the_tab", bundle: Language.resources))
         .animation(Motion.quick, value: hovering)
         .animation(Motion.quick, value: tab.stilled)
     }
@@ -155,7 +156,7 @@ private struct PlayerButton: View {
         }
         .buttonStyle(.plain)
         .onHover { hovering = $0 }
-        .help(help)
+        .help(Text(LocalizedStringKey(help), bundle: Language.resources))
         .animation(Motion.quick, value: hovering)
     }
 }

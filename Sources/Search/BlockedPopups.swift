@@ -127,6 +127,7 @@ extension Browser {
 /// The sign beside a tab's title while its page has had a window refused:
 /// quiet, the size of the other marks there, and gone with the page.
 struct PopupSign: View {
+    @ObservedObject private var language = Language.shared
     /// Handed on to the list it opens, which watches it; the sign itself,
     /// in every tab's row, shows only the tab's.
     let browser: Browser
@@ -152,8 +153,8 @@ struct PopupSign: View {
             }
             .buttonStyle(.plain)
             .onHover { hovering = $0 }
-            .help(tab.blockedPopups.count == 1 ? "Pop-up blocked" : "\(tab.blockedPopups.count) pop-ups blocked")
-            .accessibilityLabel("Pop-up blocked")
+            .help(Text(language.count("count.blocked_popups", tab.blockedPopups.count)))
+            .accessibilityLabel(Text("ui.pop_up_blocked", bundle: Language.resources))
             .popover(isPresented: $showing, arrowEdge: .bottom) {
                 BlockedPopupsMenu(browser: browser, tab: tab) { showing = false }
             }
@@ -166,6 +167,7 @@ struct PopupSign: View {
 /// What the sign offers: each refused window to open, newest first, and
 /// Always Allow for the site.
 struct BlockedPopupsMenu: View {
+    @ObservedObject private var language = Language.shared
     @ObservedObject var browser: Browser
     @ObservedObject var tab: Tab
     let done: () -> Void
@@ -176,7 +178,7 @@ struct BlockedPopupsMenu: View {
             BlockedPopups.openable(popup.url).map { (popup, $0) }
         }
         VStack(alignment: .leading, spacing: 0) {
-            Text(tab.blockedPopups.count == 1 ? "Pop-up blocked" : "\(tab.blockedPopups.count) pop-ups blocked")
+            CountText(key: "count.blocked_popups", count: tab.blockedPopups.count)
                 .font(.system(size: 11, weight: .medium))
                 .foregroundStyle(Palette.muted)
                 .padding(.horizontal, 16)
@@ -185,7 +187,7 @@ struct BlockedPopupsMenu: View {
             if !openable.isEmpty {
                 VStack(spacing: 1) {
                     ForEach(openable, id: \.0.id) { popup, url in
-                        Item(symbol: "arrow.up.forward.square", title: "Open \(BlockedPopups.label(url))") {
+                        Item(symbol: "arrow.up.forward.square", title: language.format("popup.open", fallback: "Open %1$@", BlockedPopups.label(url))) {
                             browser.openBlocked(popup, from: tab)
                             done()
                         }
@@ -197,11 +199,11 @@ struct BlockedPopupsMenu: View {
             if let site {
                 Divider().overlay(Palette.hairline)
                 Item(symbol: "checkmark.circle",
-                     title: tab.shy ? "Allow Pop-ups from \(site) in This Tab" : "Always Allow Pop-ups from \(site)", lines: 2) {
+                     title: tab.shy ? language.format("popup.allow_private", fallback: "Allow Pop-ups from %1$@ in This Tab", site) : language.format("popup.always_allow", fallback: "Always Allow Pop-ups from %1$@", site), lines: 2) {
                     browser.allowPopups(from: tab)
                     done()
                 }
-                .help(tab.shy ? "Only until this private tab closes" : "Settings › Privacy lists the sites you allow")
+                .help(Text(LocalizedStringKey(tab.shy ? "popup.private_hint" : "popup.settings_hint"), bundle: Language.resources))
                 .padding(6)
             }
         }
@@ -241,8 +243,8 @@ struct PopupSiteList: View {
     var body: some View {
         ForEach(prefs.popupSites.sorted(), id: \.self) { site in
             Rule()
-            Line(site, "Can open pop-ups without a click") {
-                Pill("Remove") { prefs.popupSites.remove(site) }
+            Line(site, "ui.can_open_pop_ups_without_a_click", localizedDetail: true) {
+                Pill("ui.remove") { prefs.popupSites.remove(site) }
             }
         }
     }

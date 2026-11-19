@@ -195,11 +195,11 @@ enum Browsers {
         let popup = browser.isPopup
         let host: NSView
         if popup {
-            let view = NSHostingView(rootView: PopupWindowView(browser: browser).frame(minWidth: 200, minHeight: 150))
+            let view = NSHostingView(rootView: LanguageRoot(content: PopupWindowView(browser: browser).frame(minWidth: 200, minHeight: 150)))
             view.sizingOptions = [.minSize]
             host = view
         } else {
-            let view = NSHostingView(rootView: ContentView(browser: browser).frame(minWidth: 640, minHeight: 420))
+            let view = NSHostingView(rootView: LanguageRoot(content: ContentView(browser: browser).frame(minWidth: 640, minHeight: 420)))
             view.sizingOptions = [.minSize]
             host = view
         }
@@ -598,7 +598,8 @@ extension Browser {
     /// How a menu names this window: the page in front, as the Window menu
     /// does, and the space when there are spaces.
     var windowName: String {
-        let page = active.map { $0.isBlank ? "New Tab" : $0.label } ?? "Window"
+        let page = active.map { $0.isBlank ? Language.shared.text("tab.new", fallback: "New Tab") : $0.displayLabel }
+            ?? Language.shared.text("ui.window", fallback: "Window")
         var name = prefs.usesSpaces ? "\(page) — \(space.name)" : page
         if Profiles.shared.several { name += " (\(Profiles.shared.profile(profileID).name))" }
         return name

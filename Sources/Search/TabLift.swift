@@ -65,8 +65,8 @@ final class TabLift {
             animationBehavior = .none
             level = .floating
             collectionBehavior = [.fullScreenAuxiliary, .ignoresCycle, .transient]
-            let host = NSHostingView(rootView: Lifted(model: model).padding(Panel.margin)
-                .frame(width: Panel.size.width, height: Panel.size.height, alignment: .topLeading))
+            let host = NSHostingView(rootView: LanguageRoot(content: Lifted(model: model).padding(Panel.margin)
+                .frame(width: Panel.size.width, height: Panel.size.height, alignment: .topLeading)))
             host.sizingOptions = []
             contentView = host
         }

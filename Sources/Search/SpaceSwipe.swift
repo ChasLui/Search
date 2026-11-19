@@ -309,7 +309,8 @@ struct NewSpaceCard: View {
     @FocusState private var typing: Bool
 
     private var saying: String {
-        shared ? "Signed in wherever your other spaces are." : "Its own cookies and sign-ins, starting from none."
+        shared ? Language.shared.text("space.shared_signins", fallback: "Signed in wherever your other spaces are.")
+               : Language.shared.text("space.separate_signins", fallback: "Its own cookies and sign-ins, starting from none.")
     }
 
     var body: some View {
@@ -320,21 +321,21 @@ struct NewSpaceCard: View {
                     pick(size: 13, box: CGSize(width: 28, height: 26))
                     field
                         .frame(width: 170)
-                    Segmented(options: [(true, "Signed in"), (false, "Signed out")], selection: $shared)
+                    Segmented(options: [(true, "Signed in"), (false, "Signed out")], selection: $shared, localized: true)
                         .fixedSize()
                         .help(saying)
-                    Pill("Cancel") { cancel() }
-                    Pill("Create", filled: true) { create() }
+                    Pill("ui.cancel") { cancel() }
+                    Pill("ui.create", filled: true) { create() }
                 }
                 .frame(height: Metrics.strip)
             } else {
                 VStack(spacing: 12) {
                     pick(size: 20, box: CGSize(width: 44, height: 40))
                     VStack(spacing: 4) {
-                        Text("New space")
+                        Text("ui.new_space", bundle: Language.resources)
                             .font(.system(size: 13, weight: .semibold))
                             .foregroundStyle(Palette.ink)
-                        Text("Its own tabs.")
+                        Text("ui.its_own_tabs", bundle: Language.resources)
                             .font(.system(size: 11))
                             .foregroundStyle(Palette.muted)
                             .multilineTextAlignment(.center)
@@ -343,7 +344,7 @@ struct NewSpaceCard: View {
                     // Most people want Google and the rest to know them here too;
                     // some want a clean slate.
                     VStack(spacing: 6) {
-                        Segmented(options: [(true, "Signed in"), (false, "Signed out")], selection: $shared, wide: true)
+                        Segmented(options: [(true, "Signed in"), (false, "Signed out")], selection: $shared, wide: true, localized: true)
                         Text(saying)
                             .font(.system(size: 11))
                             .foregroundStyle(Palette.muted)
@@ -351,8 +352,8 @@ struct NewSpaceCard: View {
                             .fixedSize(horizontal: false, vertical: true)
                     }
                     HStack(spacing: 8) {
-                        Pill("Cancel") { cancel() }
-                        Pill("Create", filled: true) { create() }
+                        Pill("ui.cancel") { cancel() }
+                        Pill("ui.create", filled: true) { create() }
                     }
                 }
                 .padding(16)
@@ -384,12 +385,12 @@ struct NewSpaceCard: View {
         }
         .buttonStyle(.plain)
         .onHover { hovering = $0 }
-        .help(inline ? "New space — choose its icon" : "Choose an icon")
+        .help(Text(LocalizedStringKey(inline ? "New space — choose its icon" : "Choose an icon"), bundle: Language.resources))
         .popover(isPresented: $choosing, arrowEdge: .bottom) { icons }
     }
 
     private var field: some View {
-        TextField(inline ? "New space" : "Name", text: $name)
+        TextField(Language.shared.text(inline ? "New space" : "Name", fallback: inline ? "New space" : "Name"), text: $name)
             .textFieldStyle(.plain)
             .font(.system(size: inline ? 12.5 : 13))
             .padding(.horizontal, 10)
@@ -418,7 +419,7 @@ struct NewSpaceCard: View {
                         choosing = false
                         typing = true
                     }
-                    .help(name)
+                    .help(Language.shared.text("icon.\(name)", fallback: name))
             }
         }
         .padding(10)

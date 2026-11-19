@@ -69,13 +69,14 @@ enum IconTiles {
     }
 
     /// The tooltip: the title, then what a row would have said beside it.
-    static func tip(_ tab: Tab, address: AtRest?) -> String {
-        var lines = [tab.label.isEmpty ? "New Tab" : tab.label]
+    static func tip(_ tab: Tab, address: AtRest?, localized: Bool = false) -> String {
+        var lines = [localized ? tab.displayLabel : tab.label]
         if let address { lines.append(address.lead + address.name + address.tail) }
         var marks: [String] = []
         if tab.shy { marks.append("Private") }
         if tab.recording { marks.append("Recording") }
         if !tab.loading && tab.muted { marks.append("Muted") } else if !tab.loading && tab.noisy { marks.append("Playing sound") }
+        if localized { marks = marks.map { Language.shared.text($0, fallback: $0) } }
         if !marks.isEmpty { lines.append(marks.joined(separator: " · ")) }
         return lines.joined(separator: "\n")
     }
@@ -83,6 +84,7 @@ enum IconTiles {
 
 /// One tab as a tile of the column of icons.
 struct IconTile: View {
+    @ObservedObject private var language = Language.shared
     @Environment(\.greys) private var greys
     @Environment(\.tabShortcutNumbers) private var shortcutNumbers
     @ObservedObject var browser: Browser
@@ -103,6 +105,7 @@ struct IconTile: View {
 
     private var rest: AtRest? { live ? AtRest.said(tab.restAddress, always: prefs.showsAddress) : nil }
     private var tip: String { IconTiles.tip(tab, address: rest) }
+    private var displayTip: String { IconTiles.tip(tab, address: rest, localized: true) }
     private var speaker: Bool { !tab.loading && (tab.noisy || tab.muted) }
     private var closable: Bool { interactive && live && tab.pin == nil }
 
@@ -202,11 +205,11 @@ struct IconTile: View {
         }
         // The title, after the system's tooltip delay. Nothing else comes
         // out under the pointer: no title sliding out, no column widening.
-        .help(tip)
+        .help(displayTip)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(tip)
+        .accessibilityLabel(displayTip)
         .accessibilityAddTraits(.isButton)
-        .accessibilityAction(named: "Close tab") { if interactive { close() } }
+        .accessibilityAction(named: Text("Close tab", bundle: Language.resources)) { if interactive { close() } }
         .animation(nil, value: hovering)
         .animation(Motion.quick, value: tab.loading)
         .animation(Motion.quick, value: speaker)
@@ -244,7 +247,7 @@ private struct CornerSpeaker: View {
                 .contentShape(Circle())
         }
         .buttonStyle(.plain)
-        .help(tab.muted ? "Unmute Tab" : "Mute Tab")
+        .help(Text(LocalizedStringKey(tab.muted ? "Unmute Tab" : "Mute Tab"), bundle: Language.resources))
         .offset(x: 3, y: 3)
     }
 }
@@ -291,7 +294,7 @@ struct IconPair: View {
             if interactive && Store.testing, let first, let last, IconTiles.pairs[first] == last { IconTiles.pairs[first] = nil }
         }
         .accessibilityElement(children: .contain)
-        .accessibilityLabel("Split tabs")
+        .accessibilityLabel(Text("ui.split_tabs", bundle: Language.resources))
     }
 
     private func half(_ tab: Tab) -> some View {

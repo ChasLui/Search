@@ -313,9 +313,9 @@ final class SpaceGradientTests: XCTestCase {
         XCTAssertEqual(browser.space.lookChoice, .colour(4))
 
         let titles = SpaceMenu.menu(for: browser).items.map(\.title)
-        XCTAssertTrue(titles.contains("Colour…"))
+        XCTAssertTrue(titles.contains { Language.matches($0, english: "Colour…") })
         XCTAssertFalse(titles.contains("Colour"), "no submenu")
-        XCTAssertNil(SpaceMenu.menu(for: browser).items.first { $0.title == "Colour…" }?.submenu)
+        XCTAssertNil(SpaceMenu.menu(for: browser).items.first { Language.matches($0.title, english: "Colour…") }?.submenu)
     }
 
     func testFoundInSettings() {

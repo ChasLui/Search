@@ -5,6 +5,7 @@ import SwiftUI
 /// narrowed by name or key. Click a key and press the new one; right-click
 /// to clear it or put the default back.
 struct ShortcutsPage: View {
+    @ObservedObject private var language = Language.shared
     @ObservedObject var browser: Browser
     @ObservedObject var store: ShortcutStore
     @ObservedObject var prefs: Preferences
@@ -24,6 +25,7 @@ struct ShortcutsPage: View {
         guard !words.isEmpty else { return true }
         let key = store.key(for: command.id)?.display ?? ""
         return command.title.localizedCaseInsensitiveContains(words)
+            || command.localizedTitle.localizedCaseInsensitiveContains(words)
             || key.localizedCaseInsensitiveContains(words.replacingOccurrences(of: " ", with: ""))
     }
 
@@ -31,22 +33,22 @@ struct ShortcutsPage: View {
         VStack(alignment: .leading, spacing: 18) {
             Hunt(text: $hunt, prompt: "Search commands or keys", focus: $hunting)
             let found = Command.all.filter(shown)
-            if found.isEmpty { Nothing("No command called that, or on that key") }
+            if found.isEmpty { Nothing("ui.no_command_called_that_or_on_that_key") }
             ForEach(Command.Section.allCases, id: \.self) { section in
                 let commands = found.filter { $0.section == section }
                 if !commands.isEmpty {
                 VStack(alignment: .leading, spacing: 6) {
-                    Caption(section.rawValue)
+                    Caption(section == .app ? section.rawValue : language.text(section.rawValue, fallback: section.rawValue))
                     Card {
                         ForEach(Array(commands.enumerated()), id: \.element.id) { index, command in
                             if index > 0 { Rule() }
-                            Line(command.title) {
+                            Line(command.localizedTitle) {
                                 KeyBox(browser: browser, store: store, id: command.id)
                             }
                             .contextMenu {
-                                Button("Clear Shortcut") { store.clear(command.id) }
+                                Button { store.clear(command.id) } label: { Text("ui.clear_shortcut", bundle: Language.resources) }
                                     .disabled(store.key(for: command.id) == nil)
-                                Button("Reset to Default") { store.reset(command.id) }
+                                Button { store.reset(command.id) } label: { Text("ui.reset_to_default", bundle: Language.resources) }
                                     .disabled(!store.isChanged(command.id))
                             }
                         }
@@ -56,7 +58,7 @@ struct ShortcutsPage: View {
             }
             if #available(macOS 15.4, *) { extensionCommands }
             if store.anyChanged || prefs.peekClick != .shift, hunt.isEmpty {
-                Pill("Reset All to Defaults") {
+                Pill("ui.reset_all_to_defaults") {
                     store.resetAll()
                     prefs.peekClick = .shift
                 }
@@ -78,7 +80,7 @@ extension ShortcutsPage {
         }
         if !commands.isEmpty {
             VStack(alignment: .leading, spacing: 6) {
-                Caption("Extensions")
+                Caption("ui.extensions", localized: true)
                 Card {
                     ForEach(Array(commands.enumerated()), id: \.element.id) { index, item in
                         if index > 0 { Rule() }
@@ -86,9 +88,9 @@ extension ShortcutsPage {
                             KeyBox(browser: browser, store: store, id: item.id)
                         }
                         .contextMenu {
-                            Button("Clear Shortcut") { store.clear(item.id) }
+                            Button { store.clear(item.id) } label: { Text("ui.clear_shortcut", bundle: Language.resources) }
                                 .disabled(store.key(for: item.id) == nil)
-                            Button("Reset to Default") { store.reset(item.id) }
+                            Button { store.reset(item.id) } label: { Text("ui.reset_to_default", bundle: Language.resources) }
                                 .disabled(!store.isChanged(item.id))
                         }
                     }
@@ -102,6 +104,7 @@ extension ShortcutsPage {
 /// here, from whichever command had it. Esc stops without changing it,
 /// ⌫ takes it off.
 private struct KeyBox: View {
+    @ObservedObject private var language = Language.shared
     let browser: Browser
     @ObservedObject var store: ShortcutStore
     /// A menu command's id, or an extension command's ("ext:…").
@@ -132,18 +135,19 @@ private struct KeyBox: View {
         }
         .buttonStyle(.plain)
         // What the Shortcuts group's line under its title used to say.
-        .help("Click, then press the new shortcut")
+        .help(Text("Click, then press the new shortcut", bundle: Language.resources))
         .onHover { hovering = $0 }
         .onDisappear(perform: stop)
     }
 
     private var label: String {
         if let taking, let other = store.owner(of: taking, except: id) {
-            return "Used by \(other.title) — press again"
+            let title = Command.named(other.id)?.localizedTitle ?? other.title
+            return language.format("shortcut.used_by", fallback: "Used by %1$@ — press again", title)
         }
-        if let note { return note }
-        if listening { return "Type a shortcut" }
-        return store.key(for: id)?.display ?? "None"
+        if let note { return language.text(note, fallback: note) }
+        if listening { return language.text("shortcut.type", fallback: "Type a shortcut") }
+        return store.key(for: id)?.display ?? language.text("shortcut.none", fallback: "None")
     }
 
     private func listen() {
@@ -183,7 +187,12 @@ private struct KeyBox: View {
         let other = store.owner(of: combo, except: id)
         store.assign(combo, to: id)
         stop()
-        if let other { browser.announce("\(combo.display) moved from \(other.title)") }
+        if let other {
+            browser.announce("\(combo.display) moved from \(other.title)", localized: {
+                Language.shared.format("announcement.shortcut_moved", fallback: "%1$@ moved from %2$@",
+                                       combo.display, Command.named(other.id)?.localizedTitle ?? other.title)
+            })
+        }
     }
 
     /// Why that key won't do, for a moment, still listening.

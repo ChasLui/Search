@@ -622,9 +622,9 @@ struct Helm: View {
                 // button. Nothing to offer while the door is Stop.
                 .contextMenu {
                     if !tab.loading && tab.isWeb {
-                        Button("Reload Page") { browser.reload() }
+                        Button { browser.reload() } label: { Text("ui.reload_page", bundle: Language.resources) }
                             .shortcut("view.reload")
-                        Button("Reload Page From Origin") { browser.reload(fromOrigin: true) }
+                        Button { browser.reload(fromOrigin: true) } label: { Text("ui.reload_page_from_origin", bundle: Language.resources) }
                             .shortcut("view.reloadOrigin")
                     }
                 }
@@ -680,6 +680,7 @@ enum Rewind {
 
 /// It doesn't watch the Browser, as a row in the column doesn't (SideRow).
 private struct TabPill: View, Equatable {
+    @ObservedObject private var language = Language.shared
     @Environment(\.tabShortcutNumbers) private var shortcutNumbers
     @Environment(\.rowCarrying) private var rowCarrying
     let browser: Browser
@@ -817,7 +818,7 @@ private struct TabPill: View, Equatable {
         .overlay { MiddleClick(act: close) }
         .onHover { hovering = $0 }
         .contextMenu { TabMenu(browser: browser, tab: tab, close: close) }
-        .help(pinned || compact ? tab.label : "")
+        .help(pinned || compact ? tab.displayLabel : "")
         .animation(nil, value: hovering)
         .animation(Motion.glide, value: editing)
         .animation(Motion.glide, value: tab.pin)
@@ -878,7 +879,7 @@ private struct TabPill: View, Equatable {
                     Image(systemName: tab.agent ? "cursorarrow.rays" : "flask")
                         .font(.system(size: 9))
                         .foregroundStyle(colour.opacity(0.7))
-                        .help(tab.agent ? "Opened by a coding agent" : "Opened by a script")
+                        .help(Text(LocalizedStringKey(tab.agent ? "Opened by a coding agent" : "Opened by a script"), bundle: Language.resources))
                 }
                 if tab.shy {
                     // Quiet, and only on the tabs that keep nothing.
@@ -891,13 +892,13 @@ private struct TabPill: View, Equatable {
                     Image(systemName: "record.circle")
                         .font(.system(size: 10))
                         .foregroundStyle(colour.opacity(0.8))
-                        .help("Recording")
+                        .help(Text("ui.recording", bundle: Language.resources))
                 }
                 // A window the page asked for was refused (BlockedPopups).
                 PopupSign(browser: browser, tab: tab, colour: colour)
                 // The page is translated (Translate.swift).
                 TranslateSign(tab: tab, colour: colour)
-                TitleAtRest(label: tab.label, rest: rest, shown: atRest, hovering: hovering,
+                TitleAtRest(label: tab.displayLabel, rest: rest, shown: atRest, hovering: hovering,
                             size: 12.5, colour: colour, roomy: false)
             }
 
@@ -1528,7 +1529,7 @@ struct TabMenu: View {
         singleMenu
         if browser.selectedTabIDs.contains(tab.id) && browser.visibleSelectedTabCount > 1 {
             Divider()
-            Button("Copy Addresses") { browser.copySelectedTabLinks() }
+            Button { browser.copySelectedTabLinks() } label: { Text("ui.copy_addresses", bundle: Language.resources) }
                 .disabled(browser.selectedTabLinkCount == 0)
         }
     }
@@ -1539,11 +1540,11 @@ struct TabMenu: View {
             // Right-clicked among tabs picked in the column: all of them, as
             // a drag onto a group takes them (see carried).
             let moving = browser.carried(with: tab)
-            Menu("Move to Group") {
-                Button("New Group") {
+            Menu {
+                Button {
                     let id = browser.addTabGroup(containing: tab)
                     for other in moving where other !== tab { browser.move(other, toGroup: id) }
-                }
+                } label: { Text("ui.new_group", bundle: Language.resources) }
                 if !browser.tabGroups.isEmpty { Divider() }
                 ForEach(browser.tabGroups) { group in
                     Button(group.name) { for each in moving { browser.move(each, toGroup: group.id) } }
@@ -1551,74 +1552,74 @@ struct TabMenu: View {
                 }
                 if moving.contains(where: { $0.groupID != nil }) {
                     Divider()
-                    Button("Remove from Group") { for each in moving { browser.move(each, toGroup: nil) } }
+                    Button { for each in moving { browser.move(each, toGroup: nil) } } label: { Text("ui.remove_from_group", bundle: Language.resources) }
                 }
-            }
+            } label: { Text("ui.move_to_group", bundle: Language.resources) }
         }
         let rows = browser.prefs.showsPinRows
         if tab.pin == nil {
-            Button("Pin") { browser.pin(tab) }
+            Button { browser.pin(tab) } label: { Text("ui.pin", bundle: Language.resources) }
                 .disabled(!tab.isWeb || tab.shy)
             if rows {
-                Button("Pin as Row") { browser.pin(tab, listed: true) }
+                Button { browser.pin(tab, listed: true) } label: { Text("ui.pin_as_row", bundle: Language.resources) }
                     .disabled(!tab.isWeb || tab.shy)
             }
         } else {
             if rows {
-                Button(tab.listed ? "Show as Square" : "Show as Row") { browser.setListed(tab, !tab.listed) }
+                Button { browser.setListed(tab, !tab.listed) } label: { Text(LocalizedStringKey(tab.listed ? "Show as Square" : "Show as Row"), bundle: Language.resources) }
             }
             // Settings › Tabs › Folders in pinned rows: a row of this
             // space's own into a folder, a new one or one there is.
             // New Live Folder… on a square too, where it lands at the top
             // of the rows: it holds a feed, not this pin.
             if browser.prefs.showsPinFolders && !browser.takesFolder(tab) {
-                Button("New Live Folder…") { LiveFolders.ask(for: browser, in: nil) }
+                Button { LiveFolders.ask(for: browser, in: nil) } label: { Text("ui.new_live_folder", bundle: Language.resources) }
             }
             if browser.prefs.showsPinFolders && browser.takesFolder(tab) {
-                Button("New Folder") { browser.newPinFolder(holding: tab) }
-                Button("New Live Folder…") { LiveFolders.ask(for: browser, in: tab.pinFolder) }
+                Button { browser.newPinFolder(holding: tab) } label: { Text("ui.new_folder_d8eddd", bundle: Language.resources) }
+                Button { LiveFolders.ask(for: browser, in: tab.pinFolder) } label: { Text("ui.new_live_folder", bundle: Language.resources) }
                 let folders = browser.pinFolders
                 if !folders.isEmpty {
-                    Menu("Move to Folder") {
+                    Menu {
                         ForEach(PinFolderMenu.entries(folders), id: \.folder.id) { entry in
                             Button(entry.title) { browser.movePin(tab, into: entry.folder.id) }
                                 .disabled(tab.pinFolder == entry.folder.id)
                         }
                         if tab.pinFolder != nil {
                             Divider()
-                            Button("Remove from Folder") { browser.movePin(tab, into: nil) }
+                            Button { browser.movePin(tab, into: nil) } label: { Text("ui.remove_from_folder", bundle: Language.resources) }
                         }
-                    }
+                    } label: { Text("ui.move_to_folder", bundle: Language.resources) }
                 }
             }
             // A row wears its title, not its letter; and a click on it is
             // the address, so the way home a square's double-click is
             // (Browser.goHome) is here instead, while it has wandered.
             if rows && tab.listed {
-                Button("Back to Pinned Page") { browser.goHome(tab) }
+                Button { browser.goHome(tab) } label: { Text("ui.back_to_pinned_page", bundle: Language.resources) }
                     .disabled(tab.home.map { Browser.samePage($0, tab.address) } ?? true)
             } else {
-                Button("Change Letter") { browser.editLetter(tab) }
+                Button { browser.editLetter(tab) } label: { Text("ui.change_letter", bundle: Language.resources) }
             }
-            Button("Replace Pinned Page with Current URL") { browser.rehome(tab) }
+            Button { browser.rehome(tab) } label: { Text("ui.replace_pinned_page_with_current_url", bundle: Language.resources) }
                 .disabled(!tab.isWeb || tab.home.map { Browser.samePage($0, tab.address) } ?? false)
             if browser.prefs.showsSharedPins {
-                Button(tab.everywhere ? "Only in This Space" : "Keep in Every Space") {
+                Button {
                     if tab.everywhere { browser.keepHere(tab) } else { browser.shareEverywhere(tab) }
-                }
+                } label: { Text(LocalizedStringKey(tab.everywhere ? "Only in This Space" : "Keep in Every Space"), bundle: Language.resources) }
             }
-            Button("Unpin") { browser.unpin(tab) }
+            Button { browser.unpin(tab) } label: { Text("ui.unpin", bundle: Language.resources) }
             // Away for good in one go, where Unpin, finding the row and its
             // × took three (#834); ⇧⌘T brings it back as a tab.
-            Button("Delete") {
+            Button {
                 browser.unpin(tab)
                 browser.close(tab)
-            }
+            } label: { Text("ui.delete", bundle: Language.resources) }
         }
         // A shared pin is in every space already: nowhere to move it.
         if browser.prefs.usesSpaces, !tab.bench, !tab.everywhere,
            tab.address.flatMap({ Browser.extensionHost(of: $0) }) == nil {
-            Menu("Move to Space") {
+            Menu {
                 ForEach(browser.spaces.filter { $0.id != browser.spaceID }) { space in
                     Button {
                         browser.move(tab, toSpace: space.id)
@@ -1627,15 +1628,15 @@ struct TabMenu: View {
                     }
                 }
                 if browser.spaces.count > 1 { Divider() }
-                Button("New Space…") {
+                Button {
                     browser.askForSpace { space in
                         browser.move(tab, toSpace: space.id) {
                             browser.switchSpace(to: space.id)
                         }
                     }
-                }
-            }
-            .help("Pages moved to a Space with different sign-ins reopen there.")
+                } label: { Text("ui.new_space_0d5525", bundle: Language.resources) }
+            } label: { Text("ui.move_to_space", bundle: Language.resources) }
+            .help(Text("ui.pages_moved_to_a_space_with_different_sign_ins_reopen_t", bundle: Language.resources))
         }
         // Settings › Spaces & Pins › Send links to a space, from here: the
         // tab's site to the space it is in, or back out of it.
@@ -1643,9 +1644,13 @@ struct TabMenu: View {
            let site = tab.address.flatMap(SpaceRoutes.site(of:)) {
             let space = browser.space
             if browser.prefs.spaceRoutes.contains(SpaceRoute(site: site, space: space.id)) {
-                Button("Stop Opening \(site) in \(space.name)") { SpaceRoutes.remove(site) }
+                Button { SpaceRoutes.remove(site) } label: {
+                    Text(Language.shared.format("tabs.stop_opening_in_space", fallback: "Stop Opening %1$@ in %2$@", site, space.name))
+                }
             } else {
-                Button("Always Open \(site) in \(space.name)") { SpaceRoutes.set(site, to: space.id) }
+                Button { SpaceRoutes.set(site, to: space.id) } label: {
+                    Text(Language.shared.format("tabs.always_open_in_space", fallback: "Always Open %1$@ in %2$@", site, space.name))
+                }
             }
         }
         if browser.prefs.splitView {
@@ -1653,29 +1658,29 @@ struct TabMenu: View {
             // side, up to four. More can't be, so it is there but off.
             let picked = browser.selectedTabIDs.contains(tab.id) ? browser.visibleSelectedTabCount : 1
             if picked > 1 && !browser.pickedTabsArePaired {
-                Button("Open \(picked) Tabs in Split View") { browser.pairPickedTabs(focus: tab) }
+                Button { browser.pairPickedTabs(focus: tab) } label: { CountText(key: "count.open_split", count: picked) }
                     .disabled(browser.pickedSplit == nil)
             }
             if let pair = browser.split(for: tab) {
-                Button("Swap Pages") {
+                Button {
                     browser.focusPane(tab)
                     browser.swapSplit()
-                }
+                } label: { Text("ui.swap_pages", bundle: Language.resources) }
                 if pair.tabs.count > 2 {
                     // This page alone out of it; the others stay together.
-                    Button("Remove from Split View") { browser.leaveSplit(tab) }
+                    Button { browser.leaveSplit(tab) } label: { Text("ui.remove_from_split_view", bundle: Language.resources) }
                 }
-                Button("Separate Split Tabs") { browser.detachSplit(tab) }
-                Button(pair.tabs.count > 2 ? "Close All Pages" : "Close Both Pages") {
+                Button { browser.detachSplit(tab) } label: { Text("ui.separate_split_tabs", bundle: Language.resources) }
+                Button {
                     browser.focusPane(tab)
                     browser.closeSplit()
-                }
+                } label: { Text(LocalizedStringKey(pair.tabs.count > 2 ? "Close All Pages" : "Close Both Pages"), bundle: Language.resources) }
             } else if picked == 1 {
                 // Beside the page on screen; on that page itself, an empty
                 // page beside it. On a split with room, one more page in it.
                 let current = browser.active
                 let adding = browser.activeSplit != nil && current?.id != tab.id
-                Button(adding ? "Add to Split View" : "Open in Split View") { browser.openInSplit(tab) }
+                Button { browser.openInSplit(tab) } label: { Text(LocalizedStringKey(adding ? "Add to Split View" : "Open in Split View"), bundle: Language.resources) }
                     .disabled(tab.bench || (adding && current.map { !browser.canJoin(tab, beside: $0) } ?? true))
             }
         }
@@ -1683,73 +1688,80 @@ struct TabMenu: View {
             // Another window, or a new one (see Browser.moveToWindow).
             let others = Browsers.all.filter { $0 !== browser && $0.isOpen && !$0.isPopup && $0.profileID == browser.profileID }
             if others.isEmpty {
-                Button("Move to New Window") { browser.moveToWindow(tab, nil) }
+                Button { browser.moveToWindow(tab, nil) } label: { Text("ui.move_to_new_window", bundle: Language.resources) }
                     .disabled(browser.tabs.count < 2)
             } else {
-                Menu("Move to Window") {
-                    Button("New Window") { browser.moveToWindow(tab, nil) }
+                Menu {
+                    Button { browser.moveToWindow(tab, nil) } label: { Text("ui.new_window", bundle: Language.resources) }
                         .disabled(browser.tabs.count < 2)
                     Divider()
                     ForEach(Array(others.enumerated()), id: \.offset) { _, other in
                         Button(other.windowName) { browser.moveToWindow(tab, other) }
                     }
-                }
+                } label: { Text("ui.move_to_window", bundle: Language.resources) }
             }
         }
         Divider()
-        Button("Rename") { browser.beginTabRename(tab) }
-        Button("Duplicate") {
+        Button { browser.beginTabRename(tab) } label: { Text("ui.rename_d3f4cb", bundle: Language.resources) }
+        Button {
             browser.select(tab)
             browser.duplicate()
-        }
+        } label: { Text("ui.duplicate", bundle: Language.resources) }
         .disabled(!tab.isWeb)
         // The card a click on the tab you are on shows under its address.
-        Button("Site Information…") {
+        Button {
             if browser.activeID != tab.id { browser.select(tab) }
             browser.beginTabEdit(tab)
-        }
+        } label: { Text("ui.site_information", bundle: Language.resources) }
         .disabled(tab.isBlank || tab.address == nil || tab.pin != nil)
-        Button("Copy Address") {
+        Button {
             browser.select(tab)
             browser.copyAddress()
-        }
+        } label: { Text("ui.copy_address", bundle: Language.resources) }
         .disabled(!tab.isWeb)
-        Button("Copy as Markdown Link") {
+        Button {
             browser.select(tab)
             browser.copyMarkdownLink()
-        }
+        } label: { Text("ui.copy_as_markdown_link", bundle: Language.resources) }
         .disabled(!tab.isWeb)
-        Button("Copy Clean Link") {
+        Button {
             browser.select(tab)
             browser.copyCleanLink()
-        }
+        } label: { Text("ui.copy_clean_link", bundle: Language.resources) }
         .disabled(!tab.isWeb)
         if browser.prefs.sitesInPanel {
-            Button("Open in Side Panel") { browser.openInSidePanel(tab) }
+            Button { browser.openInSidePanel(tab) } label: { Text("ui.open_in_side_panel", bundle: Language.resources) }
                 .disabled(!tab.isWeb || tab.shy)
         }
-        Button(tab.muted ? "Unmute Tab" : "Mute Tab") { tab.toggleMute() }
+        Button { tab.toggleMute() } label: { Text(LocalizedStringKey(tab.muted ? "Unmute Tab" : "Mute Tab"), bundle: Language.resources) }
         // Its page let go of now, as it would be after half an hour unseen:
         // the row keeps its title and picture, and it loads again when gone
         // to. Not the tab on screen, nor one that has to stay awake (#310).
-        Button("Put to Sleep") {
+        Button {
             browser.sleep(tab) { outcome in
-                if outcome != "asleep" { browser.announce("Stays awake: \(outcome)") }
+                if outcome != "asleep" {
+                    browser.announce("Stays awake: \(outcome)", localized: {
+                        Language.shared.format("announcement.stays_awake", fallback: "Stays awake: %1$@",
+                                               Language.shared.text(outcome, fallback: outcome))
+                    })
+                }
             }
-        }
+        } label: { Text("ui.put_to_sleep", bundle: Language.resources) }
         .disabled(browser.awake(because: tab) != nil)
         Divider()
         // Right-clicked among tabs picked in the column: all of them, as ⌘W
         // closes them.
         let picked = browser.selectedTabIDs.contains(tab.id) ? browser.visibleSelectedTabCount : 1
         if picked > 1 {
-            Button("Close \(picked) Tabs") { browser.closePickedTabs() }
+            Button { browser.closePickedTabs() } label: { CountText(key: "count.close_tabs", count: picked) }
         } else {
-            Button("Close Tab", action: close)
+            Button(action: close) { Text("ui.close_tab", bundle: Language.resources) }
         }
-        Button("Close Other Tabs") { browser.closeOthers(but: tab) }
+        Button { browser.closeOthers(but: tab) } label: { Text("ui.close_other_tabs", bundle: Language.resources) }
             .disabled(browser.tabs.count < 2)
-        Button(browser.prefs.sidebar ? "Close Tabs Below" : "Close Tabs to the Right") { browser.closeTabsBelow(tab) }
+        Button { browser.closeTabsBelow(tab) } label: {
+            Text(LocalizedStringKey(browser.prefs.sidebar ? "tabs.close_below" : "tabs.close_right"), bundle: Language.resources)
+        }
             .disabled(browser.tabsBelow(tab).isEmpty)
         // ⌘⇧T, and the History menu's Recently Closed, where few think to
         // look for it: here too, where tabs are closed.

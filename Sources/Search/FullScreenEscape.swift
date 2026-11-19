@@ -336,7 +336,7 @@ private final class ReminderPanel: NSPanel {
     /// From the top of the full screen to the top of the pill.
     static let fromTop: CGFloat = 44
 
-    private let content = NSHostingView(rootView: ReminderView())
+    private let content = NSHostingView(rootView: LanguageRoot(content: ReminderView()))
 
     init() {
         super.init(contentRect: NSRect(x: 0, y: 0, width: 320, height: 36),
@@ -375,14 +375,14 @@ private struct ReminderView: View {
 
     var body: some View {
         HStack(spacing: 6) {
-            Text("Press")
-            Text("Esc")
+            Text("ui.press", bundle: Language.resources)
+            Text("ui.esc", bundle: Language.resources)
                 .font(.system(size: 12, weight: .semibold))
                 .padding(.horizontal, 6)
                 .frame(height: 20)
                 .overlay(RoundedRectangle(cornerRadius: 5, style: .continuous)
                     .strokeBorder(Color.white.opacity(0.6), lineWidth: 1))
-            Text("again to exit full screen")
+            Text("ui.again_to_exit_full_screen", bundle: Language.resources)
         }
         .font(.system(size: 14, weight: .medium))
         .foregroundStyle(Color.white)
@@ -391,6 +391,6 @@ private struct ReminderView: View {
         .background(Capsule().fill(Color.black.opacity(0.72)))
         .fixedSize()
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(Self.words)
+        .accessibilityLabel(Text("Press Esc again to exit full screen", bundle: Language.resources))
     }
 }

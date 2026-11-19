@@ -6,10 +6,11 @@ import subprocess
 import sys
 
 suite = "DownloadLifecycleTests"
+resources = subprocess.run([sys.executable, "Tests/check-localization.py"])
 # The rest of the suite runs together; native WebKit state is never reused by
 # two download journeys. No retry or skipped download assertion is involved.
 result = subprocess.run(["swift", "test", "--skip", suite])
-failed = result.returncode != 0
+failed = resources.returncode != 0 or result.returncode != 0
 listing = subprocess.run(["swift", "test", "list"], check=True, capture_output=True, text=True)
 cases = [line.strip() for line in listing.stdout.splitlines()
          if re.fullmatch(r"SearchTests\.DownloadLifecycleTests/test\w+", line.strip())]

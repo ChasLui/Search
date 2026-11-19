@@ -38,10 +38,15 @@ struct TranslationMark: Equatable {
         case done
         case failed(String)
     }
+    enum Issue: Equatable {
+        case unidentified, needsMac15, needsWindow
+        case already(String), unsupported(String?, String), download(String?)
+    }
     /// The page's language, once known (a minimal identifier: "fr").
     var from: String?
     var to: String
     var phase: Phase
+    var issue: Issue? = nil
 
     var failed: Bool { if case .failed = phase { return true } else { return false } }
 }
@@ -75,14 +80,19 @@ final class PageTranslator {
         return choice.isEmpty ? reader : Locale.Language(identifier: choice)
     }
 
-    /// A language as Search's menus name it ("French"): in English, as the
-    /// rest of the interface is.
+    /// The stable English name used by diagnostics and the bench protocol.
     nonisolated static func name(_ code: String) -> String {
-        let english = Locale(identifier: "en")
-        let language = Locale.Language(identifier: code)
-        if language.script != nil, let full = english.localizedString(forIdentifier: code) { return full }
-        return english.localizedString(forLanguageCode: language.languageCode?.identifier ?? code) ?? code
+        name(code, locale: Locale(identifier: "en"))
     }
+
+    nonisolated private static func name(_ code: String, locale: Locale) -> String {
+        let language = Locale.Language(identifier: code)
+        if language.script != nil, let full = locale.localizedString(forIdentifier: code) { return full }
+        return locale.localizedString(forLanguageCode: language.languageCode?.identifier ?? code) ?? code
+    }
+
+    /// Names shown in the interface follow its language, not the translation target.
+    static func displayName(_ code: String) -> String { name(code, locale: Language.shared.locale) }
 
     /// How a language is kept and compared: its code, with its script
     /// where it has one of its own (zh-Hans), never its region.
@@ -194,7 +204,7 @@ final class PageTranslator {
             report["collectMs"] = ms()
             let sample = String(first.prefix(400).map(\.plain).joined(separator: "\n").prefix(4000))
             guard let from = PageTranslator.detect(sample, hint: await hint) else {
-                throw Failure("Search couldn't tell which language this page is in")
+                throw Failure("Search couldn't tell which language this page is in", issue: .unidentified)
             }
             // A page call comes back even after end() cancelled the run, and
             // end() is the only way a translator loses its tab: from here a
@@ -216,7 +226,7 @@ final class PageTranslator {
             try Task.checkCancellation()
             report["fullMs"] = ms()
             if (report["applied"] as? Int ?? 0) == 0, PageTranslator.same(from, target) {
-                throw Failure("This page is already in \(PageTranslator.name(PageTranslator.code(target)))")
+                throw Failure("This page is already in \(PageTranslator.name(PageTranslator.code(target)))", issue: .already(PageTranslator.code(target)))
             }
             tab.translation?.phase = .done
             finish()
@@ -230,11 +240,11 @@ final class PageTranslator {
             // Show Original, or the page went.
         } catch {
             guard tab.translator === self, !Task.isCancelled else { return }
-            let message = (error as? Failure)?.message ?? PageTranslator.describe(error, from: source, to: target)
-            report["error"] = message
+            let failure = (error as? Failure) ?? PageTranslator.describe(error, from: source, to: target)
+            report["error"] = failure.message
             report["errorDetail"] = "\(error)"
             // The mark first: the sign says why as the run ends.
-            tab.failTranslation(TranslationMark(from: source.map(PageTranslator.code), to: PageTranslator.code(target), phase: .failed(message)))
+            tab.failTranslation(TranslationMark(from: source.map(PageTranslator.code), to: PageTranslator.code(target), phase: .failed(failure.message), issue: failure.issue))
             end(restore: true)
         }
     }
@@ -496,7 +506,7 @@ final class PageTranslator {
             let tag = "[\(PageTranslator.code(from))→\(PageTranslator.code(target))] "
             return { strings in strings.map { tag + $0 } }
         }
-        guard #available(macOS 15, *) else { throw Failure("Translate Page needs macOS 15 or later") }
+        guard #available(macOS 15, *) else { throw Failure("Translate Page needs macOS 15 or later", issue: .needsMac15) }
         // SDK 26.4 and later default to Apple Intelligence's higher-fidelity
         // model. Keep page translation responsive as it was with older SDKs,
         // while retaining the newer model for pairs the fast one cannot do.
@@ -522,7 +532,7 @@ final class PageTranslator {
         switch status {
         case .unsupported:
             if main {
-                throw Failure("\(PageTranslator.name(PageTranslator.code(from))) to \(PageTranslator.name(PageTranslator.code(target))) can't be translated on this Mac")
+                throw Failure("\(PageTranslator.name(PageTranslator.code(from))) to \(PageTranslator.name(PageTranslator.code(target))) can't be translated on this Mac", issue: .unsupported(PageTranslator.code(from), PageTranslator.code(target)))
             }
             return nil
         case .installed:
@@ -541,7 +551,7 @@ final class PageTranslator {
             // To download: only for the page's own language, which you asked for.
             if !main { return nil }
         }
-        guard let content = web?.window?.contentView else { throw Failure("Translate Page needs the tab in a window") }
+        guard let content = web?.window?.contentView else { throw Failure("Translate Page needs the tab in a window", issue: .needsWindow) }
         let lease = try await SessionLease.open(from: from, to: target, fast: fast, in: content)
         guard !Task.isCancelled else {
             lease.close()
@@ -563,24 +573,25 @@ final class PageTranslator {
     }
 
     /// What went wrong, said quietly in the sign's menu.
-    private static func describe(_ error: Error, from: Locale.Language?, to: Locale.Language) -> String {
+    private static func describe(_ error: Error, from: Locale.Language?, to: Locale.Language) -> Failure {
         let language = from.map { name(code($0)) } ?? "this page's language"
         if #available(macOS 15, *), let error = error as? TranslationError {
             switch error {
             case .unsupportedLanguagePairing, .unsupportedSourceLanguage, .unsupportedTargetLanguage:
-                return "\(language) to \(name(code(to))) can't be translated on this Mac"
+                return Failure("\(language) to \(name(code(to))) can't be translated on this Mac", issue: .unsupported(from.map(code), code(to)))
             case .unableToIdentifyLanguage:
-                return "Search couldn't tell which language this page is in"
+                return Failure("Search couldn't tell which language this page is in", issue: .unidentified)
             default:
                 break
             }
         }
-        return "\(language) wasn't translated. The language may still need to be downloaded, in System Settings › General › Language & Region › Translation Languages"
+        return Failure("\(language) wasn't translated. The language may still need to be downloaded, in System Settings › General › Language & Region › Translation Languages", issue: .download(from.map(code)))
     }
 
     struct Failure: LocalizedError {
         let message: String
-        init(_ message: String) { self.message = message }
+        let issue: TranslationMark.Issue?
+        init(_ message: String, issue: TranslationMark.Issue? = nil) { self.message = message; self.issue = issue }
         var errorDescription: String? { message }
     }
 
@@ -1003,6 +1014,7 @@ extension Tab {
 /// The sign beside a tab's title while its page is translated: the size
 /// of the other marks there, and gone with the page or Show Original.
 struct TranslateSign: View {
+    @ObservedObject private var language = Language.shared
     @ObservedObject var tab: Tab
     var colour: Color = Palette.muted
     /// Drawn open, for a picture of it (tests).
@@ -1039,16 +1051,36 @@ struct TranslateSign: View {
 /// What the sign offers: Show Original, and Always Translate the page's
 /// language (in a private tab, for that tab only).
 struct TranslateMenu: View {
+    @ObservedObject private var language = Language.shared
     @ObservedObject var tab: Tab
     @ObservedObject var prefs = Shared.prefs
     let done: () -> Void
 
     static func heading(_ mark: TranslationMark) -> String {
-        let from = mark.from.map(PageTranslator.name)
+        let language = Language.shared
+        let from = mark.from.map(PageTranslator.displayName)
         switch mark.phase {
-        case .working: return from.map { "Translating from \($0)…" } ?? "Translating…"
-        case .done: return from.map { "Translated from \($0)" } ?? "Translated"
-        case .failed(let message): return message
+        case .working:
+            return from.map { language.format("translate.working_from", fallback: "Translating from %1$@…", $0) }
+                ?? language.text("translate.working", fallback: "Translating…")
+        case .done:
+            return from.map { language.format("translate.done_from", fallback: "Translated from %1$@", $0) }
+                ?? language.text("translate.done", fallback: "Translated")
+        case .failed(let message):
+            switch mark.issue {
+            case .unidentified: return language.text("translate.error.unidentified", fallback: "Search couldn't tell which language this page is in")
+            case .needsMac15: return language.text("translate.error.mac15", fallback: "Translate Page needs macOS 15 or later")
+            case .needsWindow: return language.text("translate.error.window", fallback: "Translate Page needs the tab in a window")
+            case .already(let code):
+                return language.format("translate.error.already", fallback: "This page is already in %1$@", PageTranslator.displayName(code))
+            case .unsupported(let source, let target):
+                let sourceName = source.map(PageTranslator.displayName) ?? language.text("translate.this_language", fallback: "this page's language")
+                return language.format("translate.error.unsupported", fallback: "%1$@ to %2$@ can't be translated on this Mac", sourceName, PageTranslator.displayName(target))
+            case .download(let source):
+                let sourceName = source.map(PageTranslator.displayName) ?? language.text("translate.this_language", fallback: "this page's language")
+                return language.format("translate.error.download", fallback: "%1$@ wasn't translated. The language may still need to be downloaded, in System Settings › General › Language & Region › Translation Languages", sourceName)
+            case nil: return message
+            }
         }
     }
 
@@ -1064,22 +1096,22 @@ struct TranslateMenu: View {
                 .padding(.bottom, mark.failed ? 11 : 3)
             if !mark.failed {
                 VStack(spacing: 1) {
-                    Item(symbol: "arrow.uturn.backward", title: "Show Original") {
+                    Item(symbol: "arrow.uturn.backward", title: language.text("context.show_original", fallback: "Show Original")) {
                         tab.translator?.end(restore: true)
                         done()
                     }
                     if let from = mark.from {
                         let on = tab.alwaysTranslates(from)
                         Item(symbol: on ? "checkmark" : "circle.dashed",
-                             title: tab.shy ? "Translate \(PageTranslator.name(from)) in This Tab" : "Always Translate \(PageTranslator.name(from))") {
+                             title: tab.shy ? language.format("translate.in_tab", fallback: "Translate %1$@ in This Tab", PageTranslator.displayName(from)) : language.format("translate.always_menu", fallback: "Always Translate %1$@", PageTranslator.displayName(from))) {
                             tab.setAlwaysTranslates(from, !on)
                         }
-                        .help(tab.shy ? "Only until this private tab closes" : "Settings › Browsing › Pages lists the languages always translated")
+                        .help(tab.shy ? language.text("translate.private_hint", fallback: "Only until this private tab closes") : language.text("translate.settings_hint", fallback: "Settings › Browsing › Pages lists the languages always translated"))
                     }
                 }
                 .padding(6)
                 Divider().overlay(Palette.hairline)
-                Text("Translated on this Mac. Nothing is sent anywhere.")
+                Text("ui.translated_on_this_mac_nothing_is_sent_anywhere", bundle: Language.resources)
                     .font(.system(size: 10.5))
                     .foregroundStyle(Palette.faint)
                     .padding(.horizontal, 16)
@@ -1115,13 +1147,15 @@ struct TranslateMenu: View {
 /// Settings › General, under the switch: the languages translated as their
 /// pages open, each with a way to stop.
 struct TranslateLanguageList: View {
+    @ObservedObject private var language = Language.shared
     @ObservedObject var prefs: Preferences
 
     var body: some View {
         ForEach(prefs.translateAlways.sorted(), id: \.self) { code in
             Rule()
-            Line("Always translate \(PageTranslator.name(code))", "Pages in \(PageTranslator.name(code)) are translated as they open") {
-                Pill("Remove") { prefs.translateAlways.remove(code) }
+            Line(language.format("translate.always", fallback: "Always translate %1$@", PageTranslator.displayName(code)),
+                 language.format("translate.always_detail", fallback: "Pages in %1$@ are translated as they open", PageTranslator.displayName(code))) {
+                Pill("ui.remove") { prefs.translateAlways.remove(code) }
             }
         }
     }
@@ -1129,19 +1163,20 @@ struct TranslateLanguageList: View {
 
 /// Load Apple's current language list only when this settings control appears.
 struct TranslateTargetPicker: View {
+    @ObservedObject private var language = Language.shared
     @ObservedObject var prefs: Preferences
     @State private var languages: [String] = []
 
     var body: some View {
-        Picker("Translation language", selection: $prefs.translateTarget) {
-            Text("System Default").tag("")
+        Picker(selection: $prefs.translateTarget) {
+            Text("ui.system_default", bundle: Language.resources).tag("")
             if !prefs.translateTarget.isEmpty && !languages.contains(prefs.translateTarget) {
-                Text(PageTranslator.name(prefs.translateTarget)).tag(prefs.translateTarget)
+                Text(PageTranslator.displayName(prefs.translateTarget)).tag(prefs.translateTarget)
             }
             ForEach(languages, id: \.self) { code in
-                Text(PageTranslator.name(code)).tag(code)
+                Text(PageTranslator.displayName(code)).tag(code)
             }
-        }
+        } label: { Text("ui.translation_language", bundle: Language.resources) }
         .labelsHidden()
         .pickerStyle(.menu)
         .fixedSize()

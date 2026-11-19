@@ -34,14 +34,15 @@ final class QuitConfirmationTests: XCTestCase {
     }
 
     func testCancelDeclinesQuitAndCanAskAgain() {
-        XCTAssertFalse(answer("Cancel"))
-        XCTAssertTrue(answer("Quit"))
+        XCTAssertFalse(answer("quit.cancel"))
+        XCTAssertTrue(answer("quit.confirm"))
     }
 
     func testCancelIsTheDefaultAndQuitHasNoKeyEquivalent() {
-        XCTAssertFalse(answer("Cancel") {
-            XCTAssertEqual(NSApp.modalWindow?.defaultButtonCell?.title, "Cancel")
-            let quit = self.buttons(NSApp.modalWindow?.contentView).first { $0.title == "Quit" }
+        XCTAssertFalse(answer("quit.cancel") {
+            let cancel = self.buttons(NSApp.modalWindow?.contentView).first { $0.accessibilityIdentifier() == "quit.cancel" }
+            XCTAssertTrue(NSApp.modalWindow?.defaultButtonCell === cancel?.cell)
+            let quit = self.buttons(NSApp.modalWindow?.contentView).first { $0.accessibilityIdentifier() == "quit.confirm" }
             XCTAssertEqual(quit?.keyEquivalent, "")
         })
     }
@@ -57,7 +58,7 @@ final class QuitConfirmationTests: XCTestCase {
     }
 
     func testRepeatedQuitDoesNotOpenAnotherQuestion() {
-        XCTAssertFalse(answer("Cancel") {
+        XCTAssertFalse(answer("quit.cancel") {
             let window = NSApp.modalWindow
             XCTAssertFalse(Links.shouldQuit())
             XCTAssertTrue(NSApp.modalWindow === window)
@@ -65,7 +66,7 @@ final class QuitConfirmationTests: XCTestCase {
     }
 
     func testConfirmationWithoutBrowserWindowsAndOverExistingSheet() {
-        XCTAssertTrue(answer("Quit"))
+        XCTAssertTrue(answer("quit.confirm"))
         let window = NSWindow(contentRect: NSRect(x: -20_000, y: -20_000, width: 400, height: 200),
                               styleMask: .titled, backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
@@ -73,14 +74,14 @@ final class QuitConfirmationTests: XCTestCase {
                              styleMask: .titled, backing: .buffered, defer: false)
         sheet.isReleasedWhenClosed = false
         window.beginSheet(sheet)
-        XCTAssertFalse(answer("Cancel"))
+        XCTAssertFalse(answer("quit.cancel"))
         XCTAssertTrue(window.attachedSheet === sheet)
         window.endSheet(sheet)
         sheet.close()
         window.close()
     }
 
-    private func answer(_ title: String? = nil, whileAsking: (() -> Void)? = nil) -> Bool {
+    private func answer(_ identifier: String? = nil, whileAsking: (() -> Void)? = nil) -> Bool {
         var answered = false
         let fallback = Timer(timeInterval: 2, repeats: false) { _ in
             MainActor.assumeIsolated {
@@ -91,11 +92,11 @@ final class QuitConfirmationTests: XCTestCase {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
             guard let window = NSApp.modalWindow else { return XCTFail("No quit confirmation") }
             whileAsking?()
-            guard let title else { return }
-            if let button = self.buttons(window.contentView).first(where: { $0.title == title }) {
+            guard let identifier else { return }
+            if let button = self.buttons(window.contentView).first(where: { $0.accessibilityIdentifier() == identifier }) {
                 button.performClick(nil)
             } else {
-                XCTFail("No \(title) button")
+                XCTFail("No \(identifier) button")
             }
         }
         let result = Links.shouldQuit()

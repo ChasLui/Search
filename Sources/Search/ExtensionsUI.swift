@@ -11,7 +11,7 @@ struct ExtensionsPage: View {
             Installer(browser: browser, extensions: .shared)
         } else {
             Card {
-                Line("Chrome extensions", "Need macOS 15.4 or later — the version whose WebKit can run them.") { EmptyView() }
+                Line("ui.chrome_extensions", "ui.need_macos_15_4_or_later_the_version_whose_webkit_can_r", localizedTitle: true, localizedDetail: true) { EmptyView() }
             }
         }
     }
@@ -27,18 +27,18 @@ struct ExtensionsPage: View {
                 Card {
                     VStack(alignment: .leading, spacing: 10) {
                         HStack(spacing: 8) {
-                            Text("Add from the Chrome Web Store")
+                            Text("ui.add_from_the_chrome_web_store", bundle: Language.resources)
                                 .font(.system(size: 13))
                                 .foregroundStyle(Palette.ink)
                             Spacer(minLength: 8)
-                            Pill("Open the Store") {
+                            Pill("ui.open_the_store") {
                                 browser.open(Browser.webStore, foreground: true)
                             }
                         }
                         HStack(spacing: 8) {
                             ZStack(alignment: .leading) {
                                 if link.isEmpty {
-                                    Text("Paste a link to an extension, or its id")
+                                    Text("ui.paste_a_link_to_an_extension_or_its_id", bundle: Language.resources)
                                         .foregroundStyle(Palette.muted.opacity(0.8))
                                 }
                                 TextField("", text: $link)
@@ -53,11 +53,11 @@ struct ExtensionsPage: View {
                             if !extensions.busy.isEmpty {
                                 Ring(size: 12)
                             } else {
-                                Pill("Add", filled: true, action: add)
+                                Pill("ui.add", filled: true, action: add)
                                     .disabled(Crx.id(in: link) == nil)
                             }
                         }
-                        Text("Or find it in the store and press Add to Search on its page.")
+                        Text("ui.or_find_it_in_the_store_and_press_add_to_search_on_its_", bundle: Language.resources)
                             .font(.system(size: 11.5))
                             .foregroundStyle(Palette.muted)
                             .fixedSize(horizontal: false, vertical: true)
@@ -66,8 +66,8 @@ struct ExtensionsPage: View {
                 }
 
                 Card {
-                    Line("From another browser", "What Chrome, Arc, Brave and the others added from the Chrome Web Store — installed fresh from the store, you say yes to each one") {
-                        Pill("Bring them over…") {
+                    Line("ui.from_another_browser", "ui.what_chrome_arc_brave_and_the_others_added_from_the_chr", localizedTitle: true, localizedDetail: true) {
+                        Pill("ui.bring_them_over") {
                             browser.bringingExtensions = true
                             browser.lead(to: InternalPage(.importing))
                         }
@@ -75,7 +75,7 @@ struct ExtensionsPage: View {
                 }
 
                 if extensions.installed.isEmpty {
-                    Card { Nothing("No extensions yet.") }
+                    Card { Nothing("ui.no_extensions_yet") }
                 } else {
                     Card {
                         ForEach(Array(extensions.installed.enumerated()), id: \.element.id) { index, item in
@@ -83,7 +83,7 @@ struct ExtensionsPage: View {
                             Row(item: item, extensions: extensions)
                         }
                     }
-                    Text("Each extension stays out of private tabs until you allow it in its … menu. One you allow can tell which tabs are private, but may still keep what you visit in them.")
+                    Text("ui.each_extension_stays_out_of_private_tabs_until_you_allo", bundle: Language.resources)
                         .font(.system(size: 11.5))
                         .foregroundStyle(Palette.muted)
                         .fixedSize(horizontal: false, vertical: true)
@@ -92,8 +92,8 @@ struct ExtensionsPage: View {
                 Recorders()
 
                 Card {
-                    Line("Load an unpacked extension", "A folder with a manifest.json — your own, or one exported from another browser. Reload picks up what you've changed in it since.") {
-                        Pill("Choose…") { extensions.installFolder() }
+                    Line("ui.load_an_unpacked_extension", "ui.a_folder_with_a_manifest_json_your_own_or_one_exported_", localizedTitle: true, localizedDetail: true) {
+                        Pill("ui.choose") { extensions.installFolder() }
                     }
                 }
             }
@@ -118,8 +118,8 @@ struct ExtensionsPage: View {
                     VStack(spacing: 0) {
                         ForEach(Array(ids.enumerated()), id: \.element) { index, id in
                             if index > 0 { Rule() }
-                            Line(Browser.extensionName(id), "Can record your screen — macOS asks what to share each time") {
-                                Pill("Remove") { ExtensionCapture.forget(id) }
+                            Line(Browser.extensionName(id), "ui.can_record_your_screen_macos_asks_what_to_share_each_ti", localizedDetail: true) {
+                                Pill("ui.remove") { ExtensionCapture.forget(id) }
                             }
                         }
                     }
@@ -130,6 +130,7 @@ struct ExtensionsPage: View {
 
     @available(macOS 15.4, *)
     private struct Row: View {
+        @ObservedObject private var language = Language.shared
         let item: Installed
         @ObservedObject var extensions: Extensions
         @State private var hovering = false
@@ -175,8 +176,8 @@ struct ExtensionsPage: View {
                     .menuStyle(.borderlessButton)
                     .menuIndicator(.hidden)
                     .fixedSize()
-                    .accessibilityLabel("More for \(item.name)")
-                    .help("More for \(item.name)")
+                    .accessibilityLabel(Text(Language.shared.format("extension.more", fallback: "More for %1$@", item.name)))
+                    .help(Text(Language.shared.format("extension.more", fallback: "More for %1$@", item.name)))
                     Switch(on: Binding(get: { item.enabled }, set: { extensions.setEnabled(item.id, $0) }))
                 }
                 if sites, extensions.siteAccess(item.id).restricted {
@@ -194,52 +195,53 @@ struct ExtensionsPage: View {
 
         @ViewBuilder
         private func actions(_ context: WKWebExtensionContext?) -> some View {
-            Button(item.pinned == true ? "Unpin" : "Pin to Toolbar") {
+            Button {
                 extensions.setPinned(item.id, !(item.pinned ?? false))
-            }
+            } label: { Text(LocalizedStringKey(item.pinned == true ? "Unpin" : "Pin to Toolbar"), bundle: Language.resources) }
             if context?.overrideNewTabPageURL != nil {
                 let on = extensions.newTabPageID == item.id
-                Button(on ? "Stop Showing in New Tabs" : "Show in New Tabs") {
+                Button {
                     extensions.setNewTabPage(on ? nil : item.id)
-                }
+                } label: { Text(LocalizedStringKey(on ? "extension.stop_new_tabs" : "extension.show_new_tabs"), bundle: Language.resources) }
             }
             if context?.optionsPageURL != nil {
-                Button("Options") { extensions.openOptions(item.id) }
+                Button { extensions.openOptions(item.id) } label: { Text("ui.options", bundle: Language.resources) }
             }
             if item.source != nil || !item.fromStore {
-                Button("Reload") { extensions.reload(item.id) }
+                Button { extensions.reload(item.id) } label: { Text("ui.reload", bundle: Language.resources) }
             }
             if let context {
                 Divider()
                 if (context.webExtension.manifest["incognito"] as? String) == "not_allowed" {
-                    Text("Private Tabs Aren’t Supported")
+                    Text("ui.private_tabs_aren_t_supported", bundle: Language.resources)
                 } else {
-                    Toggle("Allow in Private Tabs", isOn: Binding(
+                    Toggle(isOn: Binding(
                         get: { context.hasAccessToPrivateData },
                         set: { extensions.setPrivate(item.id, $0) }
-                    ))
-                    .accessibilityLabel("Allow \(item.name) in private tabs")
-                    .help("Private tabs opened before any extension was allowed need reopening. Turned off, a script already running in one stops only when the page reloads.")
+                    )) { Text("ui.allow_in_private_tabs", bundle: Language.resources) }
+                    .accessibilityLabel(Text(Language.shared.format("extension.allow_private", fallback: "Allow %1$@ in private tabs", item.name)))
+                    .help(Text("ui.private_tabs_opened_before_any_extension_was_allowed_ne", bundle: Language.resources))
                 }
             }
             Divider()
-            Button("Remove", role: .destructive) { extensions.remove(item.id) }
+            Button(role: .destructive) { extensions.remove(item.id) } label: { Text("Remove", bundle: Language.resources) }
         }
 
         /// Where it was loaded from, by the folder's name — the whole path
         /// is in the tooltip.
         private var folder: String {
-            item.source.map { "From “\(URL(fileURLWithPath: $0).lastPathComponent)”" } ?? "From a folder"
+            item.source.map { Language.shared.format("extension.from_folder_name", fallback: "From “%1$@”", URL(fileURLWithPath: $0).lastPathComponent) }
+                ?? Language.shared.text("extension.from_folder", fallback: "From a folder")
         }
 
         private func detail(_ context: WKWebExtensionContext?) -> String {
-            var parts = ["Version \(item.version)", item.fromStore ? "Chrome Web Store" : folder]
-            if item.enabled, context == nil { parts.append("couldn't start") }
+            var parts = [Language.shared.format("extension.version", fallback: "Version %1$@", item.version), item.fromStore ? "Chrome Web Store" : folder]
+            if item.enabled, context == nil { parts.append(Language.shared.text("extension.could_not_start", fallback: "couldn't start")) }
             if extensions.newTabPageID == item.id {
-                parts.append("shows in new tabs")
+                parts.append(Language.shared.text("extension.shows_in_new_tabs", fallback: "shows in new tabs"))
             }
-            if context?.hasAccessToPrivateData == true { parts.append("allowed in private tabs") }
-            if let errors = context.map(Extensions.errors(of:)), !errors.isEmpty { parts.append("\(errors.count) warning\(errors.count == 1 ? "" : "s")") }
+            if context?.hasAccessToPrivateData == true { parts.append(Language.shared.text("extension.allowed_private", fallback: "allowed in private tabs")) }
+            if let errors = context.map(Extensions.errors(of:)), !errors.isEmpty { parts.append(Language.shared.count("count.warnings", errors.count)) }
             return parts.joined(separator: " · ")
         }
     }
@@ -249,25 +251,26 @@ struct ExtensionsPage: View {
 /// ones you name, or only where you click its button.
 @available(macOS 15.4, *)
 private struct RunsOn: View {
+    @ObservedObject private var language = Language.shared
     let item: Installed
     @ObservedObject var extensions: Extensions
 
     var body: some View {
         let access = extensions.siteAccess(item.id)
         Menu {
-            Picker("Runs on", selection: Binding(
+            Picker(selection: Binding(
                 get: { access.mode },
                 set: { extensions.setSiteAccess(item.id, SiteAccess(mode: $0, hosts: access.hosts)) }
             )) {
-                Text("All Sites It Asks For").tag(SiteAccess.Mode.all)
-                Text("Only Sites I Name").tag(SiteAccess.Mode.some)
-                Text("Only When I Click It").tag(SiteAccess.Mode.click)
-            }
+                Text("ui.all_sites_it_asks_for", bundle: Language.resources).tag(SiteAccess.Mode.all)
+                Text("ui.only_sites_i_name", bundle: Language.resources).tag(SiteAccess.Mode.some)
+                Text("ui.only_when_i_click_it", bundle: Language.resources).tag(SiteAccess.Mode.click)
+            } label: { Text("ui.runs_on", bundle: Language.resources) }
             .pickerStyle(.inline)
             .labelsHidden()
         } label: {
             HStack(spacing: 3) {
-                Text(access.mode.title)
+                Text(LocalizedStringKey(access.mode.title), bundle: Language.resources)
                     .font(.system(size: 11.5))
                 Image(systemName: "chevron.up.chevron.down")
                     .font(.system(size: 8, weight: .semibold))
@@ -281,9 +284,9 @@ private struct RunsOn: View {
         .menuStyle(.borderlessButton)
         .menuIndicator(.hidden)
         .fixedSize()
-        .accessibilityLabel("\(item.name) runs on")
-        .accessibilityValue(access.mode.title)
-        .help("Where \(item.name) runs. Fewer sites, less memory on the rest")
+        .accessibilityLabel(Text(Language.shared.format("extension.runs_on", fallback: "%1$@ runs on", item.name)))
+        .accessibilityValue(Text(LocalizedStringKey(access.mode.title), bundle: Language.resources))
+        .help(Text(Language.shared.format("extension.where_runs", fallback: "Where %1$@ runs. Fewer sites, less memory on the rest", item.name)))
     }
 }
 
@@ -291,6 +294,7 @@ private struct RunsOn: View {
 /// and a word on what that means.
 @available(macOS 15.4, *)
 private struct SiteList: View {
+    @ObservedObject private var language = Language.shared
     let item: Installed
     @ObservedObject var extensions: Extensions
     @State private var typed = ""
@@ -316,27 +320,27 @@ private struct SiteList: View {
                                 .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
-                        .accessibilityLabel("Remove \(host)")
-                        .help("Remove \(host)")
+                        .accessibilityLabel(Text(Language.shared.format("extension.remove_host", fallback: "Remove %1$@", host)))
+                        .help(Text(Language.shared.format("extension.remove_host", fallback: "Remove %1$@", host)))
                     }
                 }
                 HStack(spacing: 8) {
                     ZStack(alignment: .leading) {
                         if typed.isEmpty {
-                            Text("Add a site, like example.com")
+                            Text("ui.add_a_site_like_example_com", bundle: Language.resources)
                                 .foregroundStyle(Palette.muted.opacity(0.8))
                         }
                         TextField("", text: $typed)
                             .textFieldStyle(.plain)
                             .foregroundStyle(Palette.ink)
                             .onSubmit(add)
-                            .accessibilityLabel("Add a site for \(item.name)")
+                            .accessibilityLabel(Text(Language.shared.format("extension.add_site", fallback: "Add a site for %1$@", item.name)))
                     }
                     .font(.system(size: 12))
                     .padding(.horizontal, 8)
                     .padding(.vertical, 5)
                     .background(Palette.wash, in: RoundedRectangle(cornerRadius: 7, style: .continuous))
-                    Pill("Add", action: add)
+                    Pill("ui.add", action: add)
                         .disabled(SiteAccess.host(from: typed) == nil)
                 }
             }
@@ -355,10 +359,10 @@ private struct SiteList: View {
 
     private func note(_ access: SiteAccess) -> String {
         var out = access.mode == .some
-            ? "Subdomains included. Elsewhere it runs once you click its button, on that tab until it leaves the site."
-            : "It runs on a page once you click its button there, on that tab until it leaves the site."
+            ? Language.shared.text("extension.some_sites_detail", fallback: "Subdomains included. Elsewhere it runs once you click its button, on that tab until it leaves the site.")
+            : Language.shared.text("extension.click_detail", fallback: "It runs on a page once you click its button there, on that tab until it leaves the site.")
         if SiteAccess.needsEverySite(name: item.name, said: Extensions.settings(for: item.id)) {
-            out += " \(item.name) may need every site to fill in sign-ins."
+            out += " " + Language.shared.format("extension.may_need_all", fallback: "%1$@ may need every site to fill in sign-ins.", item.name)
         }
         return out
     }
@@ -389,13 +393,13 @@ struct StoreOffer: View {
                     Image(systemName: "puzzlepiece.extension")
                         .font(.system(size: 11, weight: .medium))
                         .foregroundStyle(Palette.muted)
-                    Text(extensions.busy.contains(id) ? "Adding…" : "Add this extension to Search")
+                    Text(LocalizedStringKey(extensions.busy.contains(id) ? "Adding…" : "Add this extension to Search"), bundle: Language.resources)
                         .font(.system(size: 12.5))
                         .foregroundStyle(Palette.ink)
                     if extensions.busy.contains(id) {
                         Ring(size: 10)
                     } else {
-                        Button("Add") { extensions.install(from: id) }
+                        Button { extensions.install(from: id) } label: { Text("ui.add", bundle: Language.resources) }
                             .buttonStyle(.plain)
                             .font(.system(size: 12))
                             .foregroundStyle(Palette.ground)
@@ -437,6 +441,7 @@ struct HomePageLine: View {
 
     @available(macOS 15.4, *)
     private struct Chooser: View {
+        @ObservedObject private var language = Language.shared
         @ObservedObject var extensions: Extensions
 
         var body: some View {
@@ -444,12 +449,12 @@ struct HomePageLine: View {
             let current = extensions.newTabPageID
             if !askers.isEmpty {
                 Rule()
-                SettingRow(icon: "house", title: "Home page", detail: detail(askers, current)) {
+                SettingRow(icon: "house", title: language.text("Home page", fallback: "Home page"), detail: detail(askers, current)) {
                     Picker("", selection: Binding(
                         get: { current ?? "" },
                         set: { extensions.setNewTabPage($0.isEmpty ? nil : $0) }
                     )) {
-                        Text("Search's own").tag("")
+                        Text("ui.search_s_own", bundle: Language.resources).tag("")
                         Divider()
                         ForEach(askers) { Text($0.name).tag($0.id) }
                     }
@@ -462,11 +467,11 @@ struct HomePageLine: View {
 
         private func detail(_ askers: [Installed], _ current: String?) -> String {
             if let current, let name = askers.first(where: { $0.id == current })?.name {
-                return "New tabs show \(name)'s page, since you let it replace them"
+                return language.format("extension.new_tab.current", fallback: "New tabs show %1$@'s page, since you let it replace them", name)
             }
             return askers.count == 1
-                ? "New tabs open blank. \(askers[0].name) asked to show its page instead"
-                : "New tabs open blank. \(askers.count) extensions asked to show their page instead"
+                ? language.format("extension.new_tab.single", fallback: "New tabs open blank. %1$@ asked to show its page instead", askers[0].name)
+                : language.count("count.extension_new_tab", askers.count)
         }
     }
 }

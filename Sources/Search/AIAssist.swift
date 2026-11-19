@@ -70,8 +70,12 @@ final class Assistant: ObservableObject, Identifiable {
 
     /// Where it ran, for the foot of every answer.
     var place: String {
-        provider == .thisMac ? "on this Mac · \(model)"
-            : provider.isLocal ? "on this Mac · \(provider.name) · \(model)" : "sent to \(provider.name) · \(model)"
+        if provider == .thisMac {
+            return Language.shared.format("ai.place.mac", fallback: "on this Mac · %1$@", model)
+        }
+        return provider.isLocal
+            ? Language.shared.format("ai.place.local", fallback: "on this Mac · %1$@ · %2$@", provider.name, model)
+            : Language.shared.format("ai.place.remote", fallback: "sent to %1$@ · %2$@", provider.name, model)
     }
 
     func submit() {
@@ -164,15 +168,16 @@ final class Assistant: ObservableObject, Identifiable {
 enum AIAssist {
     /// What a provider off this Mac is sent, said once, the first time it is
     /// used — and a word on what it does with it where that matters.
-    static func notice(for provider: AIProvider) -> String {
-        var text = "When you ask, Search sends this page's text, its address and your question to \(provider.host)"
-        text += provider == .openRouter ? ", which passes them to the model's provider." : "."
-        text += " Their terms and privacy policy apply. Nothing is sent until you ask, never from a private tab, and Search keeps no copy."
+    @MainActor static func notice(for provider: AIProvider) -> String {
+        let language = Language.shared
+        var text = provider == .openRouter
+            ? language.format("ai.notice.router", fallback: "When you ask, Search sends this page's text, its address and your question to %1$@, which passes them to the model's provider. Their terms and privacy policy apply. Nothing is sent until you ask, never from a private tab, and Search keeps no copy.", provider.host)
+            : language.format("ai.notice.provider", fallback: "When you ask, Search sends this page's text, its address and your question to %1$@. Their terms and privacy policy apply. Nothing is sent until you ask, never from a private tab, and Search keeps no copy.", provider.host)
         switch provider {
         case .gemini:
-            text += "\n\nOn Gemini's free tier, outside the EEA, Switzerland and the UK, Google may use this to improve its products, and people may read it. Don't use it on sensitive pages."
+            text += "\n\n" + language.text("ai.notice.gemini", fallback: "On Gemini's free tier, outside the EEA, Switzerland and the UK, Google may use this to improve its products, and people may read it. Don't use it on sensitive pages.")
         case .openRouter:
-            text += "\n\nSearch asks OpenRouter to use only providers that keep nothing (zero data retention)."
+            text += "\n\n" + language.text("ai.notice.zero_retention", fallback: "Search asks OpenRouter to use only providers that keep nothing (zero data retention).")
         default:
             break
         }
@@ -189,37 +194,37 @@ extension Browser {
         guard prefs.ai, let provider = prefs.aiProvider else {
             settingsPage = .ai
             tuning = true
-            announce(prefs.ai ? "Choose where the AI runs" : "Turn on AI in Settings › AI")
+            announce(prefs.ai ? "Choose where the AI runs" : "Turn on AI in Settings › AI", localizedKey: prefs.ai ? "ai.choose_provider" : "ai.enable")
             return
         }
         // A web page, nothing else: not a file, not an extension's page.
         guard let scheme = tab.pageAddress?.scheme?.lowercased(), scheme == "https" || scheme == "http" else {
-            announce("AI works on web pages")
+            announce("AI works on web pages", localizedKey: "ai.web_pages")
             return
         }
         // A private tab leaves nothing behind anywhere, a provider included.
         let shy = tab.shy || tab.built.map { !$0.configuration.websiteDataStore.isPersistent } == true
         guard !shy || provider.isLocal else {
-            announce("In a private tab, only an AI on this Mac")
+            announce("In a private tab, only an AI on this Mac", localizedKey: "ai.private")
             return
         }
         if provider == .thisMac, AIEngine.shared.state != .ready {
             settingsPage = .ai
             tuning = true
-            announce("The model isn't on this Mac yet")
+            announce("The model isn't on this Mac yet", localizedKey: "ai.model_missing")
             return
         }
         let model = prefs.aiModel(for: provider)
         guard !model.isEmpty else {
             settingsPage = .ai
             tuning = true
-            announce("Choose a model for \(provider.name)")
+            announce("Choose a model for \(provider.name)", localizedKey: "ai.choose_model", arguments: [provider.name])
             return
         }
         guard provider.isLocal || AIKeys.hint(for: provider) != nil else {
             settingsPage = .ai
             tuning = true
-            announce("No key for \(provider.name) yet")
+            announce("No key for \(provider.name) yet", localizedKey: "ai.no_key", arguments: [provider.name])
             return
         }
         // Asked again on the page the panel is already about: the same
@@ -238,6 +243,7 @@ extension Browser {
 // MARK: - the panel
 
 struct AssistantPanel: View {
+    @ObservedObject private var language = Language.shared
     @ObservedObject var browser: Browser
     @ObservedObject var assistant: Assistant
     /// Drawn off screen, for a picture (bench ai picture): what an image
@@ -251,7 +257,7 @@ struct AssistantPanel: View {
                 Image(systemName: "sparkles")
                     .font(.system(size: 11, weight: .medium))
                     .foregroundStyle(Palette.muted)
-                Text(assistant.summary ? "Summary" : "About this page")
+                Text(LocalizedStringKey(assistant.summary ? "Summary" : "About this page"), bundle: Language.resources)
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(Palette.ink)
                 Spacer(minLength: 0)
@@ -270,9 +276,9 @@ struct AssistantPanel: View {
             Rectangle().fill(Palette.hairline).frame(height: 1)
             HStack(spacing: 8) {
                 if drawn {
-                    Text("Ask about this page…").font(.system(size: 12.5)).foregroundStyle(Palette.faint)
+                    Text("ui.ask_about_this_page", bundle: Language.resources).font(.system(size: 12.5)).foregroundStyle(Palette.faint)
                 } else {
-                    TextField("", text: $assistant.draft, prompt: Text("Ask about this page…").foregroundStyle(Palette.faint))
+                    TextField("", text: $assistant.draft, prompt: Text("ui.ask_about_this_page", bundle: Language.resources).foregroundStyle(Palette.faint))
                         .textFieldStyle(.plain)
                         .font(.system(size: 12.5))
                         .foregroundStyle(Palette.ink)
@@ -283,7 +289,7 @@ struct AssistantPanel: View {
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 10)
-            Text("AI — may be wrong · \(assistant.place)")
+            Text(Language.shared.format("ai.disclaimer.place", fallback: "AI — may be wrong · %1$@", assistant.place))
                 .font(.system(size: 10.5))
                 .foregroundStyle(Palette.faint)
                 .lineLimit(1)
@@ -299,15 +305,15 @@ struct AssistantPanel: View {
 
     private var conversation: some View {
         VStack(alignment: .leading, spacing: 14) {
-            if let notice = assistant.notice {
-                noticeCard(notice)
+            if assistant.notice != nil {
+                noticeCard(AIAssist.notice(for: assistant.provider))
             } else if let trouble = assistant.trouble {
-                Text(trouble).font(.system(size: 12.5)).foregroundStyle(Palette.muted)
+                Text(Language.shared.text("ai.nothing_to_read", fallback: trouble)).font(.system(size: 12.5)).foregroundStyle(Palette.muted)
             } else if assistant.reading {
-                Text("Reading the page…").font(.system(size: 12.5)).foregroundStyle(Palette.muted)
+                Text("ui.reading_the_page", bundle: Language.resources).font(.system(size: 12.5)).foregroundStyle(Palette.muted)
             }
             if assistant.addressed, assistant.notice == nil {
-                caution("This page has text written for an AI to follow. The answer may have been steered by it.")
+                caution(Language.shared.text("ai.page_caution", fallback: "This page has text written for an AI to follow. The answer may have been steered by it."))
             }
             ForEach(assistant.turns) { turn in
                 TurnView(turn: turn).id(turn.id)
@@ -342,7 +348,7 @@ struct AssistantPanel: View {
 
     private func noticeCard(_ notice: String) -> some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("Answers from \(assistant.provider.name)")
+            Text(Language.shared.format("ai.answers_from", fallback: "Answers from %1$@", assistant.provider.name))
                 .font(.system(size: 12.5, weight: .medium))
                 .foregroundStyle(Palette.ink)
             Text(verbatim: notice)
@@ -350,8 +356,8 @@ struct AssistantPanel: View {
                 .foregroundStyle(Palette.muted)
                 .fixedSize(horizontal: false, vertical: true)
             HStack(spacing: 8) {
-                Pill("Continue", filled: true) { assistant.agree() }
-                Pill("Cancel") { browser.closeAssistant() }
+                Pill("ui.continue", filled: true) { assistant.agree() }
+                Pill("ui.cancel") { browser.closeAssistant() }
             }
         }
         .padding(12)
@@ -388,7 +394,7 @@ struct AssistantPanel: View {
                     HStack(alignment: .firstTextBaseline, spacing: 6) {
                         Image(systemName: "exclamationmark.triangle")
                             .font(.system(size: 10, weight: .medium))
-                        Text(verbatim: "Not on the page: " + turn.strays.joined(separator: ", "))
+                        Text(verbatim: Language.shared.format("ai.not_on_page", fallback: "Not on the page: %1$@", turn.strays.joined(separator: ", ")))
                             .font(.system(size: 11.5))
                             .fixedSize(horizontal: false, vertical: true)
                     }
@@ -417,20 +423,20 @@ struct AISettings: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
             Card {
-                Line("Use AI on pages", "Summarize a page, or ask about it, from the View menu. Nothing is sent until you ask") {
+                Line("ui.use_ai_on_pages", "ui.summarize_a_page_or_ask_about_it_from_the_view_menu_not", localizedTitle: true, localizedDetail: true) {
                     Switch(on: $prefs.ai)
                 }
             }
             if prefs.ai {
                 Card {
-                    Line("Where it runs", place) {
+                    Line("ui.where_it_runs", place, localizedTitle: true) {
                         if drawn {
-                            Stand(prefs.aiProvider.map { $0.isLocal ? "\($0.name), on this Mac" : $0.name } ?? "Choose…", menu: true)
+                            Stand(prefs.aiProvider.map { $0.isLocal ? Language.shared.format("ai.provider.local", fallback: "%1$@, on this Mac", $0.name) : $0.name } ?? Language.shared.text("Choose…", fallback: "Choose…"), menu: true)
                         } else {
                         Picker("", selection: Binding(get: { prefs.aiProvider }, set: { prefs.aiProvider = $0 })) {
-                            Text("Choose…").tag(AIProvider?.none)
+                            Text("ui.choose", bundle: Language.resources).tag(AIProvider?.none)
                             ForEach(AIProvider.allCases.filter { $0 != .thisMac || engine.available || prefs.aiProvider == .thisMac }) { provider in
-                                Text(provider == .thisMac ? provider.name : provider.isLocal ? "\(provider.name), on this Mac" : provider.name)
+                                Text(provider == .thisMac ? provider.name : provider.isLocal ? Language.shared.format("ai.provider.local", fallback: "%1$@, on this Mac", provider.name) : provider.name)
                                     .tag(AIProvider?.some(provider))
                             }
                         }
@@ -451,11 +457,11 @@ struct AISettings: View {
                 }
                 .onAppear(perform: refresh)
                 Card {
-                    Line("Forget every key", "Deletes them from this Mac's keychain. A key made by signing in with OpenRouter still works until you delete it on openrouter.ai") {
-                        Pill("Forget") {
+                    Line("ui.forget_every_key", "ui.deletes_them_from_this_mac_s_keychain_a_key_made_by_sig", localizedTitle: true, localizedDetail: true) {
+                        Pill("ui.forget") {
                             AIKeys.forgetAll()
                             refresh()
-                            browser.announce("Keys forgotten")
+                            browser.announce("Keys forgotten", localizedKey: "ai.keys_forgotten")
                         }
                     }
                 }
@@ -468,53 +474,53 @@ struct AISettings: View {
     private var onThisMac: some View {
         let size = ByteCountFormatter.string(fromByteCount: engine.downloadSize, countStyle: .file)
         if AIEngine.translated {
-            Line("Model", "Needs the Apple Silicon version of Search — this copy runs translated") { EmptyView() }
+            Line("ui.model", "ui.needs_the_apple_silicon_version_of_search_this_copy_run", localizedTitle: true, localizedDetail: true) { EmptyView() }
         } else {
             switch engine.state {
             case .absent:
-                Line("Model", "\(AIEngine.model.name), downloaded once (\(size)) and checked. Nothing leaves this Mac") {
-                    Pill("Download", filled: true) { engine.install() }
+                Line("ui.model", Language.shared.format("ai.model.absent", fallback: "%1$@, downloaded once (%2$@) and checked. Nothing leaves this Mac", AIEngine.model.name, size), localizedTitle: true) {
+                    Pill("ui.download", filled: true) { engine.install() }
                 }
             case .downloading(let done):
-                Line("Model", "Downloading… \(Int(done * 100))%") {
-                    Pill("Cancel") { engine.cancelInstall() }
+                Line("ui.model", Language.shared.format("ai.model.downloading", fallback: "Downloading… %1$ld%%", Int(done * 100)), localizedTitle: true) {
+                    Pill("ui.cancel") { engine.cancelInstall() }
                 }
             case .preparing:
-                Line("Model", "Preparing it for this Mac — about twenty seconds, once") { EmptyView() }
+                Line("ui.model", "ui.preparing_it_for_this_mac_about_twenty_seconds_once", localizedTitle: true, localizedDetail: true) { EmptyView() }
             case .ready:
-                Line("Model", "\(AIEngine.model.name), on this Mac. Nothing leaves it") {
-                    Pill("Remove") { engine.remove() }
+                Line("ui.model", Language.shared.format("ai.model.ready", fallback: "%1$@, on this Mac. Nothing leaves it", AIEngine.model.name), localizedTitle: true) {
+                    Pill("ui.remove") { engine.remove() }
                 }
             case .failed(let why):
-                Line("Model", why) {
-                    Pill("Try Again") { engine.install() }
+                Line("ui.model", why, localizedTitle: true) {
+                    Pill("ui.try_again") { engine.install() }
                 }
             }
         }
     }
 
     private var place: String {
-        guard let provider = prefs.aiProvider else { return "A provider you have a key with, or an app on this Mac" }
+        guard let provider = prefs.aiProvider else { return Language.shared.text("ai.provider.choose_detail", fallback: "A provider you have a key with, or an app on this Mac") }
         return provider.isLocal
-            ? "Nothing leaves this Mac. Also in private tabs"
-            : "Your key, kept in this Mac's keychain, sent only to \(provider.host). Never from a private tab"
+            ? Language.shared.text("ai.provider.private_detail", fallback: "Nothing leaves this Mac. Also in private tabs")
+            : Language.shared.format("ai.provider.remote_detail", fallback: "Your key, kept in this Mac's keychain, sent only to %1$@. Never from a private tab", provider.host)
     }
 
     @ViewBuilder
     private func key(_ provider: AIProvider) -> some View {
         if let hint {
-            Line("Key", "\(hint), in this Mac's keychain") {
-                Pill("Forget") {
+            Line("ui.key", Language.shared.format("ai.key.hint", fallback: "%1$@, in this Mac's keychain", hint), localizedTitle: true) {
+                Pill("ui.forget") {
                     AIKeys.forget(provider)
                     refresh()
                 }
             }
         } else if !AIKeys.available {
-            Line("Key", "This copy of Search can't keep keys safely — it isn't the signed release. An app on this Mac still works") { EmptyView() }
+            Line("ui.key", "ui.this_copy_of_search_can_t_keep_keys_safely_it_isn_t_the", localizedTitle: true, localizedDetail: true) { EmptyView() }
         } else {
-            Line("Key", provider == .openRouter ? "Paste one, or sign in and OpenRouter makes one for you" : "Paste your API key") {
+            Line("ui.key", provider == .openRouter ? Language.shared.text("ai.key.router", fallback: "Paste one, or sign in and OpenRouter makes one for you") : Language.shared.text("ai.key.paste", fallback: "Paste your API key"), localizedTitle: true) {
                 HStack(spacing: 6) {
-                    SecureField("", text: $pasted, prompt: Text("Key").foregroundStyle(Palette.faint))
+                    SecureField("", text: $pasted, prompt: Text("ui.key", bundle: Language.resources).foregroundStyle(Palette.faint))
                         .textFieldStyle(.plain)
                         .font(.system(size: 12))
                         .frame(width: 130)
@@ -522,9 +528,9 @@ struct AISettings: View {
                         .padding(.vertical, 5)
                         .background(Palette.wash, in: RoundedRectangle(cornerRadius: 7, style: .continuous))
                         .onSubmit { save(provider) }
-                    Pill("Save") { save(provider) }
+                    Pill("ui.save") { save(provider) }
                     if provider == .openRouter {
-                        Pill("Sign In…") {
+                        Pill("ui.sign_in") {
                             AISignIn.start(in: browser)
                         }
                     }
@@ -534,7 +540,7 @@ struct AISettings: View {
     }
 
     private func cloudModel(_ provider: AIProvider) -> some View {
-        Line("Model", "Leave empty for \(provider.defaultModel)") {
+        Line("ui.model", Language.shared.format("ai.model.default", fallback: "Leave empty for %1$@", provider.defaultModel), localizedTitle: true) {
             if drawn {
                 Stand(prefs.aiModels[provider.rawValue].flatMap { $0.isEmpty ? nil : $0 } ?? provider.defaultModel, width: 170)
             } else {
@@ -573,13 +579,13 @@ struct AISettings: View {
     @ViewBuilder
     private func localModel(_ provider: AIProvider) -> some View {
         if models.isEmpty {
-            Line("Model", looking ? "Asking \(provider.name)…" : "\(provider.name) isn't running, or has no model yet") {
-                Pill("Look Again") { refresh() }
+            Line("ui.model", looking ? Language.shared.format("ai.model.asking", fallback: "Asking %1$@…", provider.name) : Language.shared.format("ai.model.unavailable", fallback: "%1$@ isn't running, or has no model yet", provider.name), localizedTitle: true) {
+                Pill("ui.look_again") { refresh() }
             }
         } else {
-            Line("Model", "From \(provider.name) on this Mac") {
+            Line("ui.model", Language.shared.format("ai.model.local", fallback: "From %1$@ on this Mac", provider.name), localizedTitle: true) {
                 Picker("", selection: Binding(get: { prefs.aiModel(for: provider) }, set: { prefs.setAIModel($0, for: provider) })) {
-                    Text("Choose…").tag("")
+                    Text("ui.choose", bundle: Language.resources).tag("")
                     ForEach(models, id: \.self) { Text($0).tag($0) }
                 }
                 .labelsHidden()
@@ -593,9 +599,9 @@ struct AISettings: View {
         let key = pasted
         pasted = ""
         switch AIKeys.save(key, for: provider) {
-        case .kept: browser.announce("Key kept in the keychain")
-        case .unavailable: browser.announce("This copy of Search can't keep keys")
-        case .failed: browser.announce("The key wasn't kept")
+        case .kept: browser.announce("Key kept in the keychain", localizedKey: "ai.key.kept")
+        case .unavailable: browser.announce("This copy of Search can't keep keys", localizedKey: "ai.key.unavailable")
+        case .failed: browser.announce("The key wasn't kept", localizedKey: "ai.key.failed")
         }
         refresh()
     }

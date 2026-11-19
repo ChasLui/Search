@@ -1,0 +1,6 @@
+"NSCameraUsageDescription" = "Websites you visit can ask to use your camera. Search asks you the first time each site does and keeps your answer; Settings › Privacy forgets them.";
+"NSContactsUsageDescription" = "Search fills in forms with the details on your own card in Contacts, once you pick them under a box. It reads no one else's card and saves no copy of yours.";
+"NSDownloadsFolderUsageDescription" = "Files you download are saved to your Downloads folder.";
+"NSLocationUsageDescription" = "Websites you visit can ask for your location. Search asks you each time a site does, unless you choose Always allow for it; Settings › Privacy forgets those choices.";
+"NSLocationWhenInUseUsageDescription" = "Websites you visit can ask for your location. Search asks you each time a site does, unless you choose Always allow for it; Settings › Privacy forgets those choices.";
+"NSMicrophoneUsageDescription" = "Websites you visit can ask to use your microphone. Search asks you the first time each site does and keeps your answer; Settings › Privacy forgets them.";

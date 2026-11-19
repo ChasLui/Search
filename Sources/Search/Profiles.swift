@@ -218,6 +218,7 @@ extension Browsers {
 /// space's icon, only once there is more than one profile. A click opens
 /// the list; choosing another brings its window, as in Chrome.
 struct ProfileBadge: View {
+    @ObservedObject private var language = Language.shared
     @ObservedObject var browser: Browser
     @ObservedObject var profiles = Profiles.shared
     @State private var hovering = false
@@ -240,8 +241,8 @@ struct ProfileBadge: View {
         }
         .buttonStyle(.plain)
         .onHover { hovering = $0 }
-        .help("Profile: \(name)")
-        .accessibilityLabel("Profile \(name)")
+        .help(Text(Language.shared.format("space.profile", fallback: "Profile: %@", name)))
+        .accessibilityLabel(Text(Language.shared.format("accessibility.profile", fallback: "Profile %1$@", name)))
         .animation(Motion.quick, value: hovering)
     }
 }
@@ -274,7 +275,7 @@ enum ProfileMenu {
             })
         }
         items.append(.separator())
-        items.append(item("New Profile…") { askNew() })
+        items.append(item(Language.shared.text("context.new_profile", fallback: "New Profile…")) { askNew() })
         return items
     }
 
@@ -290,7 +291,7 @@ enum ProfileMenu {
         Ask.name("New Profile", detail: OneWindow.on
                     ? "A separate set of spaces with its own sign-ins, history and bookmarks."
                     : "A separate set of spaces with its own sign-ins, history and bookmarks, in a window of its own.",
-                 placeholder: "Work", confirm: "Create") { name in
+                 placeholder: "Work", localizePlaceholder: true, confirm: "Create") { name in
             let made = Profiles.shared.add(named: name)
             Browsers.open(profile: made.id)
         }
@@ -324,8 +325,8 @@ struct ProfilesSettings: View {
 
     var body: some View {
         Card {
-            Line("Profiles", "Separate sets of spaces, each with its own sign-ins, history and bookmarks, in windows of their own. Extensions, passwords and settings are shared.") {
-                Pill("New Profile…") { ProfileMenu.askNew() }
+            Line("ui.profiles", "ui.separate_sets_of_spaces_each_with_its_own_sign_ins_hist", localizedTitle: true, localizedDetail: true) {
+                Pill("ui.new_profile") { ProfileMenu.askNew() }
             }
             if profiles.several {
                 ForEach(profiles.list) { profile in
@@ -344,16 +345,16 @@ struct ProfilesSettings: View {
         var body: some View {
             Line(profile.name + (current ? " — this window" : ""), spaces.joined(separator: ", ")) {
                 HStack(spacing: 6) {
-                    if !current { Pill("Open") { Browsers.open(profile: profile.id) } }
-                    Pill("Rename…") {
+                    if !current { Pill("ui.open") { Browsers.open(profile: profile.id) } }
+                    Pill("ui.rename") {
                         Ask.name("Rename Profile", placeholder: profile.name, initial: profile.name, confirm: "Rename") {
                             Profiles.shared.rename(profile.id, to: $0)
                         }
                     }
                     if !profile.isPersonal {
-                        Pill("Delete…", tint: .red) {
-                            Ask.sure("Delete “\(profile.name)”?",
-                                     detail: "Its windows close, its spaces go with their tabs and pins, and its cookies, sign-ins, history and bookmarks are erased from this Mac.",
+                        Pill("ui.delete_269573", tint: .red) {
+                            Ask.sure(Language.shared.format("profile.delete_title", fallback: "Delete “%1$@”?", profile.name),
+                                     detail: Language.shared.text("profile.delete_detail", fallback: "Its windows close, its spaces go with their tabs and pins, and its cookies, sign-ins, history and bookmarks are erased from this Mac."),
                                      confirm: "Delete", returnCancels: true) {
                                 Profiles.shared.delete(profile.id)
                             }

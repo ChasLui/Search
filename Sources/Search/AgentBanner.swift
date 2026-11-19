@@ -44,6 +44,7 @@ private struct AgentSessionBar: View {
 /// "Claude Code wants to use Search", Allow or Don't Allow.
 private struct AgentQuestion: View {
     @ObservedObject var session: AgentSession
+    @ObservedObject private var language = Language.shared
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -53,7 +54,7 @@ private struct AgentQuestion: View {
                     .foregroundStyle(Palette.muted)
                     .padding(.top, 2)
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("“\(session.client)” wants to use Search")
+                    Text(language.format("agent.wants_access", fallback: "“%@” wants to use Search", session.client))
                         .font(.system(size: 12.5, weight: .medium))
                         .foregroundStyle(Palette.ink)
                     Text(detail)
@@ -63,9 +64,9 @@ private struct AgentQuestion: View {
                 }
             }
             // Ticked only by a fresh click on it, as Allow is pressed.
-            Toggle("Let it see my open tabs", isOn: Binding(
+            Toggle(isOn: Binding(
                 get: { session.wantsTabs },
-                set: { _ in AgentControl.shared.toggleTabs(event: NSApp.currentEvent) }))
+                set: { _ in AgentControl.shared.toggleTabs(event: NSApp.currentEvent) })) { Text("ui.let_it_see_my_open_tabs", bundle: Language.resources) }
                 .toggleStyle(.checkbox)
                 .background(ClickSpot { AgentControl.shared.tabsBox = $0 })
                 .font(.system(size: 12))
@@ -74,14 +75,14 @@ private struct AgentQuestion: View {
             HStack(spacing: 12) {
                 Spacer(minLength: 8)
                 Button { AgentControl.shared.answer(allow: false, event: NSApp.currentEvent) } label: {
-                    Text("Don't Allow")
+                    Text("ui.don_t_allow_6c13f8", bundle: Language.resources)
                         .padding(.horizontal, 8)
                         .padding(.vertical, 6)
                         .contentShape(Rectangle())
                         .background(ClickSpot { AgentControl.shared.refuseButton = $0 })
                 }
                 Button { AgentControl.shared.answer(allow: true, event: NSApp.currentEvent) } label: {
-                    Text("Allow")
+                    Text("ui.allow", bundle: Language.resources)
                         .foregroundStyle(Palette.ground)
                         .padding(.horizontal, 12)
                         .padding(.vertical, 6)
@@ -103,27 +104,29 @@ private struct AgentQuestion: View {
 
     /// The name is the program's own word for itself; this is macOS's.
     private var detail: String {
-        let from = session.program.isEmpty ? "" : "From \(session.program) on this Mac. "
-        return from + "It works in tabs of its own while you watch, until you press Stop. "
-            + "It never sees passwords, card numbers, private tabs or Settings."
+        if session.program.isEmpty {
+            return language.text("agent.details", fallback: "It works in tabs of its own while you watch, until you press Stop. It never sees passwords, card numbers, private tabs or Settings.")
+        }
+        return language.format("agent.details_from", fallback: "From %@ on this Mac. It works in tabs of its own while you watch, until you press Stop. It never sees passwords, card numbers, private tabs or Settings.", session.program)
     }
 }
 
 /// "● Claude Code is using Search   Stop".
 private struct AgentPill: View {
     @ObservedObject var session: AgentSession
+    @ObservedObject private var language = Language.shared
 
     var body: some View {
         HStack(spacing: 10) {
             Circle()
                 .fill(Color.accentColor)
                 .frame(width: 7, height: 7)
-            Text("\(session.client) is using Search")
+            Text(language.format("agent.is_using", fallback: "%@ is using Search", session.client))
                 .font(.system(size: 12))
                 .foregroundStyle(Palette.ink)
                 .lineLimit(1)
             Button { AgentControl.shared.stopSession() } label: {
-                Text("Stop")
+                Text("ui.stop", bundle: Language.resources)
                     .font(.system(size: 12, weight: .medium))
                     .foregroundStyle(Palette.ink)
                     .padding(.horizontal, 10)
@@ -131,7 +134,7 @@ private struct AgentPill: View {
                     .overlay(Capsule().strokeBorder(Palette.hairline, lineWidth: 1))
             }
             .buttonStyle(.plain)
-            .help("Disconnect it. Its tabs stay where they are.")
+            .help(Text("ui.disconnect_it_its_tabs_stay_where_they_are", bundle: Language.resources))
         }
         .padding(.leading, 14)
         .padding(.trailing, 6)

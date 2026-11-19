@@ -61,7 +61,7 @@ enum TabOffersPanel {
         let spot = window.convertToScreen(field.convert(field.bounds, to: nil))
         // As wide as the field and the card's margin either side, within reason.
         let width = min(max(spot.width + 24, 320), 460)
-        let host = Host(rootView: AnyView(TabOffersList(browser: browser).frame(width: width)))
+        let host = Host(rootView: AnyView(LanguageRoot(content: TabOffersList(browser: browser).frame(width: width))))
         let size = host.fittingSize
         host.frame = NSRect(origin: .zero, size: size)
         let panel = Panel(contentRect: host.frame, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)

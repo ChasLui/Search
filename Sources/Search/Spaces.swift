@@ -438,7 +438,10 @@ extension Browser {
         askFocus()
         // Beside the space's icon when the tabs are on screen (SpaceDot);
         // folded away, at the bottom.
-        if folded && !peeking { announce(space.name) }
+        if folded && !peeking {
+            let name = space.name
+            announce(name, localized: { name })
+        }
     }
 
     /// Every other space's row, made ahead of time, so the column can show
@@ -678,7 +681,9 @@ struct SpaceDot: View {
         .buttonStyle(.plain)
         .onHover { hovering = $0 }
         .animation(Motion.quick, value: browser.space.look)
-        .help("\(browser.space.name) — ⌃1–⌃9, or two fingers \(browser.prefs.sidebar ? "sideways" : "up or down") over the tabs, to switch")
+        .help(browser.prefs.sidebar
+              ? Language.shared.format("space.switch.sideways", fallback: "%1$@ — ⌃1–⌃9, or two fingers sideways over the tabs, to switch", browser.space.name)
+              : Language.shared.format("space.switch.vertical", fallback: "%1$@ — ⌃1–⌃9, or two fingers up or down over the tabs, to switch", browser.space.name))
         .onChange(of: key) { _, now in
             let symbol = symbol
             DispatchQueue.main.async {
@@ -747,6 +752,13 @@ enum SpaceMenu {
         return item
     }
 
+    private static func localizedItem(_ key: String, _ english: String, checked: Bool = false,
+                                      _ run: @escaping () -> Void) -> NSMenuItem {
+        let result = item(Language.shared.text(key, fallback: english), checked: checked, run)
+        result.representedObject = english
+        return result
+    }
+
     /// A space's icon for the menu, in its colour if it has one.
     private static func image(_ symbol: String, tint: Color?) -> NSImage? {
         let plain = NSImage(systemSymbolName: symbol, accessibilityDescription: nil)
@@ -783,46 +795,53 @@ enum SpaceMenu {
             }
         }
         menu.addItem(.separator())
-        menu.addItem(item("New Space…") { browser.askForSpace() })
+        menu.addItem(localizedItem("space.new", "New Space…") { browser.askForSpace() })
         // The profiles, once there is more than one (see Profiles.swift).
         if Profiles.shared.several {
             menu.addItem(.separator())
             let profiles = NSMenu()
             for entry in ProfileMenu.items(for: browser) { profiles.addItem(entry) }
-            let holder = NSMenuItem(title: "Profile: \(Profiles.shared.profile(browser.profileID).name)", action: nil, keyEquivalent: "")
+            let name = Profiles.shared.profile(browser.profileID).name
+            let holder = NSMenuItem(title: Language.shared.format("space.profile", fallback: "Profile: %@", name), action: nil, keyEquivalent: "")
+            holder.representedObject = "Profile: \(name)"
             holder.submenu = profiles
             menu.addItem(holder)
         }
         menu.addItem(.separator())
         let here = browser.space
-        menu.addItem(item("Rename “\(here.name)”…") {
-            Ask.name("Rename Space", placeholder: here.name, initial: here.name, confirm: "Rename") { browser.renameSpace(here.id, to: $0) }
-        })
+        let rename = item(Language.shared.format("space.rename", fallback: "Rename “%@”…", here.name)) {
+            Ask.name("Rename Space",
+                     placeholder: here.name, initial: here.name, confirm: "Rename") { browser.renameSpace(here.id, to: $0) }
+        }
+        rename.representedObject = "Rename “\(here.name)”…"
+        menu.addItem(rename)
         let icons = NSMenu()
         for (symbol, name) in zip(Spaces.icons, Spaces.iconNames) {
-            let choice = item(name, checked: here.symbol == symbol) { browser.setSpaceIcon(here.id, to: symbol) }
-            choice.image = NSImage(systemSymbolName: symbol, accessibilityDescription: name)
+            let shown = Language.shared.text("icon.\(name)", fallback: name)
+            let choice = item(shown, checked: here.symbol == symbol) { browser.setSpaceIcon(here.id, to: symbol) }
+            choice.image = NSImage(systemSymbolName: symbol, accessibilityDescription: shown)
             icons.addItem(choice)
         }
-        let icon = NSMenuItem(title: "Icon", action: nil, keyEquivalent: "")
+        let icon = NSMenuItem(title: Language.shared.text("space.icon", fallback: "Icon"), action: nil, keyEquivalent: "")
+        icon.representedObject = "Icon"
         icon.submenu = icons
         menu.addItem(icon)
         // Everything the space can wear, in one popover (see SpaceLookPicker).
-        menu.addItem(item("Colour…") {
+        menu.addItem(localizedItem("space.colour", "Colour…") {
             // Once the menu has gone: a popover shown while it tracks closes with it.
             DispatchQueue.main.async { SpaceLookPopover.show(for: browser) }
         })
         // The order is the swipe's, and ⌃1–⌃9's.
         if let at = browser.spaces.firstIndex(where: { $0.id == here.id }) {
-            if at > 0 { menu.addItem(item("Move Left") { browser.moveSpace(here.id, to: at - 1) }) }
-            if at < browser.spaces.count - 1 { menu.addItem(item("Move Right") { browser.moveSpace(here.id, to: at + 1) }) }
+            if at > 0 { menu.addItem(localizedItem("space.move_left", "Move Left") { browser.moveSpace(here.id, to: at - 1) }) }
+            if at < browser.spaces.count - 1 { menu.addItem(localizedItem("space.move_right", "Move Right") { browser.moveSpace(here.id, to: at + 1) }) }
         }
         // Every group of this space, folded or opened at once, as in Arc.
         if browser.prefs.usesTabGroups, !browser.tabGroups.isEmpty {
             menu.addItem(.separator())
-            let fold = item("Fold All Groups") { browser.foldAllGroups(true) }
+            let fold = localizedItem("space.fold_groups", "Fold All Groups") { browser.foldAllGroups(true) }
             fold.isEnabled = browser.canFoldAllGroups
-            let unfold = item("Unfold All Groups") { browser.foldAllGroups(false) }
+            let unfold = localizedItem("space.unfold_groups", "Unfold All Groups") { browser.foldAllGroups(false) }
             unfold.isEnabled = browser.canUnfoldAllGroups
             menu.autoenablesItems = false
             menu.addItem(fold)
@@ -833,22 +852,26 @@ enum SpaceMenu {
         // Settings, or one of its own.
         let folder = here.downloads.map { URL(fileURLWithPath: $0).lastPathComponent }
         let places = NSMenu()
-        places.addItem(item("Same as Settings", checked: folder == nil) { browser.setSpaceDownloads(here.id, to: nil) })
+        places.addItem(localizedItem("space.same_settings", "Same as Settings", checked: folder == nil) { browser.setSpaceDownloads(here.id, to: nil) })
         if let folder {
             places.addItem(item("“\(folder)”", checked: true) {})
         }
         places.addItem(.separator())
-        places.addItem(item("Choose Folder…") { Ask.folder { browser.setSpaceDownloads(here.id, to: $0) } })
-        let downloads = NSMenuItem(title: "Downloads", action: nil, keyEquivalent: "")
+        places.addItem(localizedItem("space.choose_folder", "Choose Folder…") { Ask.folder { browser.setSpaceDownloads(here.id, to: $0) } })
+        let downloads = NSMenuItem(title: Language.shared.text("page.downloads", fallback: "Downloads"), action: nil, keyEquivalent: "")
+        downloads.representedObject = "Downloads"
         downloads.submenu = places
         menu.addItem(downloads)
         if !here.isFirst, here.id != browser.homeSpaceID {
             menu.addItem(.separator())
-            menu.addItem(item("Delete “\(here.name)”…") {
-                Ask.sure("Delete “\(here.name)”?", detail: "Its tabs close, and its cookies and sign-ins are erased from this Mac. History and bookmarks stay.", confirm: "Delete") {
+            let deletion = item(Language.shared.format("space.delete", fallback: "Delete “%@”…", here.name)) {
+                Ask.sure(Language.shared.format("space.delete_confirm", fallback: "Delete “%@”?", here.name),
+                         detail: Language.shared.text("space.delete_detail", fallback: "Its tabs close, and its cookies and sign-ins are erased from this Mac. History and bookmarks stay."), confirm: "Delete") {
                     browser.deleteSpace(here.id)
                 }
-            })
+            }
+            deletion.representedObject = "Delete “\(here.name)”…"
+            menu.addItem(deletion)
         }
         return menu
     }
@@ -864,18 +887,25 @@ enum Ask {
 
     /// `empty`: an empty name is an answer too (a bookmark's, see
     /// Bookmarks.askRename); otherwise it is taken as no answer.
-    static func name(_ title: String, detail: String? = nil, placeholder: String, initial: String = "", confirm: String, empty: Bool = false, then: @escaping (String) -> Void) {
+    static func name(_ title: String, detail: String? = nil, placeholder: String, localizePlaceholder: Bool = false, initial: String = "", confirm: String, empty: Bool = false, then: @escaping (String) -> Void) {
         let alert = NSAlert()
-        alert.messageText = title
-        if let detail { alert.informativeText = detail }
+        alert.messageText = Language.shared.text(title, fallback: title)
+        if let detail { alert.informativeText = Language.shared.text(detail, fallback: detail) }
         let field = NSTextField(frame: NSRect(x: 0, y: 0, width: 240, height: 24))
-        field.placeholderString = placeholder
+        field.placeholderString = localizePlaceholder ? Language.shared.text(placeholder, fallback: placeholder) : placeholder
         field.stringValue = initial
         alert.accessoryView = field
-        alert.addButton(withTitle: confirm)
-        alert.addButton(withTitle: "Cancel")
+        alert.addButton(withTitle: Language.shared.text(confirm, fallback: confirm))
+        alert.addButton(withTitle: Language.shared.text("Cancel", fallback: "Cancel"))
         alert.window.initialFirstResponder = field
-        show(alert) { ok in
+        show(alert, localize: { alert in
+            let language = Language.shared
+            alert.messageText = language.text(title, fallback: title)
+            if let detail { alert.informativeText = language.text(detail, fallback: detail) }
+            if localizePlaceholder { field.placeholderString = language.text(placeholder, fallback: placeholder) }
+            alert.buttons[0].title = language.text(confirm, fallback: confirm)
+            alert.buttons[1].title = language.text("Cancel", fallback: "Cancel")
+        }) { ok in
             let name = field.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
             if ok, empty || !name.isEmpty { then(name) }
         }
@@ -885,20 +915,28 @@ enum Ask {
     /// have — for when the column isn't there to hold the card.
     static func newSpace(then: @escaping (String, Bool) -> Void, cancelled: @escaping () -> Void) {
         let alert = NSAlert()
-        alert.messageText = "New Space"
-        alert.informativeText = "Its own tabs. Signed in where your other spaces are, unless it starts afresh."
+        alert.messageText = Language.shared.text("space.new_title", fallback: "New Space")
+        alert.informativeText = Language.shared.text("space.new_detail", fallback: "Its own tabs. Signed in where your other spaces are, unless it starts afresh.")
         let field = NSTextField(frame: NSRect(x: 0, y: 30, width: 260, height: 24))
-        field.placeholderString = "Work"
-        let fresh = NSButton(checkboxWithTitle: "Start signed out, with its own cookies", target: nil, action: nil)
+        field.placeholderString = Language.shared.text("space.work_placeholder", fallback: "Work")
+        let fresh = NSButton(checkboxWithTitle: Language.shared.text("space.fresh", fallback: "Start signed out, with its own cookies"), target: nil, action: nil)
         fresh.frame = NSRect(x: 0, y: 0, width: 260, height: 22)
         let box = NSView(frame: NSRect(x: 0, y: 0, width: 260, height: 56))
         box.addSubview(field)
         box.addSubview(fresh)
         alert.accessoryView = box
-        alert.addButton(withTitle: "Create")
-        alert.addButton(withTitle: "Cancel")
+        alert.addButton(withTitle: Language.shared.text("Create", fallback: "Create"))
+        alert.addButton(withTitle: Language.shared.text("Cancel", fallback: "Cancel"))
         alert.window.initialFirstResponder = field
-        show(alert) { ok in
+        show(alert, localize: { alert in
+            let language = Language.shared
+            alert.messageText = language.text("space.new_title", fallback: "New Space")
+            alert.informativeText = language.text("space.new_detail", fallback: "Its own tabs. Signed in where your other spaces are, unless it starts afresh.")
+            field.placeholderString = language.text("space.work_placeholder", fallback: "Work")
+            fresh.title = language.text("space.fresh", fallback: "Start signed out, with its own cookies")
+            alert.buttons[0].title = language.text("Create", fallback: "Create")
+            alert.buttons[1].title = language.text("Cancel", fallback: "Cancel")
+        }) { ok in
             let name = field.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
             guard ok, !name.isEmpty else { cancelled(); return }
             then(name, fresh.state != .on)
@@ -908,26 +946,37 @@ enum Ask {
     /// Something to say, with nothing to answer but OK.
     static func tell(_ title: String, detail: String) {
         let alert = NSAlert()
-        alert.messageText = title
-        alert.informativeText = detail
-        alert.addButton(withTitle: "OK")
-        show(alert) { _ in }
+        alert.messageText = Language.shared.text(title, fallback: title)
+        alert.informativeText = Language.shared.text(detail, fallback: detail)
+        alert.addButton(withTitle: Language.shared.text("OK", fallback: "OK"))
+        show(alert, localize: { alert in
+            alert.messageText = Language.shared.text(title, fallback: title)
+            alert.informativeText = Language.shared.text(detail, fallback: detail)
+            alert.buttons[0].title = Language.shared.text("OK", fallback: "OK")
+        }) { _ in }
     }
 
     /// `returnCancels`: Return is Cancel's, for a yes that can't be undone.
-    static func sure(_ title: String, detail: String, confirm: String, returnCancels: Bool = false, then: @escaping () -> Void) {
+    static func sure(_ title: @autoclosure @escaping () -> String, detail: @autoclosure @escaping () -> String, confirm: String, returnCancels: Bool = false, then: @escaping () -> Void) {
         if Store.testing, let yes = testing {
             if yes { then() }
             return
         }
         let alert = NSAlert()
-        alert.messageText = title
-        alert.informativeText = detail
-        let yes = alert.addButton(withTitle: confirm)
+        let update: (NSAlert) -> Void = { alert in
+            let language = Language.shared
+            let heading = title(), explanation = detail()
+            alert.messageText = language.text(heading, fallback: heading)
+            alert.informativeText = language.text(explanation, fallback: explanation)
+            alert.buttons[0].title = language.text(confirm, fallback: confirm)
+            alert.buttons[1].title = language.text("Cancel", fallback: "Cancel")
+        }
+        let yes = alert.addButton(withTitle: Language.shared.text(confirm, fallback: confirm))
         yes.hasDestructiveAction = true
-        let no = alert.addButton(withTitle: "Cancel")
+        let no = alert.addButton(withTitle: Language.shared.text("Cancel", fallback: "Cancel"))
+        update(alert)
         guard returnCancels else {
-            show(alert) { ok in if ok { then() } }
+            show(alert, localize: update) { ok in if ok { then() } }
             return
         }
         yes.keyEquivalent = ""
@@ -939,7 +988,7 @@ enum Ask {
             no.performClick(nil)
             return nil
         }
-        show(alert) { ok in
+        show(alert, localize: update) { ok in
             if let escape { NSEvent.removeMonitor(escape) }
             if ok { then() }
         }
@@ -950,20 +999,29 @@ enum Ask {
         panel.canChooseDirectories = true
         panel.canChooseFiles = false
         panel.canCreateDirectories = true
-        panel.prompt = "Use for This Space"
-        panel.message = "Downloads in this space go here. Cancel keeps the folder it has."
+        panel.prompt = Language.shared.text("space.folder_prompt", fallback: "Use for This Space")
+        panel.message = Language.shared.text("space.folder_message", fallback: "Downloads in this space go here. Cancel keeps the folder it has.")
         guard let window = Links.window else { return }
         panel.beginSheetModal(for: window) { answer in
             if answer == .OK, let url = panel.url { then(url) }
         }
     }
 
-    private static func show(_ alert: NSAlert, _ done: @escaping (Bool) -> Void) {
+    private static func show(_ alert: NSAlert, localize: ((NSAlert) -> Void)? = nil, _ done: @escaping (Bool) -> Void) {
+        let observer = localize.map { update in
+            NotificationCenter.default.addObserver(forName: Language.didChange, object: nil, queue: .main) { [weak alert] _ in
+                MainActor.assumeIsolated { if let alert { update(alert) } }
+            }
+        }
+        let finish: (Bool) -> Void = { answer in
+            if let observer { NotificationCenter.default.removeObserver(observer) }
+            done(answer)
+        }
         guard let window = Links.window else {
-            done(alert.runModal() == .alertFirstButtonReturn)
+            finish(alert.runModal() == .alertFirstButtonReturn)
             return
         }
-        alert.beginSheetModal(for: window) { done($0 == .alertFirstButtonReturn) }
+        alert.beginSheetModal(for: window) { finish($0 == .alertFirstButtonReturn) }
     }
 }
 

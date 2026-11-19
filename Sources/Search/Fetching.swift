@@ -743,7 +743,7 @@ struct FetchDoor: View {
             }
             .buttonStyle(.plain)
             .onHover { hovering = $0 }
-            .help("Downloads (⇧⌘J)")
+            .help(Text("ui.downloads_j", bundle: Language.resources))
             .background(ButtonSpot { spot.view = $0; if browser.downloadsHanging { float(true) } })
             .onChange(of: browser.downloadsHanging) { _, on in float(on) }
             .onDisappear { DownloadsFloat.hide(for: browser) }

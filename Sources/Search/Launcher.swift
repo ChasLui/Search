@@ -250,7 +250,7 @@ final class Launcher: NSObject, ObservableObject, NSWindowDelegate {
         panel.isMovable = false
         panel.isReleasedWhenClosed = false
         panel.delegate = self
-        panel.contentView = NSHostingView(rootView: LauncherView(launcher: self))
+        panel.contentView = NSHostingView(rootView: LanguageRoot(content: LauncherView(launcher: self)))
         return panel
     }
 
@@ -543,6 +543,7 @@ private struct LauncherView: View {
 /// the rest of an address offered after the caret, selected, so typing on
 /// replaces it and Return takes it.
 private struct LauncherField: NSViewRepresentable {
+    @ObservedObject private var language = Language.shared
     @ObservedObject var launcher: Launcher
 
     private static let font = NSFont.systemFont(ofSize: 15.5)
@@ -562,14 +563,19 @@ private struct LauncherField: NSViewRepresentable {
         field.cell?.wraps = false
         field.cell?.isScrollable = true
         field.placeholderAttributedString = NSAttributedString(
-            string: "Search or enter a web address",
+            string: language.text("launcher.placeholder", fallback: "Search or enter a web address"),
             attributes: [.font: Self.font, .foregroundColor: NSColor(Palette.ink.opacity(0.3))]
         )
-        field.setAccessibilityLabel("Address, opened in Search")
+        field.setAccessibilityLabel(language.text("launcher.address", fallback: "Address, opened in Search"))
         return field
     }
 
     func updateNSView(_ field: NSTextField, context: Context) {
+        field.placeholderAttributedString = NSAttributedString(
+            string: language.text("launcher.placeholder", fallback: "Search or enter a web address"),
+            attributes: [.font: Self.font, .foregroundColor: NSColor(Palette.ink.opacity(0.3))]
+        )
+        field.setAccessibilityLabel(language.text("launcher.address", fallback: "Address, opened in Search"))
         let coordinator = context.coordinator
         coordinator.launcher = launcher
         // Only when something other than typing changed it: the words kept
@@ -685,6 +691,7 @@ private struct LauncherField: NSViewRepresentable {
 /// The launcher's key, chosen in Settings: click, then press it. Empty until
 /// chosen, with Spotlight's key, ⇧, one click away; ⌫ takes it away.
 struct LauncherKeyBox: View {
+    @ObservedObject private var language = Language.shared
     @ObservedObject var prefs: Preferences
     @ObservedObject private var launcher = Launcher.shared
 
@@ -702,7 +709,7 @@ struct LauncherKeyBox: View {
                     .lineLimit(1)
             }
             if prefs.launcherKey == nil, !listening {
-                Pill("Use \(LauncherKey.suggested.combo.display)") { prefs.launcherKey = .suggested }
+                Pill(Language.shared.format("launcher.use_shortcut", fallback: "Use %1$@", LauncherKey.suggested.combo.display)) { prefs.launcherKey = .suggested }
             }
             Button(action: listen) {
                 Text(label)
@@ -720,16 +727,16 @@ struct LauncherKeyBox: View {
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .help("Click, then press the key. ⌫ takes it away")
+            .help(Text("ui.click_then_press_the_key_takes_it_away", bundle: Language.resources))
             .onHover { hovering = $0 }
             .onDisappear(perform: stop)
         }
     }
 
     private var label: String {
-        if let note { return note }
-        if listening { return "Type a shortcut" }
-        return prefs.launcherKey?.combo.display ?? "None"
+        if let note { return language.text(note, fallback: note) }
+        if listening { return language.text("shortcut.type", fallback: "Type a shortcut") }
+        return prefs.launcherKey?.combo.display ?? language.text("shortcut.none", fallback: "None")
     }
 
     private func listen() {

@@ -316,13 +316,14 @@ final class BrowserProxy: ObservableObject {
 /// with the review's two lines added: what actually goes through it, and
 /// that a password reaches a proxy in the clear.
 struct ProxySettings: View {
+    @ObservedObject private var language = Language.shared
     @ObservedObject private var proxy = BrowserProxy.shared
     @State private var draft = BrowserProxy.shared.value
     @State private var password = BrowserProxy.shared.savedPassword
     @State private var message: String?
 
     private var note: String {
-        """
+        language.text("proxy.note", fallback: """
         What Search fetches goes through it: pages, favicons, search \
         suggestions, copied pictures, extensions and the Web Store, the AI \
         add-on and Search's own updates. A video call is the exception: \
@@ -332,25 +333,25 @@ struct ProxySettings: View {
         or NAS reached by its address goes through the proxy. A proxy that \
         can't be reached fails \
         rather than going direct.
-        """
+        """)
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Line("Send everything through a proxy", draft.mode == .system ? "Off: Search follows the Mac's own network settings." : note) {
-                Picker("Proxy", selection: $draft.mode) {
-                    ForEach(ProxySettingsValue.Mode.allCases) { Text($0.title).tag($0) }
-                }
+            Line("ui.send_everything_through_a_proxy", draft.mode == .system ? language.text("proxy.system_detail", fallback: "Off: Search follows the Mac's own network settings.") : note, localizedTitle: true) {
+                Picker(selection: $draft.mode) {
+                    ForEach(ProxySettingsValue.Mode.allCases) { Text(LocalizedStringKey($0.title), bundle: Language.resources).tag($0) }
+                } label: { Text("ui.proxy", bundle: Language.resources) }
                 .labelsHidden()
                 .pickerStyle(.menu)
                 .frame(width: 180)
             }
             if draft.mode != .system {
                 Rule()
-                TextField("Host, such as 127.0.0.1", text: $draft.host)
-                TextField("Port, such as 7890", text: $draft.port)
-                TextField("User name, if the proxy asks for one", text: $draft.username)
-                SecureField("Password, if the proxy asks for one", text: $password)
+                TextField(text: $draft.host, prompt: Text("ui.host_such_as_127_0_0_1", bundle: Language.resources)) { Text("ui.host_such_as_127_0_0_1", bundle: Language.resources) }
+                TextField(text: $draft.port, prompt: Text("ui.port_such_as_7890", bundle: Language.resources)) { Text("ui.port_such_as_7890", bundle: Language.resources) }
+                TextField(text: $draft.username, prompt: Text("ui.user_name_if_the_proxy_asks_for_one", bundle: Language.resources)) { Text("ui.user_name_if_the_proxy_asks_for_one", bundle: Language.resources) }
+                SecureField(text: $password, prompt: Text("ui.password_if_the_proxy_asks_for_one", bundle: Language.resources)) { Text("ui.password_if_the_proxy_asks_for_one", bundle: Language.resources) }
                 small(draft.mode == .http
                     ? "HTTP proxies are reached with CONNECT, so the proxy has to allow tunnelling."
                     : "SOCKS5, as an SSH tunnel or a local client offers.")
@@ -360,7 +361,7 @@ struct ProxySettings: View {
             }
             if let validation = draft.validation { small(validation) }
             HStack(spacing: 10) {
-                Pill("Apply", filled: true) {
+                Pill("ui.apply", filled: true) {
                     do {
                         try proxy.save(draft, password: password)
                         message = draft.mode == .system ? "Proxy turned off." : "Proxy applied. Reload a page to fetch it through the proxy."
@@ -380,7 +381,7 @@ struct ProxySettings: View {
     }
 
     private func small(_ text: String) -> some View {
-        Text(text)
+        Text(LocalizedStringKey(text), bundle: Language.resources)
             .font(.system(size: 11.5))
             .foregroundStyle(Palette.muted)
             .fixedSize(horizontal: false, vertical: true)

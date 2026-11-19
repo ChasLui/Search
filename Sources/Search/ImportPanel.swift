@@ -11,11 +11,12 @@ import SwiftUI
 /// decrypted, so nothing prompts until Bring them in is pressed. Then macOS
 /// asks once for that browser's key, if it keeps one.
 struct ImportPanel: View {
+    @ObservedObject private var language = Language.shared
     @ObservedObject var browser: Browser
 
     @State private var sources: [ImportSource] = []
     @State private var unreadable: [Chromium.Unavailable] = []
-    @State private var folderError: String?
+    @State private var folderError: URL?
     @State private var looking = true
     @State private var pick: ImportSource?
     /// Each browser's profiles, and the one used most recently.
@@ -49,26 +50,81 @@ struct ImportPanel: View {
     /// offer to show the bar is for.
     @State private var marksLanded = false
 
-    struct Said: Hashable {
-        let ok: Bool
-        let text: String
+    enum Said: Hashable {
+        case passwords(Int, skipped: Int, undecrypted: Int, source: String)
+        case noKey(String), primaryPassword(String), noPasswords(String)
+        case bookmarksKept(String, Int), noBookmarks(String), bookmarks(Int), bookmarksWithExisting(Int, Int)
+        case places(Int), extensions(Int)
+        case arcAlready, arc(Int, Int, Int)
+        case sessionAlready(String), session(Int, Int, Int)
+
+        var ok: Bool {
+            switch self {
+            case .passwords(let kept, _, let undecrypted, _): return kept > 0 || undecrypted == 0
+            case .noKey, .primaryPassword, .noPasswords, .bookmarksKept: return false
+            default: return true
+            }
+        }
+
+        @MainActor var text: String {
+            let language = Language.shared
+            switch self {
+            case let .passwords(count, skipped, undecrypted, source):
+                let passwords = language.count("count.passwords", count)
+                let skippedText = language.count("count.skipped_no_address", skipped)
+                let lockedText = language.format("import.result.locked", fallback: "%1$@ with %2$@'s key", language.count("count.undecrypted", undecrypted), source)
+                if skipped > 0 && undecrypted > 0 {
+                    return language.format("import.result.passwords_both", fallback: "%1$@ (%2$@) — %3$@", passwords, skippedText, lockedText)
+                }
+                if skipped > 0 { return language.format("import.result.passwords_skipped", fallback: "%1$@ (%2$@)", passwords, skippedText) }
+                if undecrypted > 0 { return language.format("import.result.passwords_locked", fallback: "%1$@ — %2$@", passwords, lockedText) }
+                return passwords
+            case .noKey(let source):
+                return language.format("import.result.no_key", fallback: "macOS didn't hand over %1$@'s key — allow it and try again", source)
+            case .primaryPassword(let source):
+                return language.format("import.result.primary_password", fallback: "%1$@ has a primary password: export your passwords from it and bring in the CSV file", source)
+            case .noPasswords(let source):
+                return language.format("import.result.no_passwords", fallback: "No passwords readable in %1$@", source)
+            case let .bookmarksKept(source, added):
+                return language.format("import.result.bookmarks_kept", fallback: "Couldn't read all of %1$@'s bookmarks: what came from it before was kept, %2$@", source, language.count("count.new_bookmarks", added))
+            case .noBookmarks(let source):
+                return language.format("import.result.no_bookmarks", fallback: "No bookmarks in %1$@", source)
+            case .bookmarks(let count): return language.count("count.bookmarks", count)
+            case let .bookmarksWithExisting(added, already):
+                return language.format("import.result.bookmarks_existing", fallback: "%1$@, %2$@", language.count("count.new_bookmarks", added), language.count("count.already_here", already))
+            case .places(let count): return language.count("count.places", count)
+            case .extensions(let count): return language.count("count.extensions_confirm", count)
+            case .arcAlready: return language.text("import.result.arc_already", fallback: "Arc's spaces and pins were all here already")
+            case let .arc(spaces, pins, tabs):
+                return language.format("import.result.arc", fallback: "%1$@, %2$@, %3$@", language.count("count.new_spaces", spaces), language.count("count.pins", pins), language.count("count.pinned_tabs", tabs))
+            case .sessionAlready(let source):
+                return language.format("import.result.session_already", fallback: "%1$@'s open tabs were all here already", source)
+            case let .session(tabs, groups, pins):
+                var parts = [language.count("count.open_tabs", tabs)]
+                if groups > 0 { parts.append(language.count("count.new_groups", groups)) }
+                if pins > 0 { parts.append(language.count("count.pins", pins)) }
+                let list = ListFormatter()
+                list.locale = language.locale
+                return list.string(from: parts) ?? parts.joined(separator: ", ")
+            }
+        }
     }
 
     private var content: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text("Nothing in the other browser changes. Passwords go into your keychain.")
+            Text("ui.nothing_in_the_other_browser_changes_passwords_go_into_", bundle: Language.resources)
                 .font(.system(size: 12.5))
                 .foregroundStyle(Palette.muted)
 
             if looking {
                 HStack(spacing: 8) {
                     Ring(size: 10)
-                    Text("Looking on this Mac…").font(.system(size: 12)).foregroundStyle(Palette.muted)
+                    Text("ui.looking_on_this_mac", bundle: Language.resources).font(.system(size: 12)).foregroundStyle(Palette.muted)
                 }
             } else if sources.isEmpty {
                 Card { Nothing(unreadable.isEmpty ? "No other browser found on this Mac." : "Choose a browser's data folder below to allow Search to read it.") }
             } else {
-                Caption("On this Mac")
+                Caption("ui.on_this_mac", localized: true)
                 Card {
                     ForEach(Array(sources.enumerated()), id: \.element.id) { index, source in
                         if index > 0 { Rule() }
@@ -92,7 +148,7 @@ struct ImportPanel: View {
     }
 
     var body: some View {
-        Plate("Bring things over", width: 580, close: { browser.bringingIn = nil }) {
+        Plate("plate.import", localizedTitle: true, width: 580, close: { browser.bringingIn = nil }) {
             // As tall as it needs to be, and scrolling past what the window
             // can hold: many browsers, or a small window.
             ViewThatFits(in: .vertical) {
@@ -121,17 +177,17 @@ struct ImportPanel: View {
                 }
                 HStack(spacing: 8) {
                     if brought != nil {
-                        Pill("Show bookmarks") { browser.lead(to: InternalPage(.bookmarks)) }
+                        Pill("ui.show_bookmarks_60af0d") { browser.lead(to: InternalPage(.bookmarks)) }
                         // The bar is off until it is asked for, and nobody asks
                         // for a row that has nothing in it. Bookmarks having just
                         // arrived is the one moment it is worth offering; the
                         // bar comes in above this page, where it is seen.
                         if marksLanded, !browser.prefs.bookmarksBar {
-                            Pill("Show the bookmarks bar") {
+                            Pill("ui.show_the_bookmarks_bar") {
                                 withAnimation(Motion.glide) { browser.prefs.bookmarksBar = true }
                             }
                         }
-                        Pill("Show passwords") { browser.lead(to: InternalPage(.passwords)) }
+                        Pill("ui.show_passwords") { browser.lead(to: InternalPage(.passwords)) }
                     } else if let source = pick {
                         Pill(bringing ? "Bringing…" : "Bring them in", filled: true) { bring(from: source) }
                             .disabled(bringing || !(wantsPasswords || wantsBookmarks || wantsHistory || (wantsExtensions && !fresh(source).isEmpty)
@@ -140,7 +196,7 @@ struct ImportPanel: View {
                         if bringing { Ring(size: 10) }
                     }
                     Spacer(minLength: 8)
-                    Pill("File…") { browser.importFile() }
+                    Pill("ui.file") { browser.importFile() }
                         .disabled(bringing)
                 }
             }
@@ -176,14 +232,14 @@ struct ImportPanel: View {
     /// the pins and the ones it filed stay tabs in a group of that folder's
     /// name, so that neither the keeping nor the folder is lost.
     private func arcDetail(_ arc: (spaces: Int, pinned: Int)) -> String {
-        let spaces = arc.spaces == 1 ? "1 space" : "\(arc.spaces) spaces"
-        let head = "\(spaces), \(arc.pinned) pinned — each a space here, the favourites as pins"
+        let spaces = language.count("count.spaces", arc.spaces)
+        let pinned = language.count("count.pinned", arc.pinned)
         if browser.prefs.listsPins && browser.prefs.pinFolders {
-            return head + ", its pinned pages as rows under them, in its folders as folders of rows"
+            return language.format("import.arc.folders", fallback: "%1$@, %2$@ — each a space here, the favourites as pins, its pinned pages as rows under them, in its folders as folders of rows", spaces, pinned)
         }
         return browser.prefs.listsPins
-            ? head + ", its pinned pages as rows under them, and the ones it filed in a folder as tabs in a group of that name"
-            : head + ", its pinned tabs asleep in it"
+            ? language.format("import.arc.rows", fallback: "%1$@, %2$@ — each a space here, the favourites as pins, its pinned pages as rows under them, and the ones it filed in a folder as tabs in a group of that name", spaces, pinned)
+            : language.format("import.arc.sleeping", fallback: "%1$@, %2$@ — each a space here, the favourites as pins, its pinned tabs asleep in it", spaces, pinned)
     }
 
     /// Whether Arc's own spaces are coming over: they hold its tabs, which
@@ -199,13 +255,15 @@ struct ImportPanel: View {
 
     /// What the open tabs side of the import will do.
     private func tabsDetail(_ preview: ImportSource.Preview?, _ source: ImportSource) -> String {
-        guard let session = preview?.session, session.tabs > 0 else { return "None open in \(source.name)" }
-        if takesArc(source) { return "They come with Arc's spaces; turn those off to bring its open tabs instead" }
-        func count(_ n: Int, _ one: String) -> String { n == 1 ? "1 \(one)" : "\(n.formatted()) \(one)s" }
+        guard let session = preview?.session, session.tabs > 0 else { return language.format("import.no_open_tabs", fallback: "None open in %1$@", source.name) }
+        if takesArc(source) { return language.text("import.arc_tabs", fallback: "They come with Arc's spaces; turn those off to bring its open tabs instead") }
         let tabs = session.found > session.tabs
-            ? "The first \(session.tabs.formatted()) of \(session.found.formatted()) tabs" : count(session.tabs, "tab")
-        let groups = session.groups.isEmpty ? "" : " in \(count(session.groups.count, "group"))"
-        return "\(tabs)\(groups) — asleep at the end of this space, pinned tabs as pins"
+            ? language.format("import.first_tabs", fallback: "The first %1$@ of %2$@ tabs", session.tabs.formatted(), session.found.formatted())
+            : language.count("count.tabs", session.tabs)
+        if session.groups.isEmpty {
+            return language.format("import.tabs_detail", fallback: "%1$@ — asleep at the end of this space, pinned tabs as pins", tabs)
+        }
+        return language.format("import.tabs_groups_detail", fallback: "%1$@ in %2$@ — asleep at the end of this space, pinned tabs as pins", tabs, language.count("count.groups", session.groups.count))
     }
 
     /// Safari, and browsers on this Mac with nothing where their data should
@@ -215,20 +273,20 @@ struct ImportPanel: View {
         if ImportSource.safari || !unreadable.isEmpty || folderError != nil {
             VStack(alignment: .leading, spacing: 4) {
                 if ImportSource.safari {
-                    Text("Safari — macOS keeps its data from other apps: in Safari, File › Export Browsing Data, then bring the file in below.")
+                    Text("ui.safari_macos_keeps_its_data_from_other_apps_in_safari_f", bundle: Language.resources)
                         .font(.system(size: 11.5))
                         .foregroundStyle(Palette.faint)
                 }
                 ForEach(unreadable.indices, id: \.self) { index in
                     let missing = unreadable[index]
                     HStack(alignment: .firstTextBaseline, spacing: 8) {
-                        Text(missing.message)
+                        Text(missing.localizedMessage)
                         Spacer(minLength: 4)
-                        Pill("Choose folder…") { chooseFolder(for: missing.source) }
+                        Pill("ui.choose_folder") { chooseFolder(for: missing.source) }
                     }
                 }
                 if let folderError {
-                    Text(folderError)
+                    Text(language.format("import.folder_error", fallback: "No browser profile was found in %1$@. Choose the folder that contains Default or Profile 1.", folderError.path.replacingOccurrences(of: NSHomeDirectory(), with: "~")))
                         .font(.system(size: 11.5))
                         .foregroundStyle(Palette.muted)
                 }
@@ -248,8 +306,8 @@ struct ImportPanel: View {
         panel.canChooseFiles = false
         panel.allowsMultipleSelection = false
         panel.directoryURL = source.root.deletingLastPathComponent()
-        panel.message = "Choose \(source.name)'s browser data folder"
-        panel.prompt = "Use Folder"
+        panel.message = language.format("import.choose_folder", fallback: "Choose %1$@'s browser data folder", source.name)
+        panel.prompt = language.text("import.use_folder", fallback: "Use Folder")
         panel.begin { answer in
             guard answer == .OK, let folder = panel.url else { return }
             looking = true
@@ -260,7 +318,7 @@ struct ImportPanel: View {
                 DispatchQueue.main.async {
                     guard found else {
                         looking = false
-                        folderError = "No browser profile was found in \(folder.path.replacingOccurrences(of: NSHomeDirectory(), with: "~")). Choose the folder that contains Default or Profile 1."
+                        folderError = folder
                         return
                     }
                     Chromium.useForSession(folder, for: source)
@@ -280,18 +338,18 @@ struct ImportPanel: View {
         return Card {
             if case .chromium(let chromium) = source,
                let root = Chromium.chosenRoot(for: chromium.name), !Store.testing {
-                Text("From \(root.path.replacingOccurrences(of: NSHomeDirectory(), with: "~"))")
+                Text(language.format("welcome.from", fallback: "From %1$@", root.path.replacingOccurrences(of: NSHomeDirectory(), with: "~")))
                     .font(.system(size: 12))
                     .foregroundStyle(Palette.muted)
                     .textSelection(.enabled)
                 Rule()
             }
             if let record = ImportRecords.of(source.name) {
-                Line("Brought before", broughtBefore(record)) { EmptyView() }
+                Line("ui.brought_before", broughtBefore(record), localizedTitle: true) { EmptyView() }
                 Rule()
             }
             if let choices = profiles[source.id], choices.count > 1 {
-                Line("Profile") {
+                Line("ui.profile", localizedTitle: true) {
                     Picker("", selection: Binding(
                         get: { chosen[source.id] ?? usual[source.id] ?? "" },
                         set: { value in
@@ -301,10 +359,10 @@ struct ImportPanel: View {
                         }
                     )) {
                         ForEach(choices) { profile in
-                            Text(profile.id == usual[source.id] ? "Most recent: \(profile.name)" : profile.name).tag(profile.id)
+                            Text(profile.id == usual[source.id] ? language.format("import.most_recent", fallback: "Most recent: %1$@", profile.name) : profile.name).tag(profile.id)
                         }
                         Divider()
-                        Text("All profiles").tag("")
+                        Text("ui.all_profiles", bundle: Language.resources).tag("")
                     }
                     .labelsHidden()
                     .pickerStyle(.menu)
@@ -313,13 +371,13 @@ struct ImportPanel: View {
                 Rule()
             }
             // A kind the browser has none of is said so, and can't be picked.
-            Line("Passwords", !source.importsPasswords ? "Not supported for \(source.name)" : preview?.passwords == 0 ? "None in \(source.name)" : source.asksForKey
-                 ? "macOS asks once for \(source.name)'s keychain key"
-                 : "Read from \(source.name)'s own files, unless it has a primary password") {
+            Line("ui.passwords_02c830", !source.importsPasswords ? language.format("import.not_supported", fallback: "Not supported for %1$@", source.name) : preview?.passwords == 0 ? language.format("import.none_in", fallback: "None in %1$@", source.name) : source.asksForKey
+                 ? language.format("import.keychain_key", fallback: "macOS asks once for %1$@'s keychain key", source.name)
+                 : language.format("import.own_files", fallback: "Read from %1$@'s own files, unless it has a primary password", source.name), localizedTitle: true) {
                 option($wantsPasswords, none: !source.importsPasswords || preview?.passwords == 0)
             }
             Rule()
-            Line("Bookmarks", preview?.bookmarks == 0 ? "None in \(source.name)" : "In a “\(source.name)” folder, or at the top if you have none yet") {
+            Line("ui.bookmarks", preview?.bookmarks == 0 ? language.format("import.none_in", fallback: "None in %1$@", source.name) : language.format("import.bookmarks_folder", fallback: "In a “%1$@” folder, or at the top if you have none yet", source.name), localizedTitle: true) {
                 option($wantsBookmarks, none: preview?.bookmarks == 0)
             }
             // Brought before: only what is new comes, unless what came from
@@ -328,27 +386,27 @@ struct ImportPanel: View {
             if wantsBookmarks, preview?.bookmarks != 0, let record = ImportRecords.of(source.name) {
                 Rule()
                 let recorded = !record.bookmarkIDs.isEmpty
-                Line("Replace what came from \(source.name) before",
-                     recorded ? "Its bookmarks from \(record.date.formatted(.dateTime.day().month())) go, and these come fresh; passwords only ever add"
-                              : "Nothing recorded from \(source.name) yet — only what is new comes") {
+                Line(language.format("import.replace_title", fallback: "Replace what came from %1$@ before", source.name),
+                     recorded ? language.format("import.replace_detail", fallback: "Its bookmarks from %1$@ go, and these come fresh; passwords only ever add", record.date.formatted(.dateTime.day().month().locale(language.locale)))
+                              : language.format("import.nothing_recorded", fallback: "Nothing recorded from %1$@ yet — only what is new comes", source.name)) {
                     option($replaceBookmarks, none: !recorded)
                 }
             }
             Rule()
-            Line("History", preview?.places == 0 ? "None in \(source.name)" : "The last \((preview.map { $0.places } ?? 3000).formatted()) places") {
+            Line("ui.history", preview?.places == 0 ? language.format("import.none_in", fallback: "None in %1$@", source.name) : language.count("count.last_places", preview.map { $0.places } ?? 3000), localizedTitle: true) {
                 option($wantsHistory, none: preview?.places == 0)
             }
             // Its open tabs and tab groups, asleep at the end of this space.
             if case .chromium = source {
                 Rule()
-                Line("Open tabs & tab groups", tabsDetail(preview, source)) {
+                Line("ui.open_tabs_tab_groups", tabsDetail(preview, source), localizedTitle: true) {
                     option($wantsTabs, none: !bringsTabs(source))
                 }
             }
             // Arc's own: its spaces, what is pinned in them, its favourites.
             if let arc = arcCounts[key(source, profile(of: source))], arc.spaces + arc.pinned > 0 {
                 Rule()
-                Line("Spaces and pinned tabs", arcDetail(arc)) {
+                Line("ui.spaces_and_pinned_tabs", arcDetail(arc), localizedTitle: true) {
                     Switch(on: $wantsArc)
                 }
                 // Arc's pinned pages only keep their shape as pinned rows, and
@@ -358,10 +416,11 @@ struct ImportPanel: View {
                 // found afterwards.
                 if wantsArc, arc.pinned > 0, !browser.prefs.listsPins {
                     Rule()
-                    Line("Keep them as pinned rows",
-                         "As in Arc: each pinned page a row with its name, under your pins. Turned on, it stays in Settings › Spaces & Pins › Pinned rows"
-                         + (browser.prefs.sidebar ? "" : "; rows show with the tabs down the side")) {
-                        Pill("Turn on pinned rows") {
+                    Line("ui.keep_them_as_pinned_rows",
+                         browser.prefs.sidebar
+                            ? language.text("import.pinned_rows", fallback: "As in Arc: each pinned page a row with its name, under your pins. Turned on, it stays in Settings › Spaces & Pins › Pinned rows")
+                            : language.text("import.pinned_rows_sidebar", fallback: "As in Arc: each pinned page a row with its name, under your pins. Turned on, it stays in Settings › Spaces & Pins › Pinned rows; rows show with the tabs down the side"), localizedTitle: true) {
+                        Pill("ui.turn_on_pinned_rows") {
                             withAnimation(Motion.glide) { browser.prefs.listsPins = true }
                         }
                     }
@@ -370,9 +429,9 @@ struct ImportPanel: View {
                 // offered here, the moment they would be wanted, as the rows are.
                 if wantsArc, arc.pinned > 0, browser.prefs.listsPins, !browser.prefs.pinFolders {
                     Rule()
-                    Line("Keep its folders as folders",
-                         "As in Arc: each folder of pinned pages a folder of rows, nested as it was, rather than a tab group. Turned on, it stays in Settings › Spaces & Pins › Folders in pinned rows") {
-                        Pill("Turn on folders") {
+                    Line("ui.keep_its_folders_as_folders",
+                         "ui.as_in_arc_each_folder_of_pinned_pages_a_folder_of_rows_", localizedTitle: true, localizedDetail: true) {
+                        Pill("ui.turn_on_folders") {
                             withAnimation(Motion.glide) { browser.prefs.pinFolders = true }
                         }
                     }
@@ -380,7 +439,7 @@ struct ImportPanel: View {
             }
             if !extensions.isEmpty {
                 Rule()
-                Line("Extensions", "\(extensions.count) found — installed fresh from the Chrome Web Store, you say yes to each one") {
+                Line("ui.extensions", language.count("count.extensions_found", extensions.count), localizedTitle: true) {
                     Switch(on: $wantsExtensions)
                 }
             }
@@ -401,33 +460,33 @@ struct ImportPanel: View {
     }
 
     private func detail(of source: ImportSource) -> String {
-        guard let preview = previews[key(source, profile(of: source))] else { return "Counting…" }
-        func count(_ n: Int, _ one: String) -> String { n == 1 ? "1 \(one)" : "\(n.formatted()) \(one)s" }
+        guard let preview = previews[key(source, profile(of: source))] else { return language.text("import.counting", fallback: "Counting…") }
         var parts: [String] = []
-        if let choices = profiles[source.id], choices.count > 1 { parts.append("\(choices.count) profiles") }
+        if let choices = profiles[source.id], choices.count > 1 { parts.append(language.count("count.profiles", choices.count)) }
         // What it has; a kind it has none of isn't worth a word.
-        for (n, one) in [(preview.bookmarks, "bookmark"), (preview.places, "place"), (preview.passwords, "password")] where n > 0 {
-            parts.append(count(n, one))
+        for (n, key) in [(preview.bookmarks, "count.bookmarks"), (preview.places, "count.places"), (preview.passwords, "count.passwords")] where n > 0 {
+            parts.append(language.count(key, n))
         }
-        if preview.session.found > 0 { parts.append(count(preview.session.found, "open tab")) }
+        if preview.session.found > 0 { parts.append(language.count("count.open_tabs", preview.session.found)) }
         if let arc = arcCounts[key(source, profile(of: source))], arc.spaces > 0 {
-            parts.append(count(arc.spaces, "space"))
+            parts.append(language.count("count.spaces", arc.spaces))
         }
         if let record = ImportRecords.of(source.name) {
-            parts.append("brought \(record.date.formatted(.dateTime.day().month()))")
+            parts.append(language.format("import.brought_date", fallback: "brought %1$@", record.date.formatted(.dateTime.day().month().locale(language.locale))))
         }
-        return parts.isEmpty ? "Nothing to bring in" : parts.joined(separator: " · ")
+        return parts.isEmpty ? language.text("import.nothing_to_bring", fallback: "Nothing to bring in") : parts.joined(separator: " · ")
     }
 
     /// What was brought from it before, in a line: "312 bookmarks, 1,204
     /// places and 58 passwords, 27 Sep".
     private func broughtBefore(_ record: ImportRecord) -> String {
-        func count(_ n: Int, _ one: String) -> String { n == 1 ? "1 \(one)" : "\(n.formatted()) \(one)s" }
-        let parts = [(record.bookmarks, "bookmark"), (record.places, "place"), (record.passwords, "password"),
-                     (record.spaces ?? 0, "space"), (record.pinned ?? 0, "pinned tab")]
-            .filter { $0.0 > 0 }.map { count($0.0, $0.1) }
-        let what = parts.isEmpty ? "Nothing new" : ListFormatter.localizedString(byJoining: parts)
-        return "\(what), \(record.date.formatted(.dateTime.day().month()))"
+        let parts = [(record.bookmarks, "count.bookmarks"), (record.places, "count.places"), (record.passwords, "count.passwords"),
+                     (record.spaces ?? 0, "count.spaces"), (record.pinned ?? 0, "count.pinned_tabs")]
+            .filter { $0.0 > 0 }.map { language.count($0.1, $0.0) }
+        let list = ListFormatter()
+        list.locale = language.locale
+        let what = parts.isEmpty ? language.text("import.nothing_new", fallback: "Nothing new") : (list.string(from: parts) ?? parts.joined(separator: ", "))
+        return language.format("import.summary_date", fallback: "%1$@, %2$@", what, record.date.formatted(.dateTime.day().month().locale(language.locale)))
     }
 
     /// A kind's switch; off and out of reach when there is none of it.
@@ -511,19 +570,13 @@ struct ImportPanel: View {
                     case .success(let found):
                         let kept = browser.keep(found)
                         ImportRecords.note(source.name, passwords: kept)
-                        let skipped = found.skipped > 0 ? " (\(found.skipped.formatted()) skipped: no address)" : ""
-                        // Ones that didn't decrypt: said, so an import that
-                        // brought nothing says why rather than "0 passwords".
-                        let locked = found.undecrypted > 0
-                            ? " — \(found.undecrypted.formatted()) couldn't be decrypted with \(source.name)'s key" : ""
-                        said[0] = Said(ok: kept > 0 || found.undecrypted == 0,
-                                       text: (kept == 1 ? "1 password" : "\(kept.formatted()) passwords") + skipped + locked)
+                        said[0] = .passwords(kept, skipped: found.skipped, undecrypted: found.undecrypted, source: source.name)
                     case .failure(Chromium.Trouble.noPassphrase):
-                        said[0] = Said(ok: false, text: "macOS didn't hand over \(source.name)'s key — allow it and try again")
+                        said[0] = .noKey(source.name)
                     case .failure(Mozilla.Trouble.primaryPassword):
-                        said[0] = Said(ok: false, text: "\(source.name) has a primary password: export your passwords from it and bring in the CSV file")
+                        said[0] = .primaryPassword(source.name)
                     case .failure:
-                        said[0] = Said(ok: false, text: "No passwords readable in \(source.name)")
+                        said[0] = .noPasswords(source.name)
                     }
                     group.leave()
                 }
@@ -532,40 +585,31 @@ struct ImportPanel: View {
         if marks {
             let (added, already, kept) = browser.takeBookmarks(from: source, profile: profile, replacing: replaceBookmarks)
             marksLanded = added + already > 0
-            said[1] = kept
-                ? Said(ok: false, text: "Couldn't read all of \(source.name)'s bookmarks: what came from it before was kept, \(added.formatted()) new")
-                : Said(ok: true, text: added == 0 && already == 0 ? "No bookmarks in \(source.name)"
-                           : already == 0 ? "\(added.formatted()) bookmarks"
-                           : "\(added.formatted()) new bookmarks, \(already.formatted()) already here")
+            said[1] = kept ? .bookmarksKept(source.name, added)
+                : added == 0 && already == 0 ? .noBookmarks(source.name)
+                : already == 0 ? .bookmarks(added) : .bookmarksWithExisting(added, already)
         }
         if places {
             group.enter()
             browser.takePlaces(from: source, profile: profile) { count in
-                said[2] = Said(ok: true, text: "\(count.formatted()) places")
+                said[2] = .places(count)
                 group.leave()
             }
         }
         if #available(macOS 15.4, *), !extensions.isEmpty {
             // Each from the store, fresh and checked, one question at a time.
             Task { for id in extensions { await Extensions.shared.install(id: id) } }
-            said[3] = Said(ok: true, text: extensions.count == 1 ? "1 extension to confirm" : "\(extensions.count) extensions to confirm")
+            said[3] = .extensions(extensions.count)
         }
         if wantsArc, arcCounts[key(source, profile)] != nil, let sidebar = source.arcSidebar(profile: profile) {
             let (spaces, pins, tabs) = browser.takeArc(sidebar, from: source, profile: profile)
             ImportRecords.note(source.name, spaces: spaces, pinned: pins + tabs)
-            func count(_ n: Int, _ one: String) -> String { n == 1 ? "1 \(one)" : "\(n.formatted()) \(one)s" }
-            said[4] = Said(ok: true, text: spaces + pins + tabs == 0 ? "Arc's spaces and pins were all here already"
-                           : "\(count(spaces, "new space")), \(count(pins, "pin")), \(count(tabs, "pinned tab"))")
+            said[4] = spaces + pins + tabs == 0 ? .arcAlready : .arc(spaces, pins, tabs)
         }
         // From what was read when the sheet counted, not read again here.
         if wantsTabs, bringsTabs(source), let session = preview?.session {
             let got = browser.takeSession(session, from: source, profile: profile)
-            func count(_ n: Int, _ one: String) -> String { n == 1 ? "1 \(one)" : "\(n.formatted()) \(one)s" }
-            var parts = [count(got.tabs, "open tab")]
-            if got.groups > 0 { parts.append(count(got.groups, "new group")) }
-            if got.pins > 0 { parts.append(count(got.pins, "pin")) }
-            said[5] = Said(ok: true, text: got.tabs + got.pins == 0 ? "\(source.name)'s open tabs were all here already"
-                           : parts.joined(separator: ", "))
+            said[5] = got.tabs + got.pins == 0 ? .sessionAlready(source.name) : .session(got.tabs, got.groups, got.pins)
         }
         group.notify(queue: .main) {
             bringing = false

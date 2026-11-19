@@ -4,7 +4,7 @@ import SwiftUI
 /// same white-and-hairline panel as the rest, and in both cases the point is
 /// as much being able to remove a line as to read one.
 
-enum When {
+@MainActor enum When {
     private static let ago: RelativeDateTimeFormatter = {
         let formatter = RelativeDateTimeFormatter()
         formatter.unitsStyle = .abbreviated
@@ -12,7 +12,8 @@ enum When {
     }()
 
     static func said(_ date: Date) -> String {
-        ago.localizedString(for: date, relativeTo: Date())
+        if ago.locale != Language.shared.locale { ago.locale = Language.shared.locale }
+        return ago.localizedString(for: date, relativeTo: Date())
     }
 
     private static let hour: DateFormatter = {
@@ -24,22 +25,31 @@ enum When {
 
     private static let plain: DateFormatter = {
         let formatter = DateFormatter()
-        formatter.dateFormat = "d MMMM"
+        formatter.locale = Language.shared.locale
+        formatter.setLocalizedDateFormatFromTemplate("dMMMM")
         return formatter
     }()
 
     /// The time of day. Once a list is grouped by day, that is all a row needs.
-    static func clock(_ date: Date) -> String { hour.string(from: date) }
+    static func clock(_ date: Date) -> String {
+        if hour.locale != Language.shared.locale { hour.locale = Language.shared.locale }
+        return hour.string(from: date)
+    }
 
     static func day(_ date: Date) -> String {
         let calendar = Calendar.current
-        if calendar.isDateInToday(date) { return "Today" }
-        if calendar.isDateInYesterday(date) { return "Yesterday" }
+        if calendar.isDateInToday(date) { return Language.shared.text("date.today", fallback: "Today") }
+        if calendar.isDateInYesterday(date) { return Language.shared.text("date.yesterday", fallback: "Yesterday") }
+        if plain.locale != Language.shared.locale {
+            plain.locale = Language.shared.locale
+            plain.setLocalizedDateFormatFromTemplate("dMMMM")
+        }
         return plain.string(from: date)
     }
 }
 
 struct HistoryPanel: View {
+    @ObservedObject private var language = Language.shared
     @ObservedObject var browser: Browser
 
     @FocusState private var hunting: Bool
@@ -50,7 +60,7 @@ struct HistoryPanel: View {
     private var clearing: Bool { browser.recallMode == .clearing }
 
     var body: some View {
-        Plate("History", width: 600, close: { browser.recalling = false }) {
+        Plate("page.history", localizedTitle: true, width: 600, close: { browser.recalling = false }) {
             VStack(alignment: .leading, spacing: 14) {
                 Hunt(text: $browser.recallHunt, prompt: "Search everywhere you have been", focus: $hunting)
 
@@ -65,7 +75,7 @@ struct HistoryPanel: View {
                             ForEach(lines) { line in
                                 switch line.kind {
                                 case .day(let day):
-                                    Caption(day)
+                                    Caption(When.day(day))
                                         .padding(.top, line.id == lines.first?.id ? 0 : 14)
                                         .padding(.bottom, 6)
                                 case .trace(let trace, let first, let last):
@@ -110,11 +120,11 @@ struct HistoryPanel: View {
                 sweeps
             } else {
                 HStack {
-                    Text(traces.count == 1 ? "1 page" : "\(traces.count) pages")
+                    CountText(key: "count.pages", count: traces.count)
                         .font(.system(size: 12))
                         .foregroundStyle(Palette.muted)
                     Spacer()
-                    Pill("Clear…") { withAnimation(Motion.settle) { browser.recallMode = .clearing } }
+                    Pill("ui.clear_52c5aa") { withAnimation(Motion.settle) { browser.recallMode = .clearing } }
                 }
             }
         }
@@ -131,25 +141,25 @@ struct HistoryPanel: View {
     private var sweeps: some View {
         VStack(alignment: .leading, spacing: 10) {
             Card {
-                Line("History", "Everywhere you have been") {
-                    Pill("Clear") {
+                Line("ui.history", "ui.everywhere_you_have_been", localizedTitle: true, localizedDetail: true) {
+                    Pill("ui.clear") {
                         browser.clearHistory()
                         refresh()
                         withAnimation(Motion.settle) { browser.recallMode = .history }
                     }
                 }
                 Rule()
-                Line("Cookies and sign-ins", "Signs you out of every site") {
-                    Pill("Sign out of everything") { browser.clearSites() }
+                Line("ui.cookies_and_sign_ins", "ui.signs_you_out_of_every_site", localizedTitle: true, localizedDetail: true) {
+                    Pill("ui.sign_out_of_everything") { browser.clearSites() }
                 }
                 Rule()
-                Line("Cache", "Only what was fetched to draw pages") {
-                    Pill("Clear") { browser.clearCache() }
+                Line("ui.cache", "ui.only_what_was_fetched_to_draw_pages", localizedTitle: true, localizedDetail: true) {
+                    Pill("ui.clear") { browser.clearCache() }
                 }
             }
             HStack {
                 Spacer()
-                Pill("Back") { withAnimation(Motion.settle) { browser.recallMode = .history } }
+                Pill("ui.back") { withAnimation(Motion.settle) { browser.recallMode = .history } }
             }
         }
         .transition(.opacity)
@@ -162,7 +172,7 @@ struct HistoryPanel: View {
         var made: [Listed] = []
         for day in grouped.keys.sorted(by: >) {
             let rows = grouped[day]!.sorted { $0.last > $1.last }
-            made.append(Listed(id: "day " + day.description, kind: .day(When.day(day))))
+            made.append(Listed(id: "day " + day.description, kind: .day(day)))
             for (index, trace) in rows.enumerated() {
                 made.append(Listed(id: trace.id, kind: .trace(trace, first: index == 0, last: index == rows.count - 1)))
             }
@@ -173,7 +183,7 @@ struct HistoryPanel: View {
     /// One line of the list: a day's name, or a page under it.
     struct Listed: Identifiable {
         enum Kind {
-            case day(String)
+            case day(Date)
             case trace(History.Trace, first: Bool, last: Bool)
         }
         let id: String
@@ -204,6 +214,7 @@ struct HistoryPanel: View {
     /// One line. A title, where it came from, and when — the three things you
     /// scan for, in the order you scan them.
     private struct Row: View {
+        @ObservedObject private var language = Language.shared
         let trace: History.Trace
         let go: () -> Void
         let forget: () -> Void
@@ -247,6 +258,7 @@ struct HistoryPanel: View {
 }
 
 struct DownloadsPanel: View {
+    @ObservedObject private var language = Language.shared
     @ObservedObject var browser: Browser
     @ObservedObject var loot: Loot
     @ObservedObject var fetches: Fetches
@@ -271,7 +283,7 @@ struct DownloadsPanel: View {
     private var small: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: 8) {
-                Text("Downloads")
+                Text("ui.downloads", bundle: Language.resources)
                     .font(.system(size: 12.5, weight: .semibold))
                     .foregroundStyle(Palette.ink)
                 Spacer(minLength: 0)
@@ -290,7 +302,7 @@ struct DownloadsPanel: View {
                 Rectangle().fill(Palette.hairline).frame(height: 1)
                 HStack {
                     Spacer()
-                    Pill("Clear list") { loot.forgetAll() }
+                    Pill("ui.clear_list") { loot.forgetAll() }
                 }
                 .padding(.horizontal, 12)
                 .padding(.vertical, 8)
@@ -300,17 +312,17 @@ struct DownloadsPanel: View {
     }
 
     private var plate: some View {
-        Plate("Downloads", width: 560, close: close ?? { browser.hoarding = false }) {
+        Plate("page.downloads", localizedTitle: true, width: 560, close: close ?? { browser.hoarding = false }) {
             list
         } foot: {
             HStack {
-                Text(loot.kept.isEmpty ? "Files land in \(browser.downloadsFolder.lastPathComponent)"
-                     : "Clearing the list leaves the files where they are")
+                Text(loot.kept.isEmpty ? language.format("downloads.folder_hint", fallback: "Files land in %1$@", browser.downloadsFolder.lastPathComponent)
+                     : language.text("downloads.clear_hint", fallback: "Clearing the list leaves the files where they are"))
                     .font(.system(size: 12))
                     .foregroundStyle(Palette.muted)
                 Spacer()
                 if !loot.kept.isEmpty {
-                    Pill("Clear list") { loot.forgetAll() }
+                    Pill("ui.clear_list") { loot.forgetAll() }
                 }
             }
         }
@@ -319,13 +331,13 @@ struct DownloadsPanel: View {
     @ViewBuilder
     private var list: some View {
         if fetches.entries.isEmpty && loot.kept.isEmpty {
-            Card { Nothing("Nothing downloaded yet.") }
+            Card { Nothing("ui.nothing_downloaded_yet") }
         } else {
             ScrollView(showsIndicators: false) {
                 LazyVStack(alignment: .leading, spacing: 10) {
                     if !fetches.entries.isEmpty {
                         VStack(alignment: .leading, spacing: 6) {
-                            Caption("Current downloads")
+                            Caption("ui.current_downloads", localized: true)
                             Card {
                                 ForEach(Array(fetches.entries.enumerated()), id: \.element.id) { index, entry in
                                     if index > 0 { Rule() }
@@ -343,7 +355,7 @@ struct DownloadsPanel: View {
 
                     if !loot.kept.isEmpty {
                         VStack(alignment: .leading, spacing: 6) {
-                            Caption("Completed")
+                            Caption("ui.completed", localized: true)
                             Card {
                                 ForEach(Array(loot.kept.enumerated()), id: \.element.id) { index, keep in
                                     if index > 0 { Rule() }
@@ -365,6 +377,7 @@ struct DownloadsPanel: View {
     }
 
     private struct FetchRow: View {
+        @ObservedObject private var language = Language.shared
         @ObservedObject var entry: FetchEntry
         let pause: () -> Void
         let resume: () -> Void
@@ -380,11 +393,11 @@ struct DownloadsPanel: View {
 
         private var stateLabel: String {
             switch entry.state {
-            case .downloading: return "Downloading"
-            case .pausing: return entry.stopping
-            case .paused: return "Paused"
-            case .resuming: return "Resuming…"
-            case .failed: return "Failed"
+            case .downloading: return language.text("downloads.downloading", fallback: "Downloading")
+            case .pausing: return language.text(entry.stopping, fallback: entry.stopping)
+            case .paused: return language.text("downloads.paused", fallback: "Paused")
+            case .resuming: return language.text("downloads.resuming", fallback: "Resuming…")
+            case .failed: return language.text("downloads.failed", fallback: "Failed")
             }
         }
 
@@ -421,7 +434,7 @@ struct DownloadsPanel: View {
                                 }
                                 .frame(width: 68, height: 3)
                         }
-                        Text("\(stateLabel) · \(bytes)")
+                        Text(language.format("downloads.state_bytes", fallback: "%1$@ · %2$@", stateLabel, bytes))
                             .font(.system(size: 11.5))
                             .foregroundStyle(Palette.muted)
                             .monospacedDigit()
@@ -429,7 +442,7 @@ struct DownloadsPanel: View {
                             .truncationMode(.middle)
                     }
                     if case .failed = entry.state {
-                        Text(entry.errorDescription ?? "The download failed.")
+                        Text(entry.errorDescription ?? language.text("downloads.failure", fallback: "The download failed."))
                             .font(.system(size: 11.5))
                             .foregroundStyle(Palette.muted)
                             .fixedSize(horizontal: false, vertical: true)
@@ -465,7 +478,7 @@ struct DownloadsPanel: View {
                         Quick("Resume", act: resume)
                     } else if entry.canRetry {
                         Quick("Retry", act: retry)
-                            .help("Start the download again from the beginning")
+                            .help(Text("ui.start_the_download_again_from_the_beginning", bundle: Language.resources))
                     }
                     Quick("Remove", act: cancel)
                 }
@@ -480,7 +493,7 @@ struct DownloadsPanel: View {
                     if entry.canResume { Quick("Resume", act: resume) }
                     if entry.canRetry {
                         Quick("Retry", act: retry)
-                            .help("Start the download again from the beginning")
+                            .help(Text("ui.start_the_download_again_from_the_beginning", bundle: Language.resources))
                     }
                     Quick("Remove", act: cancel)
                 }
@@ -489,6 +502,7 @@ struct DownloadsPanel: View {
     }
 
     private struct KeptRow: View {
+        @ObservedObject private var language = Language.shared
         let keep: Keep
         let open: () -> Void
         let reveal: () -> Void
@@ -535,10 +549,10 @@ struct DownloadsPanel: View {
         let address: String
 
         var body: some View {
-            Button("Copy Address") {
+            Button {
                 NSPasteboard.general.clearContents()
                 NSPasteboard.general.setString(address, forType: .string)
-            }
+            } label: { Text("ui.copy_address", bundle: Language.resources) }
         }
     }
 }

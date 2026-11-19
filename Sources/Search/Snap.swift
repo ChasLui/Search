@@ -523,9 +523,11 @@ extension Browser {
                 guard let self else { return }
                 let copied = cropped ? "The top of the page copied" : "Copied"
                 if wrote {
-                    self.announce("\(copied) and saved to \(file.deletingLastPathComponent().lastPathComponent)", file: file)
+                    self.announce("\(copied) and saved to \(file.deletingLastPathComponent().lastPathComponent)", file: file,
+                                  localizedKey: cropped ? "announcement.capture_top_saved" : "announcement.capture_saved",
+                                  arguments: [file.deletingLastPathComponent().lastPathComponent])
                 } else {
-                    self.announce("\(copied), but couldn't save it")
+                    self.announce("\(copied), but couldn't save it", localizedKey: cropped ? "announcement.capture_top_not_saved" : "announcement.capture_not_saved")
                 }
                 let rep = NSBitmapImageRep(data: data.png)
                 finished?(["path": wrote ? file.path : "", "width": rep?.pixelsWide ?? 0,
