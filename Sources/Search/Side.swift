@@ -1524,6 +1524,9 @@ private struct SideRow: View, Equatable {
     /// Read from the tab here, not when the column made the row: the column
     /// isn't drawn again when one of its tabs lets its page go.
     private var putAway: Bool { grouped && tab.asleep && !live }
+    /// Any other tab asleep, with Settings › Tabs › Dim sleeping tabs on:
+    /// faded until the pointer is on it.
+    private var dim: Bool { prefs.dimsSleepingTabs && tab.asleep && !live && !hovering && !putAway }
 
     var body: some View {
         let _ = Bench.count("row")
@@ -1537,7 +1540,7 @@ private struct SideRow: View, Equatable {
                     // title either way, as Settings says (#919).
                     if !tab.isBlank {
                         Mark(icon: prefs.glyph == .icons ? tab.icon : nil, letter: tab.monogram, size: prefs.roomyTabs ? 17 : 15,
-                             dim: putAway, contrast: prefs.highContrastText)
+                             dim: putAway || dim, contrast: prefs.highContrastText)
                             // A coding agent at work here: a dot on the
                             // icon's corner, the row as it was.
                             .overlay(alignment: .bottomTrailing) { AgentMark(tab: tab) }
@@ -1566,7 +1569,7 @@ private struct SideRow: View, Equatable {
                     // The page is translated (Translate.swift).
                     TranslateSign(tab: tab, colour: colour)
                     TitleAtRest(label: tab.displayLabel, rest: rest, shown: atRest, hovering: hovering,
-                                size: prefs.sideTitle, colour: colour, roomy: true)
+                                size: prefs.sideTitle, colour: colour, roomy: true, dim: dim)
                 }
                 Spacer(minLength: 0)
             }
@@ -1687,6 +1690,7 @@ private struct SideRow: View, Equatable {
         }
         .animation(nil, value: hovering)
         .animation(Motion.glide, value: editing)
+        .animation(Motion.quick, value: dim)
         .onChange(of: refusals) { _, _ in
             guard editing else { return }
             shake = 0
