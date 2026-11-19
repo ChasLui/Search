@@ -19,7 +19,18 @@ Read [CONTRIBUTING.md](CONTRIBUTING.md) for project conventions and
   clears the selected probe profile. Reserve notarization and publishing for
   explicit release work.
 
-## Where to work
+## Fork branches and upstream sync
+
+- Use `ChasLui/Search:chaslui-dev` as the default development and fork PR
+  base branch. Keep `ChasLui/Search:main` as the mirror of
+  `driceroland/Search:main`.
+- Sync upstream into the fork's `main` first and verify that the two remote
+  `main` refs point to the same commit. Fast-forward the mirror when possible.
+  If the refs have diverged, report the divergence before rewriting any branch.
+- Review the commits introduced by that sync one by one against `chaslui-dev`.
+  Port each applicable change with any adaptations needed for the fork. Record
+  which changes were ported, already present, or deferred and why. Validate the
+  affected behavior before integrating each change into `chaslui-dev`.
 
 - When syncing upstream, review the [horizontal tab bar performance spec](docs/specs/tab-bar-grouping-performance.md)
   and preserve or revalidate its behavior and benchmarks.
@@ -28,6 +39,9 @@ Read [CONTRIBUTING.md](CONTRIBUTING.md) for project conventions and
 - When syncing or contributing extension changes upstream, use the
   [extension performance spec](docs/specs/extension-performance-upstream.md)
   to check CRX3 verification, shim generation, and external messaging.
+
+## Where to work
+
 - Browser features live in `Sources/Search/`, with Swift tests in
   `Tests/SearchTests/` and live browser probes under `Tests/`.
 - For visual changes, start with the shared appearance values in
