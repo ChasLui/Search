@@ -21,6 +21,8 @@ Read [CONTRIBUTING.md](CONTRIBUTING.md) for project conventions and
 
 ## Where to work
 
+- When syncing upstream, review the [horizontal tab bar performance spec](docs/specs/tab-bar-grouping-performance.md)
+  and preserve or revalidate its behavior and benchmarks.
 - Browser features live in `Sources/Search/`, with Swift tests in
   `Tests/SearchTests/` and live browser probes under `Tests/`.
 - For visual changes, start with the shared appearance values in

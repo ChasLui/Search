@@ -261,6 +261,97 @@ final class SpeedBenchTests: XCTestCase {
         record("rowOrder", ["ms": median(times)])
     }
 
+    func testStripGrouped200() async throws {
+        try await measureStrip(tabs: 200, groups: 10, grouped: true)
+    }
+
+    func testStripGrouped600() async throws {
+        try await measureStrip(tabs: 600, groups: 30, grouped: true)
+    }
+
+    func testStripSmall20() async throws {
+        try await measureStrip(tabs: 20, groups: 1, grouped: true)
+    }
+
+    func testStripUngrouped200() async throws {
+        try await measureStrip(tabs: 200, groups: 10, grouped: false)
+    }
+
+    /// The real strip in a window, brought up to date and drawn after each
+    /// action. The run-loop clock also records later Core Animation work.
+    private func measureStrip(tabs count: Int, groups countGroups: Int, grouped: Bool) async throws {
+        Session.write(now: true, Session.Shape(tabs: [], active: 0))
+        let browser = makeBrowser(tabs: count)
+        defer {
+            browser.closeAll()
+            Session.write(now: true, Session.Shape(tabs: [], active: 0))
+        }
+        browser.prefs.sidebar = false
+        browser.prefs.usesTabGroups = grouped
+        browser.prefs.splitView = true
+        let tabs = browser.tabs
+        let groups = (0..<countGroups).map { TabGroup(id: UUID(), name: "Group \($0)", collapsed: false) }
+        browser.tabGroups = groups
+        for (index, group) in groups.enumerated() {
+            for tab in tabs[(index * 20)..<(index * 20 + 15)] { tab.groupID = group.id }
+        }
+        for index in 0..<countGroups {
+            let first = tabs[index * 20]
+            let second = tabs[index * 20 + 1]
+            first.restore(url: URL(string: "search://history/\(index)-first")!, title: "First")
+            second.restore(url: URL(string: "search://history/\(index)-second")!, title: "Second")
+            browser.pair(first, with: second, onLeft: true)
+        }
+        XCTAssertEqual(browser.splits.count, countGroups)
+
+        // These two pages can wake without making a network request.
+        for tab in tabs[18...19] {
+            tab.restore(url: URL(string: "about:blank#strip-\(tab.id)")!, title: "Benchmark")
+            browser.select(tab)
+        }
+        let window = NSWindow(contentRect: NSRect(x: -20_000, y: -20_000, width: 1100, height: Metrics.strip),
+                              styleMask: .borderless, backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        window.contentView = NSHostingView(rootView: TabBar(browser: browser))
+        browser.window = window
+        window.orderFrontRegardless()
+        windows.append(window)
+        XCTAssertFalse(NSScreen.screens.contains { $0.frame.intersects(window.frame) })
+        try await settle()
+
+        let name = "strip.\(grouped ? "grouped" : "ungrouped").\(count)"
+        func measure(_ action: String, _ step: (Int) -> Void) async throws {
+            for index in 0..<3 {
+                step(index)
+                try await Task.sleep(for: .milliseconds(35))
+            }
+            let clock = LoopClock()
+            clock.start()
+            defer { clock.stop() }
+            var times: [Double] = []
+            for index in 0..<30 {
+                clock.mark()
+                let start = CACurrentMediaTime()
+                step(index)
+                drain()
+                times.append((CACurrentMediaTime() - start) * 1000)
+                try await Task.sleep(for: .milliseconds(35))
+            }
+            record("\(name).\(action)", LoopClock.summary(times))
+            record("\(name).\(action).loop", LoopClock.summary(clock.marked))
+        }
+
+        try await measure("select") {
+            let tab = tabs[18 + $0 % 2]
+            browser.select(tab)
+            XCTAssertEqual(browser.activeID, tab.id)
+        }
+        if grouped {
+            try await measure("fold") { _ in browser.toggleTabGroup(groups[0].id) }
+        }
+        try await measure("resize") { window.setContentSize(NSSize(width: CGFloat(1100 + $0 % 2 * 40), height: Metrics.strip)) }
+    }
+
     /// The scripts a page is given at each link followed.
     func testArming() async throws {
         let browser = makeBrowser(tabs: 1)

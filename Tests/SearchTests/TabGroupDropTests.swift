@@ -9,6 +9,60 @@ final class TabGroupDropTests: XCTestCase {
         super.setUp()
     }
 
+    func testGroupedRowKeepsPinsOrderAndSplitVisibility() {
+        _ = NSApplication.shared
+        NSApp.setActivationPolicy(.prohibited)
+        Session.write(now: true, Session.Shape(tabs: [], active: 0))
+        let browser = Browser(record: WindowRecord())
+        let grouped = browser.prefs.usesTabGroups
+        let split = browser.prefs.splitView
+        defer {
+            browser.closeAll()
+            Session.write(now: true, Session.Shape(tabs: [], active: 0))
+            browser.prefs.usesTabGroups = grouped
+            browser.prefs.splitView = split
+        }
+        browser.prefs.usesTabGroups = true
+        browser.prefs.splitView = true
+        for number in 0..<8 {
+            if number > 0 { browser.newTab() }
+            browser.tabs.last?.restore(url: URL(string: "search://history/\(number)")!, title: "\(number)")
+        }
+        let tabs = browser.tabs
+        defer { browser.unpin(tabs[0]) }
+        let first = TabGroup(id: UUID(), name: "First", collapsed: false)
+        let second = TabGroup(id: UUID(), name: "Second", collapsed: false)
+        let empty = TabGroup(id: UUID(), name: "Empty", collapsed: false)
+        browser.tabGroups = [second, first, empty]
+        tabs[0].pin = "Pinned"
+        tabs[0].groupID = first.id
+        for tab in tabs[1...3] { tab.groupID = first.id }
+        for tab in tabs[4...5] { tab.groupID = second.id }
+        tabs[7].groupID = UUID()
+        browser.pair(tabs[1], with: tabs[2], onLeft: true)
+
+        var row = browser.groupedTabRow
+        XCTAssertEqual(row.pins.map(\.id), [tabs[0].id])
+        XCTAssertEqual(row.groups.map(\.id), [second.id, first.id, empty.id])
+        XCTAssertEqual(row.groups[0].tabs.map(\.id), [tabs[4].id, tabs[5].id])
+        XCTAssertEqual(row.groups[1].tabs.map(\.id), [tabs[1].id, tabs[3].id])
+        XCTAssertTrue(row.groups[2].tabs.isEmpty)
+        XCTAssertEqual(row.ungrouped.map(\.id), [tabs[6].id, tabs[7].id])
+        XCTAssertEqual(row.pins.map(\.id) + row.groups.flatMap(\.tabs).map(\.id) + row.ungrouped.map(\.id),
+                       browser.shownTabs.map(\.id))
+
+        browser.toggleTabGroup(first.id)
+        browser.activeID = tabs[2].id
+        row = browser.groupedTabRow
+        XCTAssertEqual(row.groups[1].tabs.map(\.id), [tabs[1].id], "The right pane shows its left representative")
+        browser.activeID = tabs[6].id
+        XCTAssertTrue(browser.groupedTabRow.groups[1].tabs.isEmpty)
+
+        browser.toggleTabGroup(first.id)
+        browser.prefs.splitView = false
+        XCTAssertEqual(browser.groupedTabRow.groups[1].tabs.map(\.id), [tabs[1].id, tabs[2].id, tabs[3].id])
+    }
+
     func testPositionalMovesAndSourceCleanup() throws {
         _ = NSApplication.shared
         NSApp.setActivationPolicy(.prohibited)
@@ -64,6 +118,7 @@ final class TabGroupDropTests: XCTestCase {
         XCTAssertEqual(browser.tabs.first?.id, tabs[1].id)
         XCTAssertEqual(browser.tabs.last?.id, tabs[0].id)
         XCTAssertNil(browser.split(for: tabs[1]))
+        browser.leaveFiles()
         let saved = try XCTUnwrap(browser.record.rows[browser.spaceID.uuidString])
         let restored = Browser(record: browser.record)
         XCTAssertEqual(restored.tabs.map { $0.address?.absoluteString }, saved.tabs.map { Optional($0.url) })
