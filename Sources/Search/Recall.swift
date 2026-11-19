@@ -57,6 +57,9 @@ struct HistoryPanel: View {
     /// The list as drawn: each day's name, then its pages. Worked out when
     /// the history or the search changes, not each time the panel is drawn.
     @State private var lines: [Listed] = []
+    /// Which history Clear takes: nil for every space's, as Safari's All
+    /// Profiles; shown only when a signed-out space keeps one of its own.
+    @State private var clearsIn: UUID?
     private var clearing: Bool { browser.recallMode == .clearing }
 
     var body: some View {
@@ -134,6 +137,8 @@ struct HistoryPanel: View {
             refresh()
         }
         .onChange(of: browser.recallHunt) { _, _ in refresh() }
+        // Another space may keep a history of its own (Spaces.history).
+        .onChange(of: browser.spaceID) { _, _ in refresh() }
     }
 
     /// Three separate things, worded so nobody has to guess which one signs
@@ -141,9 +146,20 @@ struct HistoryPanel: View {
     private var sweeps: some View {
         VStack(alignment: .leading, spacing: 10) {
             Card {
-                Line("ui.history", "ui.everywhere_you_have_been", localizedTitle: true, localizedDetail: true) {
+                Line("ui.history", historyDetail, localizedTitle: true) {
+                    let scopes = browser.historyScopes
+                    if !scopes.isEmpty {
+                        Picker("", selection: $clearsIn) {
+                            Text(language.text("ui.all_spaces", fallback: "All Spaces")).tag(UUID?.none)
+                            ForEach(scopes, id: \.space) { Text($0.name).tag(UUID?.some($0.space)) }
+                        }
+                        .labelsHidden()
+                        .pickerStyle(.menu)
+                        .fixedSize()
+                    }
                     Pill("ui.clear") {
-                        browser.clearHistory()
+                        browser.clearHistory(in: scopes.contains { $0.space == clearsIn } ? clearsIn : nil)
+                        clearsIn = nil
                         refresh()
                         withAnimation(Motion.settle) { browser.recallMode = .history }
                     }
@@ -163,6 +179,13 @@ struct HistoryPanel: View {
             }
         }
         .transition(.opacity)
+    }
+
+    private var historyDetail: String {
+        guard let clearsIn, let scope = browser.historyScopes.first(where: { $0.space == clearsIn }) else {
+            return language.text("ui.everywhere_you_have_been", fallback: "Everywhere you have been")
+        }
+        return language.format("history.where_in_space", fallback: "Where you have been in %1$@", scope.name)
     }
 
     private func refresh() {
