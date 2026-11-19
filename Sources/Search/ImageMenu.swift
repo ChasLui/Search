@@ -202,10 +202,15 @@ extension Browser {
         const found = await fetch(src);
         const blob = await found.blob();
         if (!blob.type.startsWith("image/") || blob.size > 50000000) return null;
-        const bytes = new Uint8Array(await blob.arrayBuffer());
-        let text = "";
-        for (let i = 0; i < bytes.length; i += 32768) text += String.fromCharCode.apply(null, bytes.subarray(i, i + 32768));
-        return btoa(text);
+        return await new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => {
+                const data = reader.result;
+                resolve(data.slice(data.lastIndexOf(",") + 1));
+            };
+            reader.onerror = () => reject(reader.error);
+            reader.readAsDataURL(blob);
+        });
         """
         let frame = tab.imageFrame
         let answer: Any? = await withCheckedContinuation { done in

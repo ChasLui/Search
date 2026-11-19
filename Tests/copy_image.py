@@ -5,8 +5,10 @@ Build first (`./build.sh`), then `python3 Tests/copy_image.py`. A 3 MB
 picture is served from 127.0.0.1 and fetched the way Copy Image fetches it
 (`imageData`, which never touches the pasteboard: a test run must not take
 the person's clipboard). Read a byte at a time, it took twenty seconds; it
-should take well under one. A picture over the 50 MB limit is let go.
+should take well under one. Blob images are read in the page, while non-images
+and pictures over the 50 MB limit are let go.
 """
+import base64
 import struct
 import sys
 import threading
@@ -62,6 +64,48 @@ try:
     t.ok("and is a picture that may be decoded", r.get("reasonable") is True, r)
     r = sv.cmd({"do": "imageData", "id": a, "url": f"http://127.0.0.1:{PORT}/huge"})
     t.ok("one past the 50 MB limit is let go", r.get("bytes") == -1, r)
+
+    small = png(5, 5)
+    encoded = base64.b64encode(small).decode("ascii")
+    url = sv.cmd({
+        "do": "eval", "id": a,
+        "js": f"URL.createObjectURL(new Blob([Uint8Array.from(atob('{encoded}'), c => c.charCodeAt(0))], {{type: 'image/png'}}))",
+    })["value"]
+    r = sv.cmd({"do": "imageData", "id": a, "url": url})
+    t.ok("a blob image is returned whole and decodable", r.get("bytes") == len(small) and r.get("reasonable") is True, r)
+    sv.cmd({"do": "eval", "id": a, "js": f"URL.revokeObjectURL('{url}')"})
+
+    url = sv.cmd({
+        "do": "eval", "id": a,
+        "js": f"URL.createObjectURL(new Blob([Uint8Array.from(atob('{encoded}'), c => c.charCodeAt(0))], {{type: 'image/png;name=a,b'}}))",
+    })["value"]
+    r = sv.cmd({"do": "imageData", "id": a, "url": url})
+    t.ok("a comma in a blob image's type keeps the bytes", r.get("bytes") == len(small) and r.get("reasonable") is True, r)
+    sv.cmd({"do": "eval", "id": a, "js": f"URL.revokeObjectURL('{url}')"})
+
+    url = sv.cmd({
+        "do": "eval", "id": a,
+        "js": "URL.createObjectURL(new Blob(['hello'], {type: 'text/plain'}))",
+    })["value"]
+    r = sv.cmd({"do": "imageData", "id": a, "url": url})
+    t.ok("a non-image blob is refused", r.get("bytes") == -1, r)
+    sv.cmd({"do": "eval", "id": a, "js": f"URL.revokeObjectURL('{url}')"})
+
+    url = sv.cmd({
+        "do": "eval", "id": a,
+        "js": "URL.createObjectURL(new Blob([new Uint8Array(50000000)], {type: 'image/png'}))",
+    })["value"]
+    r = sv.cmd({"do": "imageData", "id": a, "url": url})
+    t.ok("a blob at the 50 MB limit is returned", r.get("bytes") == 50000000, r)
+    sv.cmd({"do": "eval", "id": a, "js": f"URL.revokeObjectURL('{url}')"})
+
+    url = sv.cmd({
+        "do": "eval", "id": a,
+        "js": "URL.createObjectURL(new Blob([new Uint8Array(50000001)], {type: 'image/png'}))",
+    })["value"]
+    r = sv.cmd({"do": "imageData", "id": a, "url": url})
+    t.ok("a blob over 50 MB is refused", r.get("bytes") == -1, r)
+    sv.cmd({"do": "eval", "id": a, "js": f"URL.revokeObjectURL('{url}')"})
 finally:
     server.shutdown()
     sv.finish()
