@@ -5,10 +5,10 @@ import re
 import subprocess
 import sys
 
-isolated_suites = ("DownloadLifecycleTests", "PinStuckTests", "SidebarPressTests")
+isolated_suites = ("DownloadLifecycleTests", "FloatUnseenTests", "PinStuckTests", "SidebarPressTests")
 suite_pattern = "|".join(isolated_suites)
 resources = subprocess.run([sys.executable, "Tests/check-localization.py"])
-# WebKit download journeys and AppKit gesture fixtures interfere when they
+# WebKit lifecycle journeys and AppKit gesture fixtures interfere when they
 # share a process and retain native state between cases.
 result = subprocess.run(["swift", "test", "--skip", suite_pattern])
 failed = resources.returncode != 0 or result.returncode != 0

@@ -412,16 +412,18 @@ final class PinDragTests: XCTestCase {
 @MainActor
 extension Browser {
     func selectLoadedPinForDrag(_ tab: Search.Tab) async throws {
-        let address = try XCTUnwrap(tab.address)
+        let address = try XCTUnwrap(tab.address?.absoluteString)
         select(tab)
         let page = tab.web
         // A restored tab waits for a window before loading. In a sidebar-only
         // fixture that load can start during the drag and cancel the gesture.
+        // WebKit can escape the fragment marker in these about:blank URLs.
         let deadline = ContinuousClock.now + .seconds(5)
-        while (page.url != address || page.isLoading || tab.loading), ContinuousClock.now < deadline {
+        while (page.url?.absoluteString.removingPercentEncoding != address || page.isLoading || tab.loading),
+              ContinuousClock.now < deadline {
             try await Task.sleep(for: .milliseconds(20))
         }
-        XCTAssertEqual(page.url, address)
+        XCTAssertEqual(page.url?.absoluteString.removingPercentEncoding, address)
         XCTAssertFalse(page.isLoading || tab.loading)
     }
 }
