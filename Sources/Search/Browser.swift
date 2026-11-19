@@ -5617,6 +5617,29 @@ final class Browser: NSObject, ObservableObject {
         return group.collapsed ? shown.filter { $0.id == (activeSplit?.left ?? activeID) } : shown
     }
 
+    struct GroupedTabRow {
+        struct Group: Identifiable {
+            let group: TabGroup
+            let tabs: [Tab]
+            var id: UUID { group.id }
+        }
+
+        let pins: [Tab]
+        let groups: [Group]
+        let ungrouped: [Tab]
+    }
+
+    /// One grouping for the strip's measurements and its visible rows.
+    var groupedTabRow: GroupedTabRow {
+        let off = pairedOff
+        let buckets = grouping(tabs)
+        return GroupedTabRow(
+            pins: tabs.filter { $0.pin != nil && !off.contains($0.id) },
+            groups: tabGroups.map { GroupedTabRow.Group(group: $0, tabs: visible($0, among: buckets[$0.id] ?? [], off: off)) },
+            ungrouped: (buckets[nil] ?? []).filter { !off.contains($0.id) }
+        )
+    }
+
     /// A group lasts as long as its tabs: the last one gone, it goes too.
     private func removeEmptyGroup(_ id: UUID?) {
         guard let id, !tabs.contains(where: { $0.groupID == id }) else { return }
