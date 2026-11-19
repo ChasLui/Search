@@ -111,6 +111,7 @@ BINARY="$(swift build "${SWIFTFLAGS[@]}" --show-bin-path)/Search"
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$BINARY" "$APP/Contents/MacOS/$NAME"
+cp -R Sources/Search/Resources/*.lproj "$APP/Contents/Resources/"
 # The binary says which SDK it was built with, and AppKit draws the app the
 # way that SDK's macOS drew it: built with the macOS 27 SDK, a Mac on 27 gets
 # 27's window buttons and controls; said to be built with an older one, it
@@ -182,6 +183,8 @@ cat > "$APP/Contents/Info.plist" <<PLIST
 <dict>
   <key>CFBundleName</key><string>$NAME</string>
   <key>CFBundleDisplayName</key><string>$NAME</string>
+  <key>CFBundleDevelopmentRegion</key><string>en</string>
+  <key>CFBundleLocalizations</key><array><string>en</string><string>zh-Hans</string></array>
   <key>CFBundleExecutable</key><string>$NAME</string>
   <key>CFBundleIdentifier</key><string>com.officecommun.search</string>
   <key>CFBundlePackageType</key><string>APPL</string>
@@ -269,9 +272,10 @@ PLIST
 # plain names above stay "Search", matching the folder, since a folder named
 # otherwise reads to macOS as renamed by hand, and then the folder wins.
 if [ "$DEV" = 1 ]; then
-  mkdir -p "$APP/Contents/Resources/en.lproj"
-  printf '"CFBundleDisplayName" = "%s";\n"CFBundleName" = "%s";\n' "$SHOWN" "$SHOWN" \
-    > "$APP/Contents/Resources/en.lproj/InfoPlist.strings"
+  for locale in en zh-Hans; do
+    printf '"CFBundleDisplayName" = "%s";\n"CFBundleName" = "%s";\n' "$SHOWN" "$SHOWN" \
+      >> "$APP/Contents/Resources/$locale.lproj/InfoPlist.strings"
+  done
   /usr/libexec/PlistBuddy -c "Add :LSHasLocalizedDisplayName bool true" "$APP/Contents/Info.plist"
 fi
 

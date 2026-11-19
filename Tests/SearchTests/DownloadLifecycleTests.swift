@@ -381,8 +381,12 @@ final class DownloadLifecycleTests: XCTestCase {
     }
 
     func testRightClickOnARowOffersItsAddressWhenItHasOne() async throws {
+        let language = Language.shared
+        let previousLanguage = language.selection
+        language.select(.english)
+        defer { language.select(previousLanguage) }
         let tab = try await openFixturePage()
-        let host = NSHostingView(rootView: DownloadsPanel(browser: browser, loot: browser.loot))
+        let host = NSHostingView(rootView: LanguageRoot(content: DownloadsPanel(browser: browser, loot: browser.loot)))
         host.frame = NSRect(x: 0, y: 0, width: 560, height: 680)
         let offscreen = NSWindow(contentRect: NSRect(x: -20000, y: -20000, width: 560, height: 680),
                                  styleMask: [.borderless], backing: .buffered, defer: false)
@@ -395,7 +399,12 @@ final class DownloadLifecycleTests: XCTestCase {
                         address: "https://example.test/done.zip")
         browser.loot.add(old)
         browser.loot.add(done)
-        try await waitUntil { rowMenus(in: host) == [["Copy Address"]] }
+        do { try await waitUntil { rowMenus(in: host) == [["Copy Address"]] } }
+        catch { XCTFail("English download menus: \(rowMenus(in: host))"); throw error }
+        language.select(.simplifiedChinese)
+        do { try await waitUntil { rowMenus(in: host) == [["复制网址"]] } }
+        catch { XCTFail("Chinese download menus: \(rowMenus(in: host))"); throw error }
+        language.select(.english)
 
         // Only the file listed before addresses were noted is left: no menu.
         browser.loot.forget(done)

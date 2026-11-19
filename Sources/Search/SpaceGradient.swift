@@ -408,6 +408,7 @@ extension Browser {
 /// pick is made to the space at once, so the window is the preview too; a
 /// click elsewhere keeps it, Escape puts back what was there.
 struct SpaceLookPicker: View {
+    @ObservedObject private var language = Language.shared
     @ObservedObject var browser: Browser
     let id: UUID
     @State private var customOpen: Bool
@@ -480,11 +481,11 @@ struct SpaceLookPicker: View {
                         Image(systemName: "chevron.right")
                             .font(.system(size: 9, weight: .semibold))
                             .rotationEffect(.degrees(customOpen ? 90 : 0))
-                        Text("Custom gradient")
+                        Text("ui.custom_gradient", bundle: Language.resources)
                             .font(.system(size: 11, weight: .medium))
                         if choice == .custom {
                             Circle().fill(Palette.ink.opacity(0.7)).frame(width: 5, height: 5)
-                                .accessibilityLabel("Chosen")
+                                .accessibilityLabel(Text("ui.chosen", bundle: Language.resources))
                         }
                     }
                     .foregroundStyle(Palette.muted)
@@ -522,7 +523,7 @@ struct SpaceLookPicker: View {
                 .foregroundStyle(choice == .none ? Palette.muted : Color.white)
                 .shadow(color: .black.opacity(choice == .none ? 0 : 0.18), radius: 2, y: 1)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-            Text(space.lookName)
+            Text(language.text("gradient.\(space.lookName)", fallback: space.lookName))
                 .font(.system(size: 11, weight: .semibold))
                 .foregroundStyle(choice == .none ? Palette.muted : Color.white.opacity(0.92))
                 .shadow(color: .black.opacity(choice == .none ? 0 : 0.18), radius: 2, y: 1)
@@ -531,7 +532,7 @@ struct SpaceLookPicker: View {
         }
         .frame(height: 76)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("\(space.name): \(space.lookName)")
+        .accessibilityLabel(Text(language.format("gradient.space_look", fallback: "%1$@: %2$@", space.name, language.text("gradient.\(space.lookName)", fallback: space.lookName))))
     }
 
     private var custom: some View {
@@ -539,7 +540,7 @@ struct SpaceLookPicker: View {
         return VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 10) {
                 ForEach(gradient.colours.indices, id: \.self) { index in
-                    swatch(selected: well == index, name: "Colour \(index + 1)", action: { well = index }) {
+                    swatch(selected: well == index, name: language.format("gradient.colour_number", fallback: "Colour %1$ld", index + 1), action: { well = index }) {
                         Circle().fill(colour(gradient.colours[index]))
                     }
                 }
@@ -568,8 +569,8 @@ struct SpaceLookPicker: View {
                             }
                     }
                     .buttonStyle(.plain)
-                    .help(pick.name)
-                    .accessibilityLabel(pick.name)
+                    .help(language.text("gradient.\(pick.name)", fallback: pick.name))
+                    .accessibilityLabel(Text(language.text("gradient.\(pick.name)", fallback: pick.name)))
                 }
             }
             HStack(spacing: 0) {
@@ -590,16 +591,16 @@ struct SpaceLookPicker: View {
                             .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
-                    .help(direction.name)
-                    .accessibilityLabel(direction.name)
+                    .help(language.text("gradient.\(direction.name)", fallback: direction.name))
+                    .accessibilityLabel(Text(language.text("gradient.\(direction.name)", fallback: direction.name)))
                 }
             }
             .padding(2)
             .background(RoundedRectangle(cornerRadius: 7, style: .continuous).fill(Palette.hover))
             HStack {
-                Text("Grain").font(.system(size: 12)).foregroundStyle(Palette.ink)
+                Text("ui.grain", bundle: Language.resources).font(.system(size: 12)).foregroundStyle(Palette.ink)
                 Spacer()
-                Toggle("Grain", isOn: Binding(get: { gradient.grain }, set: { on in browser.editGradient(id) { $0.grain = on } }))
+                Toggle(isOn: Binding(get: { gradient.grain }, set: { on in browser.editGradient(id) { $0.grain = on } })) { Text("ui.grain", bundle: Language.resources) }
                     .toggleStyle(.switch)
                     .controlSize(.mini)
                     .labelsHidden()
@@ -609,7 +610,7 @@ struct SpaceLookPicker: View {
 
     private func section(_ title: String, @ViewBuilder _ content: () -> some View) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text(title)
+            Text(LocalizedStringKey(title), bundle: Language.resources)
                 .font(.system(size: 11, weight: .medium))
                 .foregroundStyle(Palette.muted)
             content()
@@ -627,8 +628,8 @@ struct SpaceLookPicker: View {
                 .contentShape(Circle())
         }
         .buttonStyle(.plain)
-        .help(name)
-        .accessibilityLabel(name)
+        .help(language.text("gradient.\(name)", fallback: name))
+        .accessibilityLabel(Text(language.text("gradient.\(name)", fallback: name)))
         .accessibilityAddTraits(selected ? .isSelected : [])
     }
 
@@ -643,8 +644,8 @@ struct SpaceLookPicker: View {
                 .contentShape(Circle())
         }
         .buttonStyle(.plain)
-        .help(name)
-        .accessibilityLabel(name)
+        .help(language.text("gradient.\(name)", fallback: name))
+        .accessibilityLabel(Text(language.text("gradient.\(name)", fallback: name)))
     }
 
     private func colour(_ hex: String) -> Color {
@@ -679,7 +680,7 @@ enum SpaceLookPopover {
         shown?.close()
         let space = browser.space
         let before = (colour: space.colour, gradient: space.gradient)
-        let host = NSHostingController(rootView: SpaceLookPicker(browser: browser, id: space.id))
+        let host = NSHostingController(rootView: LanguageRoot(content: SpaceLookPicker(browser: browser, id: space.id)))
         host.sizingOptions = .preferredContentSize
         let popover = NSPopover()
         popover.contentViewController = host

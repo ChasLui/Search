@@ -37,7 +37,7 @@ struct PinFolderHeading: View {
         .onHover { hovering = interactive && $0 }
         .contextMenu { if interactive { menu } }
         .accessibilityLabel(folder.name)
-        .accessibilityHint(folder.collapsed ? "Folded folder" : "Folder")
+        .accessibilityHint(Text(LocalizedStringKey(folder.collapsed ? "Folded folder" : "Folder"), bundle: Language.resources))
     }
 
     private var short: some View {
@@ -51,7 +51,7 @@ struct PinFolderHeading: View {
         .foregroundStyle(hovering ? Palette.ink.opacity(0.7) : Palette.muted)
         .frame(maxWidth: .infinity)
         .frame(height: GroupHeading.compactHeight)
-        .help(folder.collapsed ? "\(folder.name) — folded" : (tip.isEmpty ? folder.name : "\(folder.name) — \(tip)"))
+        .help(folder.collapsed ? Language.shared.format("group.folded", fallback: "%1$@ — folded", folder.name) : (tip.isEmpty ? folder.name : "\(folder.name) — \(tip)"))
         .popover(isPresented: Binding(get: { editing }, set: { if !$0 { browser.editingPinFolder = nil } }),
                  arrowEdge: browser.prefs.sidePosition == .right ? .leading : .trailing) {
             field
@@ -111,12 +111,12 @@ struct PinFolderHeading: View {
     /// A live folder's feed, or that its last fetch failed: nothing louder.
     private var tip: String {
         guard let feed = folder.feed else { return "" }
-        if LiveFolders.failed.contains(folder.id) { return "Couldn’t refresh" }
+        if LiveFolders.failed.contains(folder.id) { return Language.shared.text("Couldn’t refresh", fallback: "Couldn’t refresh") }
         return feed.host() ?? feed.absoluteString
     }
 
     private var field: some View {
-        TextField("Folder name", text: $draft)
+        TextField(text: $draft, prompt: Text("ui.folder_name", bundle: Language.resources)) { Text("ui.folder_name", bundle: Language.resources) }
             .textFieldStyle(.plain)
             .font(.system(size: 12.5, weight: .medium))
             .focused($focused)
@@ -132,18 +132,18 @@ struct PinFolderHeading: View {
     @ViewBuilder
     private var menu: some View {
         let folders = browser.pinFolders
-        Button("Rename Folder") { browser.editingPinFolder = folder.id }
-        Button(folder.collapsed ? "Expand Folder" : "Collapse Folder") { browser.togglePinFolder(folder.id) }
+        Button { browser.editingPinFolder = folder.id } label: { Text("ui.rename_folder", bundle: Language.resources) }
+        Button { browser.togglePinFolder(folder.id) } label: { Text(LocalizedStringKey(folder.collapsed ? "Expand Folder" : "Collapse Folder"), bundle: Language.resources) }
         if folder.isLive {
-            Button("Refresh") { LiveFolders.refresh(folder.id, in: browser.spaceID) }
+            Button { LiveFolders.refresh(folder.id, in: browser.spaceID) } label: { Text("ui.refresh", bundle: Language.resources) }
         } else {
-            Button("New Folder Inside") { browser.newPinFolder(in: folder.id) }
+            Button { browser.newPinFolder(in: folder.id) } label: { Text("ui.new_folder_inside_e8febb", bundle: Language.resources) }
                 .disabled(!PinTree.canMake(in: folder.id, in: folders))
-            Button("New Live Folder Inside…") { LiveFolders.ask(for: browser, in: folder.id) }
+            Button { LiveFolders.ask(for: browser, in: folder.id) } label: { Text("ui.new_live_folder_inside", bundle: Language.resources) }
                 .disabled(!PinTree.canMake(in: folder.id, in: folders))
         }
-        Menu("Move Folder To") {
-            Button("Top of Pinned Rows") { browser.movePinFolder(folder.id, into: nil) }
+        Menu {
+            Button { browser.movePinFolder(folder.id, into: nil) } label: { Text("ui.top_of_pinned_rows", bundle: Language.resources) }
                 .disabled(folder.parent == nil)
             let others = PinFolderMenu.entries(folders).filter { $0.folder.id != folder.id }
             if !others.isEmpty { Divider() }
@@ -151,9 +151,9 @@ struct PinFolderHeading: View {
                 Button(entry.title) { browser.movePinFolder(folder.id, into: entry.folder.id) }
                     .disabled(folder.parent == entry.folder.id || !PinTree.canMove(folder.id, into: entry.folder.id, in: folders))
             }
-        }
+        } label: { Text("ui.move_folder_to", bundle: Language.resources) }
         Divider()
-        Button("Delete Folder") { browser.deletePinFolder(folder.id) }
+        Button { browser.deletePinFolder(folder.id) } label: { Text("ui.delete_folder", bundle: Language.resources) }
     }
 }
 

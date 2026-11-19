@@ -10,6 +10,7 @@ import SwiftUI
 /// about, and — when there is one — a foot below a hairline.
 struct Plate<Content: View, Foot: View>: View {
     let title: String
+    let localizedTitle: Bool
     var width: CGFloat = 560
     let close: () -> Void
     @ViewBuilder let content: () -> Content
@@ -17,12 +18,14 @@ struct Plate<Content: View, Foot: View>: View {
 
     init(
         _ title: String,
+        localizedTitle: Bool = false,
         width: CGFloat = 560,
         close: @escaping () -> Void,
         @ViewBuilder content: @escaping () -> Content,
         @ViewBuilder foot: @escaping () -> Foot
     ) {
         self.title = title
+        self.localizedTitle = localizedTitle
         self.width = width
         self.close = close
         self.content = content
@@ -40,7 +43,7 @@ struct Plate<Content: View, Foot: View>: View {
     /// card, no shadow, no cross — the tab is what closes.
     private var page: some View {
         VStack(alignment: .leading, spacing: 0) {
-            Text(title)
+            (localizedTitle ? Text(LocalizedStringKey(title), bundle: Language.resources) : Text(title))
                 .font(.system(size: 22, weight: .semibold))
                 .foregroundStyle(Palette.ink)
                 .padding(.top, 44)
@@ -64,7 +67,7 @@ struct Plate<Content: View, Foot: View>: View {
     private var card: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: 10) {
-                Text(title)
+                (localizedTitle ? Text(LocalizedStringKey(title), bundle: Language.resources) : Text(title))
                     .font(.system(size: 17, weight: .semibold))
                     .foregroundStyle(Palette.ink)
                 Spacer(minLength: 0)
@@ -101,11 +104,12 @@ struct Plate<Content: View, Foot: View>: View {
 extension Plate where Foot == EmptyView {
     init(
         _ title: String,
+        localizedTitle: Bool = false,
         width: CGFloat = 560,
         close: @escaping () -> Void,
         @ViewBuilder content: @escaping () -> Content
     ) {
-        self.init(title, width: width, close: close, content: content, foot: { EmptyView() })
+        self.init(title, localizedTitle: localizedTitle, width: width, close: close, content: content, foot: { EmptyView() })
     }
 }
 
@@ -153,22 +157,27 @@ extension EnvironmentValues {
 struct Line<Control: View>: View {
     let title: String
     let detail: String?
+    let localizedTitle: Bool
+    let localizedDetail: Bool
     @ViewBuilder let control: () -> Control
 
-    init(_ title: String, _ detail: String? = nil, @ViewBuilder control: @escaping () -> Control) {
+    init(_ title: String, _ detail: String? = nil, localizedTitle: Bool = false, localizedDetail: Bool = false,
+         @ViewBuilder control: @escaping () -> Control) {
         self.title = title
         self.detail = detail
+        self.localizedTitle = localizedTitle
+        self.localizedDetail = localizedDetail
         self.control = control
     }
 
     var body: some View {
         HStack(alignment: .center, spacing: 16) {
             VStack(alignment: .leading, spacing: 3) {
-                Text(title)
+                (localizedTitle ? Text(LocalizedStringKey(title), bundle: Language.resources) : Text(title))
                     .font(.system(size: 13))
                     .foregroundStyle(Palette.ink)
                 if let detail {
-                    Text(detail)
+                    (localizedDetail ? Text(LocalizedStringKey(detail), bundle: Language.resources) : Text(detail))
                         .font(.system(size: 11.5))
                         .foregroundStyle(Palette.muted)
                         .lineLimit(3)
@@ -186,9 +195,13 @@ struct Line<Control: View>: View {
 /// A small heading over a card, for when a panel has more than one.
 struct Caption: View {
     let text: String
-    init(_ text: String) { self.text = text }
+    var localized = false
+    init(_ text: String, localized: Bool = false) {
+        self.text = text
+        self.localized = localized
+    }
     var body: some View {
-        Text(text)
+        (localized ? Text(LocalizedStringKey(text), bundle: Language.resources) : Text(text))
             .font(.system(size: 11.5, weight: .medium))
             .foregroundStyle(Palette.muted)
             .padding(.leading, 2)
@@ -198,7 +211,7 @@ struct Caption: View {
 /// The field for narrowing a list. The wash, the glass, the caret.
 struct Hunt: View {
     @Binding var text: String
-    var prompt = "Search"
+    var prompt = "ui.search_field"
     var focus: FocusState<Bool>.Binding
 
     var body: some View {
@@ -208,11 +221,12 @@ struct Hunt: View {
                 .foregroundStyle(Palette.muted)
             ZStack(alignment: .leading) {
                 if text.isEmpty {
-                    Text(prompt).foregroundStyle(Palette.muted.opacity(0.7))
+                    Text(LocalizedStringKey(prompt), bundle: Language.resources).foregroundStyle(Palette.muted.opacity(0.7))
                 }
                 TextField("", text: $text)
                     .textFieldStyle(.plain)
                     .foregroundStyle(Palette.ink)
+                    .accessibilityLabel(Text(LocalizedStringKey(prompt), bundle: Language.resources))
                     .focused(focus)
             }
             .font(.system(size: 13))
@@ -223,6 +237,7 @@ struct Hunt: View {
                         .foregroundStyle(Palette.faint)
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel(Text("search.clear", bundle: Language.resources))
             }
         }
         .padding(.horizontal, 12)
@@ -236,7 +251,7 @@ struct Nothing: View {
     let text: String
     init(_ text: String) { self.text = text }
     var body: some View {
-        Text(text)
+        Text(LocalizedStringKey(text), bundle: Language.resources)
             .font(.system(size: 13))
             .foregroundStyle(Palette.muted)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -261,7 +276,7 @@ struct Quick: View {
         Button(action: act) {
             // On one line, whatever room is left: in the narrow downloads
             // card, Resume, Retry and Remove broke in the middle of a word.
-            Text(title)
+            Text(LocalizedStringKey(title), bundle: Language.resources)
                 .font(.system(size: 11.5))
                 .foregroundStyle(tint)
                 .lineLimit(1)

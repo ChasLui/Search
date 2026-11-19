@@ -162,6 +162,7 @@ extension Browser {
 /// History › Archived Tabs…: History's look, its days and its rows, for the
 /// tabs Search closed by itself.
 struct ArchivePanel: View {
+    @ObservedObject private var language = Language.shared
     @ObservedObject var browser: Browser
     @ObservedObject var archive: Archive
 
@@ -172,7 +173,7 @@ struct ArchivePanel: View {
 
     var body: some View {
         let listed = self.listed
-        Plate("Archived Tabs", width: 600, close: { browser.archiving = false }) {
+        Plate("page.archive", localizedTitle: true, width: 600, close: { browser.archiving = false }) {
             VStack(alignment: .leading, spacing: 14) {
                 Hunt(text: $hunt, prompt: "Search the tabs Search closed", focus: $hunting)
                 if listed.isEmpty {
@@ -212,15 +213,15 @@ struct ArchivePanel: View {
             }
         } foot: {
             HStack {
-                Text(listed.count == 1 ? "1 tab" : "\(listed.count) tabs")
+                CountText(key: "count.tabs", count: listed.count)
                     .font(.system(size: 12))
                     .foregroundStyle(Palette.muted)
-                Text("· kept for 30 days")
+                Text("ui.kept_for_30_days", bundle: Language.resources)
                     .font(.system(size: 12))
                     .foregroundStyle(Palette.faint)
                 Spacer()
                 if !archive.tabs.isEmpty {
-                    Pill("Clear") { archive.clear() }
+                    Pill("ui.clear") { archive.clear() }
                 }
             }
         }
@@ -302,7 +303,7 @@ struct ArchivePanel: View {
             .onTapGesture(perform: go)
             .onHover { hovering = $0 }
             .animation(Motion.quick, value: hovering)
-            .help("Open again in this space")
+            .help(Text("ui.open_again_in_this_space", bundle: Language.resources))
         }
     }
 }

@@ -17,6 +17,10 @@ struct SettingsGroup: Identifiable {
     let page: SettingsPanel.Page
     let title: String
     let icon: String
+
+    @MainActor var localizedTitle: String {
+        Language.shared.text("settings.group.\(id)", fallback: title)
+    }
 }
 
 /// One row of Settings.
@@ -53,6 +57,18 @@ struct SettingsItem: Identifiable {
     var findOnly = false
 
     var page: SettingsPanel.Page { SettingsIndex.group(group)?.page ?? .general }
+
+    @MainActor var localizedTitle: String {
+        Language.shared.text("settings.\(id).title", fallback: title)
+    }
+
+    @MainActor var localizedDetail: String {
+        Language.shared.text("settings.\(id).detail", fallback: detail)
+    }
+
+    @MainActor var localizedMore: String? {
+        more.map { Language.shared.text("settings.\(id).more", fallback: $0) }
+    }
 }
 
 enum SettingsIndex {
@@ -116,6 +132,9 @@ enum SettingsIndex {
               title: "Bring things over", detail: "Bookmarks, history, passwords and extensions from another browser",
               more: "From another browser on this Mac, or from a file it exported. Nothing leaves your Mac.",
               words: ["import", "chrome", "safari", "arc", "migrate"]),
+        .init(id: "general.language", group: "browser", icon: "character.bubble",
+              title: "Interface language", detail: "Choose the language used by Search",
+              keys: ["ui.language"], words: ["language", "localization", "中文", "语言"]),
         .init(id: "sync", group: "browser", icon: "arrow.triangle.2.circlepath",
               title: "Sync with your other Macs", detail: "Spaces, pins, bookmarks and settings, through a folder you choose",
               more: "Choose a folder your Macs share, in iCloud Drive or Dropbox for example, and turn this on with the same folder in Search on each Mac. Each profile syncs on its own. Never your history, passwords, cookies, sign-ins or open tabs. No account and no server: only small files in that folder.",
@@ -559,15 +578,27 @@ enum SettingsIndex {
 
     /// The rows whose words match what was typed, in the order of the
     /// sections. Every word typed has to be found somewhere in the row.
-    static func find(_ typed: String) -> [SettingsItem] {
+    @MainActor private static var searchLanguage: InterfaceLanguage?
+    @MainActor private static var searchWords: [String: String] = [:]
+
+    @MainActor static func find(_ typed: String) -> [SettingsItem] {
         let words = typed.lowercased().split(whereSeparator: \.isWhitespace).map(String.init)
         guard !words.isEmpty else { return [] }
+        let language = Language.shared.effective
+        if searchLanguage != language {
+            searchWords = Dictionary(uniqueKeysWithValues: items.map { item in
+                let group = SettingsIndex.group(item.group)
+                let english = [item.title, item.detail, item.more ?? "", group?.title ?? "", item.page.title]
+                let localized = [item.localizedTitle, item.localizedDetail, item.localizedMore ?? "",
+                                 group?.localizedTitle ?? "", item.page.localizedTitle]
+                return (item.id, (english + localized + item.words + item.keys).joined(separator: " ").lowercased())
+            })
+            searchLanguage = language
+        }
         let order = SettingsPanel.Page.allCases
         return items
             .filter { item in
-                let group = SettingsIndex.group(item.group)
-                let hay = ([item.title, item.detail, item.more ?? "", group?.title ?? "", item.page.title]
-                    + item.words + item.keys).joined(separator: " ").lowercased()
+                let hay = searchWords[item.id] ?? ""
                 return words.allSatisfy { hay.contains($0) }
             }
             .sorted { (order.firstIndex(of: $0.page) ?? 0, groupOrder($0.group)) < (order.firstIndex(of: $1.page) ?? 0, groupOrder($1.group)) }
@@ -766,6 +797,7 @@ extension SettingsIndex {
     /// defaults changed: what Tests/settings_layout.py reads back.
     @MainActor static func values(_ prefs: Preferences) -> [String: Any] {
         [
+            "ui.language": Language.shared.selection.rawValue,
             "tabs.layout": prefs.tabsLayout.rawValue,
             "tabs.sleep": prefs.sleepChoice.rawValue,
             "float.own": prefs.floatOwn.rawValue,
@@ -795,6 +827,9 @@ extension SettingsIndex {
     /// value it doesn't know.
     @MainActor static func apply(_ id: String, _ value: Any, to prefs: Preferences) -> Bool {
         switch id {
+        case "general.language":
+            guard let choice = (value as? String).flatMap(InterfaceLanguage.init(rawValue:)) else { return false }
+            Language.shared.select(choice)
         case "tabs.layout":
             guard let layout = (value as? String).flatMap(TabsLayout.init) else { return false }
             prefs.tabsLayout = layout

@@ -290,13 +290,21 @@ final class Browser: NSObject, ObservableObject {
         }
         let (count, already, ids) = bookmarks.takeNoting(found, from: source.name)
         ImportRecords.note(source.name, bookmarks: ids, bookmarks: count)
+        let name = source.name, empty = Bookmarks.count(found) == 0, preserved = kept
         announce(
-            kept ? "Couldn't read all of \(source.name)'s bookmarks: what came from it before was kept"
-                : Bookmarks.count(found) == 0 ? "No bookmarks in \(source.name)"
-                : count == 0 ? "The bookmarks from \(source.name) were all here already"
-                : already == 0 ? "\(count) bookmarks from \(source.name)"
-                : "\(count) new bookmarks from \(source.name), \(already) already here"
-        )
+            preserved ? "Couldn't read all of \(name)'s bookmarks: what came from it before was kept"
+                : empty ? "No bookmarks in \(name)"
+                : count == 0 ? "The bookmarks from \(name) were all here already"
+                : already == 0 ? "\(count) bookmarks from \(name)"
+                : "\(count) new bookmarks from \(name), \(already) already here",
+            localized: {
+                let language = Language.shared
+                if preserved { return language.format("announcement.bookmarks_kept", fallback: "Couldn't read all of %1$@'s bookmarks: what came from it before was kept", name) }
+                if empty { return language.format("import.result.no_bookmarks", fallback: "No bookmarks in %1$@", name) }
+                if count == 0 { return language.format("announcement.bookmarks_already", fallback: "The bookmarks from %1$@ were all here already", name) }
+                if already == 0 { return language.format("announcement.bookmarks_from", fallback: "%1$@ from %2$@", language.count("count.bookmarks", count), name) }
+                return language.format("announcement.bookmarks_from_existing", fallback: "%1$@ from %2$@, %3$@", language.count("count.new_bookmarks", count), name, language.count("count.already_here", already))
+            })
         let urls = Bookmarks.urls(found)
         DispatchQueue.global(qos: .utility).async {
             let icons = source.icons(profile: profile, for: urls)
@@ -815,7 +823,7 @@ final class Browser: NSObject, ObservableObject {
         }
         guard let host = hereHost, let back = curtain.undo(on: host) else { return }
         redress()
-        announce("\(back.label) is back")
+        announce("\(back.label) is back", localizedKey: "announcement.is_back", arguments: [back.label])
     }
 
     /// The pointer resting on a row in the list brings that one thing back,
@@ -950,7 +958,8 @@ final class Browser: NSObject, ObservableObject {
             return
         }
         relist()
-        announce(offer.changed ? "Password updated for \(login.host)" : "Password saved for \(login.host)")
+        announce(offer.changed ? "Password updated for \(login.host)" : "Password saved for \(login.host)",
+                 localizedKey: offer.changed ? "announcement.password_updated" : "announcement.password_saved", arguments: [login.host])
     }
 
     func dropOffer() { offering = nil }
@@ -961,7 +970,7 @@ final class Browser: NSObject, ObservableObject {
         guard let offer = offering else { return }
         Vault.never(offer.login.host)
         offering = nil
-        announce("Never for \(offer.login.host)")
+        announce("Never for \(offer.login.host)", localizedKey: "announcement.never_for", arguments: [offer.login.host])
     }
 
     /// The caret in a sign-in box: the accounts kept for this site, and the
@@ -1428,7 +1437,7 @@ final class Browser: NSObject, ObservableObject {
             return
         }
         relist()
-        announce("Kept for \(host)")
+        announce("Kept for \(host)", localizedKey: "announcement.kept_for", arguments: [host])
     }
 
     func forget(_ login: Kept) {
@@ -1448,12 +1457,12 @@ final class Browser: NSObject, ObservableObject {
         let count = shown.count
         let many = count == 1 ? "1 password" : "\(count) passwords"
         Ask.sure(
-            count == 1 ? "Remove 1 Password?" : "Remove \(count) Passwords?",
-            detail: "They're taken out of your keychain. Only the passwords Search keeps are removed: password managers, other apps and other browsers keep theirs. This can't be undone.",
+            Language.shared.count("count.remove_passwords", count),
+            detail: Language.shared.text("password.remove_detail", fallback: "They're taken out of your keychain. Only the passwords Search keeps are removed: password managers, other apps and other browsers keep theirs. This can't be undone."),
             confirm: "Remove",
             returnCancels: true
         ) { [weak self] in
-            Vault.prove("remove \(many)") { ok in
+            Vault.prove(Language.shared.format("auth.remove_passwords", fallback: "remove %1$@", Language.shared.count("count.passwords", count))) { ok in
                 guard ok, let self, !self.forgetting else { return }
                 // A keychain delete is a few milliseconds, a few hundred of
                 // them a second: off the main thread, as imports are (#380).
@@ -1468,7 +1477,12 @@ final class Browser: NSObject, ObservableObject {
                         let removed = gone == 1 ? "1 password" : "\(gone) passwords"
                         self.announce(gone == count ? "Removed \(removed)"
                             : gone == 0 ? "The keychain refused them"
-                            : "Removed \(gone) of \(many)")
+                            : "Removed \(gone) of \(many)", localized: {
+                                let language = Language.shared
+                                if gone == count { return language.format("announcement.removed_passwords", fallback: "Removed %1$@", language.count("count.passwords", gone)) }
+                                if gone == 0 { return language.text("The keychain refused them", fallback: "The keychain refused them") }
+                                return language.format("announcement.removed_some_passwords", fallback: "Removed %1$ld of %2$ld passwords", gone, count)
+                            })
                     }
                 }
             }
@@ -1481,7 +1495,7 @@ final class Browser: NSObject, ObservableObject {
     /// of their history, and it is taken off again after a minute and a
     /// half unless something else has been copied since.
     func copy(_ login: Kept) {
-        Vault.prove("copy the password for \(login.host)") { [weak self] ok in
+        Vault.prove(Language.shared.format("auth.copy_password", fallback: "copy the password for %1$@", login.host)) { [weak self] ok in
             guard ok, let self else { return }
             // Read here, once the Mac has said who this is: what the panel
             // drew its list from holds no secrets.
@@ -1526,13 +1540,20 @@ final class Browser: NSObject, ObservableObject {
             let kept = keep(found)
             ImportRecords.note(name, passwords: kept)
             let locked = found.undecrypted > 0 ? " (\(found.undecrypted) couldn't be decrypted)" : ""
-            announce((kept == 0 ? "Nothing new in \(name)" : "\(kept) passwords from \(name)") + locked)
+            let undecrypted = found.undecrypted
+            announce((kept == 0 ? "Nothing new in \(name)" : "\(kept) passwords from \(name)") + locked, localized: {
+                let language = Language.shared
+                let result = kept == 0
+                    ? language.format("announcement.passwords_nothing_new", fallback: "Nothing new in %1$@", name)
+                    : language.format("announcement.passwords_from", fallback: "%1$@ from %2$@", language.count("count.passwords", kept), name)
+                return undecrypted == 0 ? result : language.format("announcement.passwords_locked", fallback: "%1$@ (%2$ld couldn't be decrypted)", result, undecrypted)
+            })
         case .failure(Chromium.Trouble.noPassphrase):
-            announce("\(name) didn't give up its keychain key")
+            announce("\(name) didn't give up its keychain key", localizedKey: "announcement.keychain_key", arguments: [name])
         case .failure(Mozilla.Trouble.primaryPassword):
-            announce("\(name) has a primary password — export your passwords from it (Settings › Passwords › ⋯ › Export) and bring in the CSV file")
+            announce("\(name) has a primary password — export your passwords from it (Settings › Passwords › ⋯ › Export) and bring in the CSV file", localizedKey: "announcement.primary_password", arguments: [name])
         case .failure:
-            announce("Nothing readable in \(name)")
+            announce("Nothing readable in \(name)", localizedKey: "announcement.nothing_readable", arguments: [name])
         }
     }
 
@@ -1560,10 +1581,13 @@ final class Browser: NSObject, ObservableObject {
         panel.allowedContentTypes = [.html, .commaSeparatedText, .plainText, .zip, .json]
         panel.canChooseDirectories = true
         panel.allowsMultipleSelection = false
-        panel.prompt = "Bring In"
-        panel.message = "A file another browser exported: bookmarks (.html), passwords (.csv), or Safari's File › Export Browsing Data (.zip)."
+        panel.prompt = Language.shared.text("panel.import.prompt", fallback: "Bring In")
+        panel.message = Language.shared.text("panel.import.message", fallback: "A file another browser exported: bookmarks (.html), passwords (.csv), or Safari's File › Export Browsing Data (.zip).")
         guard panel.runModal() == .OK, let url = panel.url else { return }
-        Task { announce((await takeFile(url)).said) }
+        Task {
+            let result = await takeFile(url)
+            announce(result.said, localized: { result.localizedText })
+        }
     }
 
     /// The file's bookmarks, history and passwords, taken in as a browser's
@@ -1578,11 +1602,45 @@ final class Browser: NSObject, ObservableObject {
         let kept: Int
         let skipped: Int
         let cancelled: Bool
+        let failed: Bool
+        let mergedBookmarks: Bool
+        let safari: Bool
+        let busy: Bool
+
+        @MainActor var localizedText: String {
+            let language = Language.shared
+            if busy { return language.text("import.file.busy", fallback: "An import is already running") }
+            var parts: [String] = []
+            if bookmarks > 0 || already > 0 {
+                let added = language.count(already == 0 ? "count.bookmarks" : "count.new_bookmarks", bookmarks)
+                parts.append(already == 0 ? added : language.format("import.result.bookmarks_existing", fallback: "%1$@, %2$@", added, language.count("count.already_here", already)))
+            }
+            if places > 0 { parts.append(language.count("count.places", places)) }
+            if kept > 0 || skipped > 0 {
+                let passwords = language.count("count.passwords", kept)
+                parts.append(skipped == 0 ? passwords : language.format("import.file.passwords_skipped", fallback: "%1$@, %2$ld skipped", passwords, skipped))
+            }
+            var result = parts.joined(separator: " · ")
+            if cancelled {
+                result = result.isEmpty
+                    ? language.text(mergedBookmarks ? "import.file.cancelled_merged" : "import.file.cancelled_empty", fallback: mergedBookmarks ? "Import cancelled after merging bookmarks" : "Import cancelled; nothing was changed")
+                    : language.format("import.file.cancelled_after", fallback: "Import cancelled after %1$@", result)
+            } else if failed {
+                result = result.isEmpty ? language.text("import.file.unreadable", fallback: "That file couldn't be read")
+                    : language.format("import.file.stopped_after", fallback: "Import stopped after %1$@", result)
+            } else if result.isEmpty {
+                result = language.text(mergedBookmarks ? "import.file.folders" : "import.file.empty", fallback: mergedBookmarks ? "Bookmark folders imported" : "Nothing to bring in from that file")
+            }
+            if safari && kept > 0 {
+                result = language.format("import.file.safari_warning", fallback: "%1$@ — the exported file holds your passwords in the clear: delete it now", result)
+            }
+            return result
+        }
     }
 
     @discardableResult
     func takeFile(_ url: URL) async -> FileTake {
-        guard !Browser.fileImportTerminating, fileImport == nil else { return FileTake(said: "An import is already running", bookmarks: 0, already: 0, places: 0, kept: 0, skipped: 0, cancelled: false) }
+        guard !Browser.fileImportTerminating, fileImport == nil else { return FileTake(said: "An import is already running", bookmarks: 0, already: 0, places: 0, kept: 0, skipped: 0, cancelled: false, failed: false, mergedBookmarks: false, safari: false, busy: true) }
         let id = UUID()
         fileImport = FileImportJob(id: id, filename: url.lastPathComponent, message: "Reading…")
         let control = ImportFile.Control { [weak self] progress in
@@ -1682,7 +1740,7 @@ final class Browser: NSObject, ObservableObject {
         if safari, kept > 0 {
             said += " — the exported file holds your passwords in the clear: delete it now"
         }
-        return FileTake(said: said, bookmarks: added, already: already, places: places, kept: kept, skipped: skipped, cancelled: control.isCancelled)
+        return FileTake(said: said, bookmarks: added, already: already, places: places, kept: kept, skipped: skipped, cancelled: control.isCancelled, failed: failed, mergedBookmarks: mergedBookmarks, safari: safari, busy: false)
     }
 
     // MARK: - what is kept, and getting rid of it
@@ -2396,6 +2454,9 @@ final class Browser: NSObject, ObservableObject {
 
     /// A line that rises from the bottom, says one thing, and leaves.
     @Published private(set) var announcement: String?
+    private var announcementKey: String?
+    private var announcementArguments: [CVarArg] = []
+    private var announcementLocalization: (() -> String)?
     /// The file a "Saved …" line is about: clicked, the line shows it in
     /// the Finder, and it stays long enough to be clicked.
     @Published private(set) var announcedFile: URL?
@@ -2437,13 +2498,29 @@ final class Browser: NSObject, ObservableObject {
         return "[\(text)](\(url.absoluteString))"
     }
 
-    func announce(_ text: String, file: URL? = nil) {
+    var displayedAnnouncement: String? {
+        guard let announcement else { return nil }
+        if let announcementLocalization { return announcementLocalization() }
+        let language = Language.shared
+        guard let announcementKey else { return language.text(announcement, fallback: announcement) }
+        let format = language.text(announcementKey, fallback: announcementKey)
+        guard format != announcementKey else { return announcement }
+        return String(format: format, locale: language.locale, arguments: announcementArguments)
+    }
+
+    func announce(_ text: String, file: URL? = nil, localizedKey: String? = nil, arguments: [CVarArg] = [], localized: (() -> String)? = nil) {
+        announcementKey = localizedKey
+        announcementArguments = arguments
+        announcementLocalization = localized
         announcement = text
         announcedFile = file
         hush?.cancel()
         let work = DispatchWorkItem { [weak self] in
             self?.announcement = nil
             self?.announcedFile = nil
+            self?.announcementKey = nil
+            self?.announcementArguments = []
+            self?.announcementLocalization = nil
         }
         hush = work
         DispatchQueue.main.asyncAfter(deadline: .now() + (file == nil ? 1.7 : 4), execute: work)
@@ -2710,7 +2787,9 @@ final class Browser: NSObject, ObservableObject {
             welcoming = !prefs.welcomed
             newsShowing = WhatsNew.due(prefs: prefs, welcoming: welcoming)
             // Once a day, quietly: is there a newer one?
-            Updater.shared.checkIfDue { [weak self] line in self?.announce(line) }
+            Updater.shared.checkIfDue { [weak self] line, key, arguments in
+                self?.announce(line, localizedKey: key, arguments: arguments)
+            }
             // With your other Macs, if that is on (see Sync.swift).
             Sync.shared.start()
             // An icon that arrives is looked for again by every tab showing
@@ -4897,6 +4976,26 @@ final class Browser: NSObject, ObservableObject {
         return "Reopen \(closedTitle(for: last))"
     }
 
+    func closedDisplayTitle(for ghost: Ghost) -> String {
+        guard let batch = ghost.batch else { return ghost.label }
+        let count = ghosts.filter { $0.batch == batch }.count
+        switch ghost.kind {
+        case .group: return Language.shared.text("history.closed_group", fallback: "Closed Group")
+        case .clear:
+            return count == 1 ? Language.shared.text("history.cleared_tab", fallback: "Cleared Tab") : Language.shared.count("count.cleared_tabs", count)
+        case .tabs:
+            return count == 1 ? Language.shared.text("history.closed_tab", fallback: "Closed Tab") : Language.shared.count("count.closed_tabs", count)
+        }
+    }
+
+    var reopenDisplayTitle: String {
+        guard let last = ghosts.last, last.batch != nil,
+              (Browsers.lastClosedAt ?? .distantPast) <= last.at else {
+            return Language.shared.text("history.reopen_closed_tab", fallback: "Reopen Closed Tab")
+        }
+        return Language.shared.format("history.reopen", fallback: "Reopen %1$@", closedDisplayTitle(for: last))
+    }
+
     /// Everything one bulk close closed, back as it was: each tab
     /// at its place, the newest closed first, so each goes into the row as
     /// it stood just before that tab left it; a closed group comes back
@@ -5075,8 +5174,8 @@ final class Browser: NSObject, ObservableObject {
             else { return }
             if unsaved {
                 Ask.sure(
-                    "Move Tab?",
-                    detail: "This page has unsaved form entries. It will reopen in “\(destination.name)” with that Space’s sign-ins, so the entries may be lost.",
+                    Language.shared.text("move.tab_title", fallback: "Move Tab?"),
+                    detail: Language.shared.format("move.tab_detail", fallback: "This page has unsaved form entries. It will reopen in “%1$@” with that Space’s sign-ins, so the entries may be lost.", destination.name),
                     confirm: "Move",
                     then: complete
                 )
@@ -5116,8 +5215,8 @@ final class Browser: NSObject, ObservableObject {
         asked.notify(queue: .main) {
             guard unsaved else { return complete() }
             Ask.sure(
-                "Move Group?",
-                detail: "A page in this group has unsaved form entries. The group will reopen in “\(destination.name)” with that Space’s sign-ins, so the entries may be lost.",
+                Language.shared.text("move.group_title", fallback: "Move Group?"),
+                detail: Language.shared.format("move.group_detail", fallback: "A page in this group has unsaved form entries. The group will reopen in “%1$@” with that Space’s sign-ins, so the entries may be lost.", destination.name),
                 confirm: "Move",
                 then: complete
             )
@@ -5139,7 +5238,7 @@ final class Browser: NSObject, ObservableObject {
         for tab in members { finishMove(tab, toSpace: destination.id, group: group, quietly: true) }
         writeSession(now: true)
         if let row = parked[destination.id] { writeSession(now: true, space: destination.id, row: row) }
-        announce("Moved \(group.name) to \(destination.name)")
+        announce("Moved \(group.name) to \(destination.name)", localizedKey: "announcement.moved_group", arguments: [group.name, destination.name])
     }
 
     @discardableResult
@@ -5200,7 +5299,7 @@ final class Browser: NSObject, ObservableObject {
         guard !quietly else { return true }
         writeSession(now: true)
         writeSession(now: true, space: id, row: row)
-        announce("Moved to \(destination.name)")
+        announce("Moved to \(destination.name)", localizedKey: "announcement.moved_to", arguments: [destination.name])
         return true
     }
 
@@ -5655,7 +5754,8 @@ final class Browser: NSObject, ObservableObject {
         guard !links.isEmpty else { return }
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(links.joined(separator: "\n"), forType: .string)
-        announce(links.count == 1 ? "1 address copied" : "\(links.count) addresses copied")
+        announce(links.count == 1 ? "1 address copied" : "\(links.count) addresses copied",
+                 localized: { Language.shared.count("count.addresses_copied", links.count) })
     }
 
     /// ⌃Tab, ⌃⇧Tab: the next tab on screen, round to the first again. It
@@ -6179,7 +6279,7 @@ final class Browser: NSObject, ObservableObject {
             let wrote = (try? data.write(to: file, options: .atomic)) != nil
             if wrote, marked { Browser.markDownloaded(file) }
             DispatchQueue.main.async {
-                if wrote { self?.announce("Saved \(file.lastPathComponent)", file: file) } else { self?.announce(failed) }
+                if wrote { self?.announce("Saved \(file.lastPathComponent)", file: file, localizedKey: "announcement.saved", arguments: [file.lastPathComponent]) } else { self?.announce(failed) }
                 finished?(wrote)
             }
         }
@@ -6802,7 +6902,7 @@ final class Browser: NSObject, ObservableObject {
             offering = offer
         }
         tab.onPickTrouble = { [weak self] _, reason in
-            self?.announce("Couldn't hide that — \(reason)")
+            self?.announce("Couldn't hide that — \(reason)", localizedKey: "announcement.couldnt_hide", arguments: [reason])
         }
 
         // The line at the bottom doubles as the zoom read-out: it keeps being
@@ -7885,11 +7985,19 @@ extension Browser: WKNavigationDelegate, WKUIDelegate {
         // Over its own tab only, as a page's own questions are (see ask).
         ask(from: webView, show: {
             let alert = NSAlert()
-            alert.messageText = "Open \u{201C}\(name)\u{201D}?"
-            alert.informativeText = "\(webView.url?.host() ?? "This page") wants to open \(name)."
-            alert.addButton(withTitle: "Open")
-            alert.addButton(withTitle: "Cancel")
-            Dialogs.show(alert, over: webView) { answer in
+            alert.messageText = Language.shared.format("dialog.open_app.title", fallback: "Open “%1$@”?", name)
+            let site = webView.url?.host() ?? Language.shared.text("dialog.this_page", fallback: "This page")
+            alert.informativeText = Language.shared.format("dialog.open_app.detail", fallback: "%1$@ wants to open %2$@.", site, name)
+            alert.addButton(withTitle: Language.shared.text("Open", fallback: "Open"))
+            alert.addButton(withTitle: Language.shared.text("Cancel", fallback: "Cancel"))
+            Dialogs.show(alert, over: webView, localize: { alert in
+                let language = Language.shared
+                let site = webView.url?.host() ?? language.text("dialog.this_page", fallback: "This page")
+                alert.messageText = language.format("dialog.open_app.title", fallback: "Open “%1$@”?", name)
+                alert.informativeText = language.format("dialog.open_app.detail", fallback: "%1$@ wants to open %2$@.", site, name)
+                alert.buttons[0].title = language.text("Open", fallback: "Open")
+                alert.buttons[1].title = language.text("Cancel", fallback: "Cancel")
+            }) { answer in
                 guard answer == .alertFirstButtonReturn else { return }
                 NSWorkspace.shared.open(url)
             }
@@ -8781,7 +8889,7 @@ extension Browser: WKDownloadDelegate {
         // gave it: never from "report 2.pdf", whose own " 2" is not its name.
         if chosen == nil { fetches.entry(for: download)?.retryName = prefs.asksWhereToSave ? file.lastPathComponent : name }
         completionHandler(file)
-        announce("Downloading \(file.lastPathComponent)")
+        announce("Downloading \(file.lastPathComponent)", localizedKey: "announcement.downloading", arguments: [file.lastPathComponent])
     }
 
     func downloadDidFinish(_ download: WKDownload) {
@@ -8797,7 +8905,7 @@ extension Browser: WKDownloadDelegate {
             return
         }
         guard listed else {
-            announce("Saved \(file.lastPathComponent)")
+            announce("Saved \(file.lastPathComponent)", localizedKey: "announcement.saved", arguments: [file.lastPathComponent])
             return
         }
         if #available(macOS 15.4, *), let asked = source,
@@ -8828,7 +8936,7 @@ extension Browser: WKDownloadDelegate {
             if webView.configuration.websiteDataStore.isPersistent, anyTab(for: webView)?.shy != true {
                 saved(file, from: originatingURL)
             } else {
-                announce("Saved \(file.lastPathComponent)")
+                announce("Saved \(file.lastPathComponent)", localizedKey: "announcement.saved", arguments: [file.lastPathComponent])
             }
         } catch {
             announce("Download failed")
@@ -8926,7 +9034,7 @@ extension Browser: WKDownloadDelegate {
     private func saved(_ file: URL, from source: URL?, keepsAddress: Bool = true) {
         loot.add(Keep(name: file.lastPathComponent, from: source?.host() ?? "", path: file.path, date: Date(),
                       address: keepsAddress ? Keep.address(of: source) : nil))
-        announce("Saved \(file.lastPathComponent)", file: file)
+        announce("Saved \(file.lastPathComponent)", file: file, localizedKey: "announcement.saved", arguments: [file.lastPathComponent])
     }
 
     func download(

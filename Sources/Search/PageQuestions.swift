@@ -3,6 +3,7 @@ import SwiftUI
 /// The same site permission question in a browser or a small popup window.
 struct CaptureQuestion: View {
     @ObservedObject var browser: Browser
+    @ObservedObject private var language = Language.shared
     let ask: Browser.CaptureAsk
 
     var body: some View {
@@ -31,12 +32,20 @@ struct CaptureQuestion: View {
             Image(systemName: ask.wants == "location" ? "location" : ask.wants == "microphone" ? "mic" : ask.wants == "notifications" ? "bell" : "video")
                 .font(.system(size: 11, weight: .medium))
                 .foregroundStyle(Palette.muted)
-            Text(ask.wants == "location" ? "\(ask.host) wants to know your location"
-                 : ask.wants == "notifications" ? "\(ask.host) wants to send you notifications"
-                 : "\(ask.host) wants to use your \(ask.wants)")
+            Text(captureQuestion)
                 .font(.system(size: 12.5))
                 .foregroundStyle(Palette.ink)
                 .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    private var captureQuestion: String {
+        switch ask.wants {
+        case "location": return language.format("permission.location", fallback: "%@ wants to know your location", ask.host)
+        case "notifications": return language.format("permission.notifications", fallback: "%@ wants to send you notifications", ask.host)
+        case "camera": return language.format("permission.camera", fallback: "%@ wants to use your camera", ask.host)
+        case "microphone": return language.format("permission.microphone", fallback: "%@ wants to use your microphone", ask.host)
+        default: return language.format("permission.camera_microphone", fallback: "%@ wants to use your camera and microphone", ask.host)
         }
     }
 
@@ -47,17 +56,17 @@ struct CaptureQuestion: View {
     @ViewBuilder
     private var buttons: some View {
         Button { ask.once ? browser.allowCaptureOnce() : browser.allowCapture() } label: {
-            Text(ask.once ? "Allow once" : "Allow")
+            Text(LocalizedStringKey(ask.once ? "Allow once" : "Allow"), bundle: Language.resources)
                 .foregroundStyle(Palette.ground)
                 .padding(.horizontal, 11)
                 .padding(.vertical, 5)
                 .background(Palette.ink, in: Capsule())
         }
         if ask.once, ask.keeps {
-            Button("Always allow") { browser.allowCapture() }
+            Button { browser.allowCapture() } label: { Text("ui.always_allow", bundle: Language.resources) }
                 .foregroundStyle(Palette.ink)
         }
-        Button("Don't allow") { browser.denyCapture() }
+        Button { browser.denyCapture() } label: { Text("ui.don_t_allow", bundle: Language.resources) }
             .foregroundStyle(Palette.muted)
     }
 }
@@ -67,6 +76,7 @@ struct CaptureQuestion: View {
 /// which only these two answers open.
 struct ScreenQuestion: View {
     @ObservedObject var browser: Browser
+    @ObservedObject private var language = Language.shared
     let ask: Browser.CaptureAsk
 
     var body: some View {
@@ -76,15 +86,16 @@ struct ScreenQuestion: View {
                     .font(.system(size: 13))
                     .foregroundStyle(Palette.muted)
                     .padding(.top, 2)
-                Text(ask.sound ? "\(ask.host) wants to share your screen and your Mac's sound"
-                               : "\(ask.host) wants to share your screen")
+                Text(ask.sound
+                     ? language.format("permission.screen_sound", fallback: "%@ wants to share your screen and your Mac's sound", ask.host)
+                     : language.format("permission.screen", fallback: "%@ wants to share your screen", ask.host))
                     .font(.system(size: 12.5))
                     .foregroundStyle(Palette.ink)
                     .fixedSize(horizontal: false, vertical: true)
             }
             HStack(spacing: 12) {
                 Button { browser.denyShare() } label: {
-                    Text("Don't allow")
+                    Text("ui.don_t_allow", bundle: Language.resources)
                         .padding(.horizontal, 8)
                         .padding(.vertical, 7)
                         .contentShape(Rectangle())
@@ -93,13 +104,13 @@ struct ScreenQuestion: View {
                 // A window gives away less than a whole screen: it is the
                 // one drawn as the answer.
                 Button { browser.shareScreen() } label: {
-                    Text("Share a Screen")
+                    Text("ui.share_a_screen", bundle: Language.resources)
                         .padding(.horizontal, 8)
                         .padding(.vertical, 7)
                         .contentShape(Rectangle())
                 }
                 Button { browser.shareWindow() } label: {
-                    Text("Share a Window")
+                    Text("ui.share_a_window", bundle: Language.resources)
                         .foregroundStyle(Palette.ground)
                         .padding(.horizontal, 12)
                         .padding(.vertical, 7)
@@ -122,6 +133,7 @@ struct ScreenQuestion: View {
 /// A password offer remains readable in the popup that submitted the form.
 struct PasswordOffer: View {
     @ObservedObject var browser: Browser
+    @ObservedObject private var language = Language.shared
     let offer: Browser.Offer
 
     var body: some View {
@@ -148,10 +160,10 @@ struct PasswordOffer: View {
     private var question: some View {
         let login = offer.login
         return Text(offer.changed
-             ? "Update the password for \(login.user) on \(login.host)?"
+             ? language.format("password.update", fallback: "Update the password for %@ on %@?", login.user, login.host)
              : (login.user.isEmpty
-                ? "Save this password for \(login.host)?"
-                : "Save the password for \(login.user) on \(login.host)?"))
+                ? language.format("password.save_site", fallback: "Save this password for %@?", login.host)
+                : language.format("password.save_user", fallback: "Save the password for %@ on %@?", login.user, login.host)))
             .font(.system(size: 12.5))
             .foregroundStyle(Palette.ink)
             .fixedSize(horizontal: false, vertical: true)
@@ -161,15 +173,17 @@ struct PasswordOffer: View {
 
     @ViewBuilder
     private var buttons: some View {
-        Button(offer.changed ? "Update" : "Save") { browser.keepOffer() }
+        Button { browser.keepOffer() } label: {
+            Text(LocalizedStringKey(offer.changed ? "Update" : "Save"), bundle: Language.resources)
+        }
             .foregroundStyle(Palette.ground)
             .padding(.horizontal, 11)
             .padding(.vertical, 5)
             .background(Palette.ink, in: Capsule())
-        Button("Not now") { browser.dropOffer() }
+        Button { browser.dropOffer() } label: { Text("ui.not_now", bundle: Language.resources) }
             .foregroundStyle(Palette.muted)
         if !offer.changed {
-            Button("Never here") { browser.neverOffer() }
+            Button { browser.neverOffer() } label: { Text("ui.never_here", bundle: Language.resources) }
                 .foregroundStyle(Palette.muted)
         }
     }

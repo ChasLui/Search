@@ -8,6 +8,7 @@ import SwiftUI
 // one, since its page is nobody else's business.
 struct WindowTitle: View {
     @ObservedObject var tab: Tab
+    @ObservedObject private var language = Language.shared
     let window: NSWindow?
 
     /// What the window is called for a page: the name you gave the tab, else
@@ -24,6 +25,7 @@ struct WindowTitle: View {
             .onAppear(perform: apply)
             .onChange(of: tab.title) { _, _ in apply() }
             .onChange(of: tab.name) { _, _ in apply() }
+            .onChange(of: language.effective) { _, _ in apply() }
     }
 
     private func apply() {
@@ -33,7 +35,9 @@ struct WindowTitle: View {
     /// Names the window for the tab in front. Also called as the window is
     /// first set (WindowSetup), so its name doesn't wait for the next change.
     static func set(_ tab: Tab, in window: NSWindow) {
-        let title = name(page: tab.name ?? tab.title, private: tab.shy)
+        let page = tab.name ?? (tab.page == nil ? tab.title : tab.displayLabel)
+        let title = tab.shy ? Language.shared.text("tab.private", fallback: "Private Tab")
+                            : name(page: page, private: false)
         guard window.title != title else { return }
         window.title = title
         // A new title makes AppKit lay the title bar out again, and the

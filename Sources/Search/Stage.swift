@@ -68,7 +68,7 @@ struct Page: View {
             if tab.floating {
                 // The tab is not empty, its page is simply elsewhere. Saying so
                 // is kinder than a white rectangle.
-                Text("This page is playing in the floating window.")
+                Text("ui.this_page_is_playing_in_the_floating_window", bundle: Language.resources)
                     .font(.system(size: 13))
                     .foregroundStyle(Palette.muted)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -646,10 +646,10 @@ struct Trouble: View {
 
     var body: some View {
         VStack(spacing: 10) {
-            Text(message)
+            Text(LocalizedStringKey(message), bundle: Language.resources)
                 .font(.system(size: 14))
                 .foregroundStyle(Palette.ink)
-            Button("Try again", action: retry)
+            Button(action: retry) { Text("ui.try_again_042c86", bundle: Language.resources) }
                 .buttonStyle(.plain)
                 .font(.system(size: 12))
                 .foregroundStyle(Palette.muted)

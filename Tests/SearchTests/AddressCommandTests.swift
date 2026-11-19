@@ -68,6 +68,10 @@ final class AddressCommandTests: XCTestCase {
 
     func testMenuCommandsAndSettingsPagesAreOfferedUnderTheRest() {
         _ = NSApplication.shared
+        let language = Language.shared
+        let previousLanguage = language.selection
+        language.select(.english)
+        defer { language.select(previousLanguage) }
         let browser = Browser(record: WindowRecord())
         let prefs = browser.prefs
         let saved = (prefs.commandBar, prefs.splitView, prefs.ai, prefs.bookmarksBar)

@@ -81,7 +81,7 @@ enum SiteCardPanel {
             SiteCardPanel.hide()
             browser.cancelTabEdit()
         }
-        let host = FirstClick(rootView: AnyView(card.fixedSize()))
+        let host = FirstClick(rootView: AnyView(LanguageRoot(content: card.fixedSize())))
         let size = host.fittingSize
         let glass = NSVisualEffectView(frame: NSRect(origin: .zero, size: size))
         glass.material = .menu
@@ -187,6 +187,7 @@ enum SiteCardPanel {
 /// that belong to this page rather than to the browser. The connection's line
 /// goes a step further in, to what it means and the certificate behind it.
 struct SiteCard: View {
+    @ObservedObject private var language = Language.shared
     let browser: Browser
     @ObservedObject var prefs: Preferences
     @ObservedObject var tab: Tab
@@ -259,11 +260,11 @@ struct SiteCard: View {
             darken
             if prefs.keepsSitesAwake, tab.awakeHost != nil {
                 HStack(spacing: 0) {
-                    Text("Keep This Site Awake").font(MenuMetrics.font)
+                    Text("ui.keep_this_site_awake", bundle: Language.resources).font(MenuMetrics.font)
                     Spacer(minLength: 24)
                     Switch(on: Binding(get: { browser.keepsAwake(tab) }, set: { browser.keepAwake($0, for: tab) }))
                         .accessibilityRepresentation {
-                            Toggle("Keep This Site Awake", isOn: Binding(get: { browser.keepsAwake(tab) }, set: { browser.keepAwake($0, for: tab) }))
+                            Toggle(isOn: Binding(get: { browser.keepsAwake(tab) }, set: { browser.keepAwake($0, for: tab) })) { Text("ui.keep_this_site_awake", bundle: Language.resources) }
                         }
                         .focusable()
                         .onKeyPress(.space) { browser.keepAwake(!browser.keepsAwake(tab), for: tab); return .handled }
@@ -271,7 +272,7 @@ struct SiteCard: View {
                 .padding(.leading, MenuMetrics.text)
                 .padding(.trailing, MenuMetrics.trailing)
                 .frame(height: MenuMetrics.row)
-                .help(tab.shy ? "Only in this private tab, until it closes. Uses more memory." : "Prevents sleep and automatic closure, even when memory is low. You can still close the tab.")
+                .help(Text(LocalizedStringKey(tab.shy ? "Only in this private tab, until it closes. Uses more memory." : "Prevents sleep and automatic closure, even when memory is low. You can still close the tab."), bundle: Language.resources))
             }
         }
     }
@@ -282,35 +283,35 @@ struct SiteCard: View {
             VStack(alignment: .leading, spacing: 0) {
                 Header(title: origin)
                 if tab.shy {
-                    Text("Permissions aren't saved in a private tab.")
+                    Text("ui.permissions_aren_t_saved_in_a_private_tab", bundle: Language.resources)
                         .font(.system(size: 11)).foregroundStyle(Color(nsColor: .secondaryLabelColor))
                         .padding(.horizontal, MenuMetrics.text).padding(.vertical, 8)
                 } else {
                     ForEach([CaptureChoices.Kind.camera, .microphone, .location, .notifications]) { kind in
                         HStack {
-                            Text(kind.title).font(MenuMetrics.font)
+                            Text(LocalizedStringKey(kind.title), bundle: Language.resources).font(MenuMetrics.font)
                             Spacer(minLength: 24)
                             Menu {
-                                Button("Ask") { browser.setSitePermission(nil, kind: kind, origin: origin) }
-                                Button("Allow") { browser.setSitePermission(true, kind: kind, origin: origin) }
+                                Button { browser.setSitePermission(nil, kind: kind, origin: origin) } label: { Text("ui.ask", bundle: Language.resources) }
+                                Button { browser.setSitePermission(true, kind: kind, origin: origin) } label: { Text("ui.allow", bundle: Language.resources) }
                                     .disabled(kind == .notifications && !prefs.siteNotifications)
-                                Button("Refuse") { browser.setSitePermission(false, kind: kind, origin: origin) }
+                                Button { browser.setSitePermission(false, kind: kind, origin: origin) } label: { Text("ui.refuse", bundle: Language.resources) }
                             } label: {
-                                Text(CaptureChoices.choice(kind, origin: origin).title)
+                                Text(LocalizedStringKey(CaptureChoices.choice(kind, origin: origin).title), bundle: Language.resources)
                                     .font(MenuMetrics.font)
                             }
-                            .accessibilityLabel("\(kind.title): \(CaptureChoices.choice(kind, origin: origin).title)")
+                            .accessibilityLabel(Text(language.format("site.permission_status", fallback: "%1$@: %2$@", language.text(kind.title, fallback: kind.title), language.text(CaptureChoices.choice(kind, origin: origin).title, fallback: CaptureChoices.choice(kind, origin: origin).title))))
                             .menuStyle(.borderlessButton).fixedSize()
                         }.padding(.horizontal, MenuMetrics.text).frame(height: MenuMetrics.row)
                     }
                     if !prefs.siteNotifications {
-                        Text("Notifications are off in Settings › Privacy.")
+                        Text("ui.notifications_are_off_in_settings_privacy", bundle: Language.resources)
                             .font(.system(size: 11)).foregroundStyle(Color(nsColor: .secondaryLabelColor))
                             .frame(width: 230, alignment: .leading)
                             .padding(.horizontal, MenuMetrics.text).padding(.vertical, 6)
                     }
                     if [CaptureChoices.Kind.camera, .microphone, .location, .notifications].contains(where: { CaptureChoices.choice($0, origin: origin) == .different }) {
-                        Text("Saved two ways for this site. Pick one to keep.")
+                        Text("ui.saved_two_ways_for_this_site_pick_one_to_keep", bundle: Language.resources)
                             .font(.system(size: 11)).foregroundStyle(Color(nsColor: .secondaryLabelColor))
                             .frame(width: 230, alignment: .leading)
                             .padding(.horizontal, MenuMetrics.text).padding(.vertical, 6)
@@ -370,7 +371,7 @@ struct SiteCard: View {
     /// its end. The number puts it back to the size every site starts at.
     private var zoom: some View {
         HStack(spacing: 0) {
-            Text("Zoom")
+            Text("ui.zoom", bundle: Language.resources)
                 .font(MenuMetrics.font)
                 .foregroundStyle(Color(nsColor: .labelColor))
             Spacer(minLength: 24)
@@ -384,7 +385,7 @@ struct SiteCard: View {
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .help("Actual Size   ⌘0")
+            .help(Text("ui.actual_size_0", bundle: Language.resources))
             Step(symbol: "plus", help: "Zoom In   ⌘+") { browser.zoom(by: 1.1) }
         }
         .padding(.leading, MenuMetrics.text)
@@ -407,13 +408,13 @@ struct SiteCard: View {
 
         var body: some View {
             HStack(spacing: 0) {
-                Text("Play Sound by Itself")
+                Text("ui.play_sound_by_itself", bundle: Language.resources)
                     .font(MenuMetrics.font)
                     .foregroundStyle(Color(nsColor: .labelColor))
                     .fixedSize()
                 Spacer(minLength: 24)
                 if on != was {
-                    Text("from the next page")
+                    Text("ui.from_the_next_page", bundle: Language.resources)
                         .font(.system(size: 11))
                         .foregroundStyle(Color(nsColor: .secondaryLabelColor))
                         .fixedSize()
@@ -442,7 +443,7 @@ struct SiteCard: View {
 
         var body: some View {
             HStack(spacing: 0) {
-                Text("Block Ads and Trackers")
+                Text("ui.block_ads_and_trackers", bundle: Language.resources)
                     .font(MenuMetrics.font)
                     .foregroundStyle(Color(nsColor: .labelColor))
                     .fixedSize()
@@ -452,7 +453,7 @@ struct SiteCard: View {
             .padding(.leading, MenuMetrics.text)
             .padding(.trailing, MenuMetrics.trailing)
             .frame(height: MenuMetrics.row)
-            .help("Turn off here if the site breaks; the page reloads")
+            .help(Text("ui.turn_off_here_if_the_site_breaks_the_page_reloads", bundle: Language.resources))
             .onChange(of: on) { _, value in
                 Shield.shared.pause(host, !value)
                 reload()
@@ -473,7 +474,7 @@ struct SiteCard: View {
 
         var body: some View {
             HStack(spacing: 0) {
-                Text("Don't Float Videos Here")
+                Text("ui.don_t_float_videos_here", bundle: Language.resources)
                     .font(MenuMetrics.font)
                     .foregroundStyle(Color(nsColor: .labelColor))
                     .fixedSize()
@@ -492,7 +493,7 @@ struct SiteCard: View {
 
         var body: some View {
             HStack(spacing: 0) {
-                Text("Darken This Site")
+                Text("ui.darken_this_site", bundle: Language.resources)
                     .font(MenuMetrics.font)
                     .foregroundStyle(Color(nsColor: .labelColor))
                     .fixedSize()
@@ -520,12 +521,12 @@ struct SiteCard: View {
             if let url = tab.pageAddress {
                 Header(title: SiteCard.site(url))
             }
-            Text(safety.title)
+            Text(LocalizedStringKey(safety.title), bundle: Language.resources)
                 .font(MenuMetrics.font)
                 .foregroundStyle(Color(nsColor: .labelColor))
                 .padding(.leading, MenuMetrics.text)
                 .frame(height: MenuMetrics.row, alignment: .leading)
-            Text(safety.detail)
+            Text(LocalizedStringKey(safety.detail), bundle: Language.resources)
                 .font(.system(size: 11))
                 .foregroundStyle(Color(nsColor: .secondaryLabelColor))
                 .fixedSize(horizontal: false, vertical: true)
@@ -640,7 +641,7 @@ struct SiteCard: View {
 
         var body: some View {
             HStack(spacing: 0) {
-                Text(title)
+                Text(LocalizedStringKey(title), bundle: Language.resources)
                     .font(MenuMetrics.font)
                     .foregroundStyle(hovering ? Color.white : Color(nsColor: .labelColor))
                     .lineLimit(1)
@@ -721,7 +722,7 @@ struct SiteCard: View {
             }
             .buttonStyle(.plain)
             .onHover { hovering = $0 }
-            .help(help)
+            .help(Text(LocalizedStringKey(help), bundle: Language.resources))
         }
     }
 }

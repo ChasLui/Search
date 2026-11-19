@@ -14,6 +14,7 @@ struct SearchApp: App {
     @ObservedObject private var shortcuts = ShortcutStore.shared
     /// Only for the File menu's Profile list, once there is a second one.
     @ObservedObject private var profiles = Profiles.shared
+    @ObservedObject private var language = Language.shared
     /// Links from other apps, and the Dock icon.
     @NSApplicationDelegateAdaptor(Links.self) private var links
 
@@ -40,85 +41,86 @@ struct SearchApp: App {
         // real window came back at. The other windows' frames are in
         // windows.json (see Windows.swift).
         Window("Search", id: Browsers.sceneID) {
-            SceneRoot(slot: SceneSlot.shared)
-                .frame(minWidth: 640, minHeight: 420)
+            LanguageRoot(content: SceneRoot(slot: SceneSlot.shared)
+                .frame(minWidth: 640, minHeight: 420))
         }
+        .environment(\.locale, language.locale)
         .windowStyle(.hiddenTitleBar)
         .defaultSize(width: 1180, height: 780)
         .commands {
             CommandGroup(replacing: .newItem) {
                 // Another window, with tabs of its own (see Windows.swift).
-                Button("New Window") { Browsers.newWindow() }
+                Button(language.text("ui.new_window", fallback: "New Window")) { Browsers.newWindow() }
                     .shortcut("file.newWindow")
                 // The profiles, once there is more than one (see Profiles.swift):
                 // each one's window, brought forward or opened.
                 if profiles.several {
-                    Menu("Profile") {
+                    Menu(language.text("ui.profile", fallback: "Profile")) {
                         ForEach(profiles.list) { profile in
                             Button(profile.id == browser.profileID ? "\(profile.name) ✓" : profile.name) {
                                 Browsers.open(profile: profile.id)
                             }
                         }
                         Divider()
-                        Button("New Profile…") { ProfileMenu.askNew() }
+                        Button(language.text("ui.new_profile", fallback: "New Profile…")) { ProfileMenu.askNew() }
                     }
                 }
-                Button("New Tab") { browser.launch() }
+                Button(language.text("ui.new_tab", fallback: "New Tab")) { browser.launch() }
                     .shortcut("file.newTab")
-                Button("New Private Tab") { browser.newShyTab() }
+                Button(language.text("ui.new_private_tab", fallback: "New Private Tab")) { browser.newShyTab() }
                     .shortcut("file.newPrivateTab")
-                Button(browser.reopenTitle) { browser.reopen() }
+                Button(browser.reopenDisplayTitle) { browser.reopen() }
                     .shortcut("file.reopen")
                     .disabled(browser.ghosts.isEmpty && Browsers.lastClosedAt == nil)
                 Divider()
-                Button("Open Address…") { browser.edit() }
+                Button(language.text("ui.open_address", fallback: "Open Address…")) { browser.edit() }
                     .shortcut("file.openAddress")
                 Divider()
                 // Another browser's bookmarks, history, passwords and the
                 // rest, as Safari's File › Import From: the one sheet every
                 // other way in opens too.
-                Button("Bring Things Over…") { browser.bringingIn = "" }
+                Button(language.text("ui.bring_things_over", fallback: "Bring Things Over…")) { browser.bringingIn = "" }
                     .shortcut("file.import")
                 Divider()
-                Button("Close Tab") { browser.closeFront() }
+                Button(language.text("ui.close_tab", fallback: "Close Tab")) { browser.closeFront() }
                     .shortcut("file.closeTab")
-                Button("Close Window") { browser.closeWindow() }
+                Button(language.text("ui.close_window", fallback: "Close Window")) { browser.closeWindow() }
                     .shortcut("file.closeWindow")
             }
             CommandGroup(replacing: .printItem) {
-                Button("Share…") { browser.share() }
+                Button(language.text("ui.share", fallback: "Share…")) { browser.share() }
                     .shortcut("file.share")
                     .disabled(!(browser.active?.isWeb ?? false))
-                Button("Save Page As…") { browser.savePage() }
+                Button(language.text("ui.save_page_as", fallback: "Save Page As…")) { browser.savePage() }
                     .shortcut("file.savePage")
                     .disabled(!(browser.active?.isWeb ?? false))
-                Button("Export as PDF…") { browser.exportPDF() }
+                Button(language.text("ui.export_as_pdf", fallback: "Export as PDF…")) { browser.exportPDF() }
                     .shortcut("file.exportPDF")
                     .disabled(!(browser.active?.isWeb ?? false))
-                Button("Print…") { browser.printPage() }
+                Button(language.text("ui.print", fallback: "Print…")) { browser.printPage() }
                     .shortcut("file.print")
                     .disabled(!(browser.active?.isWeb ?? false))
             }
             CommandGroup(after: .pasteboard) {
-                Button("Copy Clean Link") { browser.copyCleanLink() }
+                Button(language.text("ui.copy_clean_link", fallback: "Copy Clean Link")) { browser.copyCleanLink() }
                     .shortcut("edit.copyCleanLink")
                     .disabled(browser.active?.isBlank ?? true)
                 Divider()
-                Button("Find on Page…") { browser.openFind() }
+                Button(language.text("ui.find_on_page_76643d", fallback: "Find on Page…")) { browser.openFind() }
                     .shortcut("edit.find")
                     // On the Settings tab, ⌘F finds a setting.
                     .disabled(!(browser.active?.isWeb ?? false) && browser.active?.page?.kind != .settings)
-                Button("Find Next") { browser.look(forward: true) }
+                Button(language.text("ui.find_next", fallback: "Find Next")) { browser.look(forward: true) }
                     .shortcut("edit.findNext")
                     .disabled(!browser.finding)
-                Button("Find Previous") { browser.look(forward: false) }
+                Button(language.text("ui.find_previous", fallback: "Find Previous")) { browser.look(forward: false) }
                     .shortcut("edit.findPrevious")
                     .disabled(!browser.finding)
                 Divider()
                 // As in Safari: each follows the Mac until switched here
                 // (see Substitutions.swift).
-                Menu("Substitutions") {
-                    Button("Show Substitutions") { Substitution.showPanel() }
+                Menu(language.text("ui.substitutions", fallback: "Substitutions")) {
+                    Button(language.text("ui.show_substitutions", fallback: "Show Substitutions")) { Substitution.showPanel() }
                     Divider()
                     ForEach(Substitution.allCases, id: \.self) { kind in
                         Toggle(kind.title, isOn: Binding(
@@ -129,143 +131,144 @@ struct SearchApp: App {
                 }
                 // Moved here from Settings, as Safari has it. WebKit reads it
                 // once, so it counts from the next page on.
-                Menu("Spelling and Grammar") {
-                    Toggle("Correct Spelling Automatically", isOn: Binding(
+                Menu(language.text("ui.spelling_and_grammar", fallback: "Spelling and Grammar")) {
+                    Toggle(isOn: Binding(
                         get: { browser.prefs.autocorrect },
                         set: { browser.prefs.autocorrect = $0 }
-                    ))
+                    )) { Text("ui.correct_spelling_automatically", bundle: Language.resources) }
                 }
             }
             CommandGroup(replacing: .toolbar) {
-                Toggle("Show Tabs in Sidebar", isOn: Binding(
+                Toggle(isOn: Binding(
                     get: { browser.prefs.sidebar },
                     set: { _ in browser.toggleSidebar() }
-                ))
+                )) { Text("ui.show_tabs_in_sidebar", bundle: Language.resources) }
                 .shortcut("view.sidebar")
                 // Folded away, not moved (see Fold.swift) — the column, or the
                 // strip across the top.
-                Button(browser.prefs.shrinks && !browser.folded
+                let foldTitle = browser.prefs.shrinks && !browser.folded
                        ? (browser.prefs.sideIcons ? "Show Sidebar Titles" : "Show Sidebar as Icons Only")
                        : browser.prefs.sidebar
                        ? (browser.folded ? "Show Sidebar" : "Hide Sidebar")
-                       : (browser.folded ? "Show Tab Bar" : "Hide Tab Bar")) { browser.toggleFold() }
+                       : (browser.folded ? "Show Tab Bar" : "Hide Tab Bar")
+                Button(language.text(foldTitle, fallback: foldTitle)) { browser.toggleFold() }
                     .shortcut("view.fold")
-                Picker("Tabs Wear", selection: Binding(
+                Picker(selection: Binding(
                     get: { browser.prefs.glyph },
                     set: { browser.prefs.glyph = $0 }
                 )) {
                     ForEach(Glyph.allCases) { glyph in
-                        Text(glyph.title).tag(glyph)
+                        Text(LocalizedStringKey(glyph.title), bundle: Language.resources).tag(glyph)
                     }
-                }
+                } label: { Text("ui.tabs_wear_0f0c0b", bundle: Language.resources) }
                 // Every group of the space on screen, folded or opened at once.
-                Button("Fold All Groups") { browser.foldAllGroups(true) }
+                Button(language.text("ui.fold_all_groups", fallback: "Fold All Groups")) { browser.foldAllGroups(true) }
                     .shortcut("view.foldGroups")
                     .disabled(!browser.canFoldAllGroups)
-                Button("Unfold All Groups") { browser.foldAllGroups(false) }
+                Button(language.text("ui.unfold_all_groups", fallback: "Unfold All Groups")) { browser.foldAllGroups(false) }
                     .shortcut("view.unfoldGroups")
                     .disabled(!browser.canUnfoldAllGroups)
                 Divider()
-                Button("Reload Page") { browser.reload() }
+                Button(language.text("ui.reload_page", fallback: "Reload Page")) { browser.reload() }
                     .shortcut("view.reload")
-                Button("Reload Page From Origin") { browser.reload(fromOrigin: true) }
+                Button(language.text("ui.reload_page_from_origin", fallback: "Reload Page From Origin")) { browser.reload(fromOrigin: true) }
                     .shortcut("view.reloadOrigin")
-                Button("Reading Mode") { browser.toggleReader() }
+                Button(language.text("ui.reading_mode", fallback: "Reading Mode")) { browser.toggleReader() }
                     .shortcut("view.reader")
-                Button("Float Video") { browser.toggleFloat() }
+                Button(language.text("ui.float_video", fallback: "Float Video")) { browser.toggleFloat() }
                     .shortcut("view.float")
                 // Websites in the side panel, only once they are on
                 // (Settings › General).
                 if browser.prefs.sitesInPanel {
-                    Menu("Side Panel") {
-                        Button(browser.sidePanelShown ? "Close Side Panel" : "Show Side Panel") { browser.toggleSitePanel() }
+                    Menu(language.text("ui.side_panel", fallback: "Side Panel")) {
+                        Button(browser.sidePanelShown ? language.text("Close Side Panel", fallback: "Close Side Panel") : language.text("Show Side Panel", fallback: "Show Side Panel")) { browser.toggleSitePanel() }
                             .shortcut("view.sitePanel")
                         Divider()
                         ForEach(PanelSites.offered, id: \.name) { site in
                             Button(site.name) { browser.showSiteInPanel(site.url) }
                         }
                         Divider()
-                        Button("This Page") { if let tab = browser.active { browser.openInSidePanel(tab) } }
+                        Button(language.text("ui.this_page", fallback: "This Page")) { if let tab = browser.active { browser.openInSidePanel(tab) } }
                             .disabled(!(browser.active?.isWeb ?? false) || (browser.active?.shy ?? true))
                     }
                 }
                 // Dark pages, only once they are on (Settings › Appearance).
                 if browser.prefs.darkensPages {
                     Divider()
-                    Toggle("Darken This Site", isOn: Binding(
+                    Toggle(isOn: Binding(
                         get: { browser.active?.dusked ?? false },
                         set: { _ in browser.toggleDusk() }
-                    ))
+                    )) { Text("ui.darken_this_site", bundle: Language.resources) }
                     .shortcut("view.dusk")
                     .disabled(!browser.canDusk)
-                    Toggle("Pause Darkening", isOn: Binding(
+                    Toggle(isOn: Binding(
                         get: { Dusk.shared.paused },
                         set: { _ in browser.pauseDusk() }
-                    ))
+                    )) { Text("ui.pause_darkening", bundle: Language.resources) }
                     .shortcut("view.duskPause")
                 }
                 // The AI add-on's, only once it is on (Settings › AI).
                 if browser.prefs.ai {
                     Divider()
-                    Button("Summarize Page") { browser.summarizePage() }
+                    Button(language.text("ui.summarize_page", fallback: "Summarize Page")) { browser.summarizePage() }
                         .shortcut("view.summarize")
                         .disabled(!(browser.active?.isWeb ?? false))
-                    Button("Ask About This Page…") { browser.askAboutPage() }
+                    Button(language.text("ui.ask_about_this_page_037217", fallback: "Ask About This Page…")) { browser.askAboutPage() }
                         .shortcut("view.ask")
                         .disabled(!(browser.active?.isWeb ?? false))
                 }
                 Divider()
                 // Only once it is on (Settings › Browsing › Pages).
                 if browser.prefs.capturesPages {
-                    Button("Capture…") { browser.toggleSnap() }
+                    Button(language.text("ui.capture", fallback: "Capture…")) { browser.toggleSnap() }
                         .shortcut("view.capture")
                         .disabled(!(browser.active?.isWeb ?? false))
                 }
-                Button("Hide Elements…") { browser.toggleHiding() }
+                Button(language.text("ui.hide_elements", fallback: "Hide Elements…")) { browser.toggleHiding() }
                     .shortcut("view.hide")
-                Button("Hidden on This Site…") { browser.reviewing.toggle() }
+                Button(language.text("ui.hidden_on_this_site", fallback: "Hidden on This Site…")) { browser.reviewing.toggle() }
                     .shortcut("view.hidden")
                 // Only once it is on (Settings › Browsing › Pages).
                 if browser.prefs.sitesStyles {
-                    Button("Edit Site Style…") { browser.editSiteStyle() }
+                    Button(language.text("ui.edit_site_style", fallback: "Edit Site Style…")) { browser.editSiteStyle() }
                         .shortcut("view.style")
                         .disabled(!(browser.active?.isWeb ?? false) || browser.active?.shy == true)
                 }
                 Divider()
-                Button("Zoom In") { browser.zoom(by: 1.1) }
+                Button(language.text("ui.zoom_in", fallback: "Zoom In")) { browser.zoom(by: 1.1) }
                     .shortcut("view.zoomIn")
-                Button("Zoom Out") { browser.zoom(by: 1 / 1.1) }
+                Button(language.text("ui.zoom_out", fallback: "Zoom Out")) { browser.zoom(by: 1 / 1.1) }
                     .shortcut("view.zoomOut")
-                Button("Actual Size") { browser.resetZoom() }
+                Button(language.text("ui.actual_size", fallback: "Actual Size")) { browser.resetZoom() }
                     .shortcut("view.actualSize")
                 Divider()
                 // The Web Inspector, on the keys Chrome and Arc use (see Inspector.swift).
-                Button("Web Inspector") { browser.toggleInspector() }
+                Button(language.text("ui.web_inspector", fallback: "Web Inspector")) { browser.toggleInspector() }
                     .shortcut("view.inspector")
-                Button("JavaScript Console") { browser.showConsole() }
+                Button(language.text("ui.javascript_console", fallback: "JavaScript Console")) { browser.showConsole() }
                     .shortcut("view.console")
-                Button("Inspect Element") { browser.inspectElement() }
+                Button(language.text("ui.inspect_element", fallback: "Inspect Element")) { browser.inspectElement() }
                     .shortcut("view.inspect")
             }
-            CommandMenu("Tabs") {
-                Button("Back") { browser.back() }
+            CommandMenu(language.text("menu.tabs", fallback: "Tabs")) {
+                Button(language.text("ui.back", fallback: "Back")) { browser.back() }
                     .shortcut("tabs.back")
                     .disabled(browser.active?.canGoBack != true)
-                Button("Forward") { browser.forward() }
+                Button(language.text("ui.forward", fallback: "Forward")) { browser.forward() }
                     .shortcut("tabs.forward")
                     .disabled(browser.active?.canGoForward != true)
                 Divider()
-                Button("Next Tab") { browser.step(1) }
+                Button(language.text("ui.next_tab", fallback: "Next Tab")) { browser.step(1) }
                     .shortcut("tabs.next")
-                Button("Previous Tab") { browser.step(-1) }
+                Button(language.text("ui.previous_tab", fallback: "Previous Tab")) { browser.step(-1) }
                     .shortcut("tabs.previous")
-                Button("Search Tabs…") { browser.summon() }
+                Button(language.text("ui.search_tabs", fallback: "Search Tabs…")) { browser.summon() }
                     .shortcut("tabs.search")
                 Divider()
                 if browser.prefs.splitView {
                     // The same key puts a pair apart: on a pair, the item
                     // says so, and the one below it without a key goes.
-                    Button(browser.activeSplit == nil || browser.pickedSplit != nil ? "Split Current Page" : "Separate Split Tabs") {
+                    Button(browser.activeSplit == nil || browser.pickedSplit != nil ? language.text("Split Current Page", fallback: "Split Current Page") : language.text("Separate Split Tabs", fallback: "Separate Split Tabs")) {
                         browser.splitKey()
                     }
                         .shortcut("tabs.split")
@@ -273,88 +276,89 @@ struct SearchApp: App {
                     // On a split with room: one more page, empty, beside
                     // the one with the keys (up to four).
                     if browser.activeSplit != nil {
-                        Button("Add Page to Split View") { browser.addPaneToSplit() }
+                        Button(language.text("ui.add_page_to_split_view", fallback: "Add Page to Split View")) { browser.addPaneToSplit() }
                             .disabled(!browser.canAddPane)
                     }
-                    Button("Focus Left Page") { browser.focusPane(onLeft: true) }
+                    Button(language.text("ui.focus_left_page", fallback: "Focus Left Page")) { browser.focusPane(onLeft: true) }
                         .shortcut("tabs.focusLeftPane")
                         .disabled(browser.activeSplit == nil)
-                    Button("Focus Right Page") { browser.focusPane(onLeft: false) }
+                    Button(language.text("ui.focus_right_page", fallback: "Focus Right Page")) { browser.focusPane(onLeft: false) }
                         .shortcut("tabs.focusRightPane")
                         .disabled(browser.activeSplit == nil)
-                    Button("Swap Pages") { browser.swapSplit() }
+                    Button(language.text("ui.swap_pages", fallback: "Swap Pages")) { browser.swapSplit() }
                         .shortcut("tabs.swapSplit")
                         .disabled(browser.activeSplit == nil)
                     if browser.activeSplit == nil || browser.pickedSplit != nil {
-                        Button("Separate Split Tabs") {
+                        Button(language.text("ui.separate_split_tabs", fallback: "Separate Split Tabs")) {
                             if let tab = browser.active { browser.detachSplit(tab) }
                         }
                         .shortcut("tabs.separateSplit")
                         .disabled(browser.activeSplit == nil)
                     }
-                    Button((browser.activeSplit?.tabs.count ?? 2) > 2 ? "Close All Pages" : "Close Both Pages") { browser.closeSplit() }
+                    Button((browser.activeSplit?.tabs.count ?? 2) > 2 ? language.text("Close All Pages", fallback: "Close All Pages") : language.text("Close Both Pages", fallback: "Close Both Pages")) { browser.closeSplit() }
                         .disabled(browser.activeSplit == nil)
                     Divider()
                 }
                 if let tab = browser.active {
                     let rows = browser.prefs.showsPinRows
                     if tab.pin == nil {
-                        Button("Pin Tab") { browser.pin(tab) }
+                        Button(language.text("ui.pin_tab", fallback: "Pin Tab")) { browser.pin(tab) }
                             .shortcut("tabs.pin")
                             .disabled(!tab.isWeb || tab.shy)
                         if rows {
-                            Button("Pin Tab as Row") { browser.pin(tab, listed: true) }
+                            Button(language.text("ui.pin_tab_as_row", fallback: "Pin Tab as Row")) { browser.pin(tab, listed: true) }
                                 .shortcut("tabs.pinRow")
                                 .disabled(!tab.isWeb || tab.shy)
                         }
                     } else {
                         if rows {
-                            Button(tab.listed ? "Show Pin as Square" : "Show Pin as Row") { browser.setListed(tab, !tab.listed) }
+                            Button(tab.listed ? language.text("Show Pin as Square", fallback: "Show Pin as Square") : language.text("Show Pin as Row", fallback: "Show Pin as Row")) { browser.setListed(tab, !tab.listed) }
                         }
                         if !(rows && tab.listed) {
-                            Button("Change Letter") { browser.editLetter(tab) }
+                            Button(language.text("ui.change_letter", fallback: "Change Letter")) { browser.editLetter(tab) }
                         }
-                        Button("Unpin Tab") { browser.unpin(tab) }
+                        Button(language.text("ui.unpin_tab", fallback: "Unpin Tab")) { browser.unpin(tab) }
                             .shortcut(rows && tab.listed ? "tabs.pinRow" : "tabs.pin")
                     }
                 }
-                Button("Rename Tab") { if let tab = browser.active { browser.beginTabRename(tab) } }
+                Button(language.text("ui.rename_tab", fallback: "Rename Tab")) { if let tab = browser.active { browser.beginTabRename(tab) } }
                     .shortcut("tabs.rename")
                     .disabled(browser.active == nil)
-                Button("Duplicate Tab") { browser.duplicate() }
+                Button(language.text("ui.duplicate_tab", fallback: "Duplicate Tab")) { browser.duplicate() }
                     .shortcut("tabs.duplicate")
                     .disabled(!(browser.active?.isWeb ?? false))
-                Button("Copy Address") { browser.copyAddress() }
+                Button(language.text("ui.copy_address", fallback: "Copy Address")) { browser.copyAddress() }
                     .shortcut("tabs.copyAddress")
                     .disabled(!(browser.active?.isWeb ?? false))
-                Button("Copy as Markdown Link") { browser.copyMarkdownLink() }
+                Button(language.text("ui.copy_as_markdown_link", fallback: "Copy as Markdown Link")) { browser.copyMarkdownLink() }
                     .shortcut("tabs.copyMarkdown")
                     .disabled(!(browser.active?.isWeb ?? false))
-                Button("Paste and Go") { browser.pasteAndGo() }
+                Button(language.text("ui.paste_and_go", fallback: "Paste and Go")) { browser.pasteAndGo() }
                     .shortcut("tabs.pasteAndGo")
                 Divider()
-                Button("Close Other Tabs") { if let tab = browser.active { browser.closeOthers(but: tab) } }
+                Button(language.text("ui.close_other_tabs", fallback: "Close Other Tabs")) { if let tab = browser.active { browser.closeOthers(but: tab) } }
                     .shortcut("tabs.closeOthers")
                     .disabled(browser.tabs.count < 2)
-                Button("Stop Sound in Tab") { browser.pauseMedia() }
+                Button(language.text("ui.stop_sound_in_tab", fallback: "Stop Sound in Tab")) { browser.pauseMedia() }
                     .shortcut("tabs.mute")
             }
-            CommandMenu("Bookmarks") {
-                Button(browser.pageKept ? "Edit Bookmark\u{2026}" : "Add This Page") { browser.bookmarkCurrent() }
+            CommandMenu(language.text("menu.bookmarks", fallback: "Bookmarks")) {
+                Button(browser.pageKept ? language.text("bookmark.edit", fallback: "Edit Bookmark…")
+                                        : language.text("bookmark.add", fallback: "Add This Page")) { browser.bookmarkCurrent() }
                     .shortcut("bookmarks.add")
                     .disabled(!(browser.active?.isWeb ?? false))
-                Button("Show Bookmarks…") { browser.bookmarking = true }
+                Button(language.text("ui.show_bookmarks", fallback: "Show Bookmarks…")) { browser.bookmarking = true }
                     .shortcut("bookmarks.show")
-                Toggle("Show Bookmarks Bar", isOn: Binding(
+                Toggle(isOn: Binding(
                     get: { browser.prefs.bookmarksBar },
                     set: { on in withAnimation(Motion.glide) { browser.prefs.bookmarksBar = on } }
-                ))
+                )) { Text("ui.show_bookmarks_bar", bundle: Language.resources) }
                 .shortcut("bookmarks.bar")
                 // The bookmarks themselves follow, put in by AppKit (see
                 // BookmarkMenu in Bookmarks.swift).
             }
-            CommandMenu("History") {
-                Section("Recently Visited") {
+            CommandMenu(language.text("menu.history", fallback: "History")) {
+                Section {
                     ForEach(browser.recentlyVisited) { trace in
                         Button {
                             browser.open(trace.url, foreground: true)
@@ -362,42 +366,42 @@ struct SearchApp: App {
                             MenuLine(title: trace.title.isEmpty ? Address.withoutWWW(trace.address) : trace.title, url: trace.url)
                         }
                     }
-                }
+                } header: { Text("history.recently_visited", bundle: Language.resources) }
                 if !browser.ghosts.isEmpty {
-                    Section("Recently Closed") {
+                    Section {
                         ForEach(browser.recentlyClosed.prefix(10)) { ghost in
                             Button {
                                 browser.reopen(ghost)
                             } label: {
-                                MenuLine(title: browser.closedTitle(for: ghost), url: ghost.url)
+                                MenuLine(title: browser.closedDisplayTitle(for: ghost), url: ghost.url)
                             }
                         }
-                    }
+                    } header: { Text("history.recently_closed", bundle: Language.resources) }
                 }
                 Divider()
-                Button("Show History…") { browser.recalling = true }
+                Button(language.text("ui.show_history", fallback: "Show History…")) { browser.recalling = true }
                     .shortcut("history.show")
-                Button("Downloads…") { browser.showDownloads() }
+                Button(language.text("ui.downloads_78aeb3", fallback: "Downloads…")) { browser.showDownloads() }
                     .shortcut("history.downloads")
                 // Only while tabs close by themselves (Closing.swift).
                 if browser.prefs.tabLife != .never {
-                    Button("Archived Tabs…") { browser.archiving = true }
+                    Button(language.text("ui.archived_tabs", fallback: "Archived Tabs…")) { browser.archiving = true }
                         .shortcut("history.archive")
                 }
                 Divider()
-                Button("Clear Browsing Data…") { browser.clearBrowsingData() }
+                Button(language.text("ui.clear_browsing_data", fallback: "Clear Browsing Data…")) { browser.clearBrowsingData() }
                     .shortcut("history.clearData")
-                Button("Clear History") { browser.clearHistory() }
+                Button(language.text("ui.clear_history", fallback: "Clear History")) { browser.clearHistory() }
                     .shortcut("history.clear")
             }
             // Search › Check for Updates…, under About, as in any Mac app.
             CommandGroup(after: .appInfo) { UpdateMenuItem() }
             CommandGroup(after: .appSettings) {
-                Button("Settings…") { browser.tuning = true }
+                Button(language.text("ui.settings", fallback: "Settings…")) { browser.tuning = true }
                     .shortcut("app.settings")
-                Button("Welcome…") { browser.welcoming = true }
+                Button(language.text("ui.welcome", fallback: "Welcome…")) { browser.welcoming = true }
                     .shortcut("app.welcome")
-                Button("Passwords…") { browser.managing = true }
+                Button(language.text("ui.passwords", fallback: "Passwords…")) { browser.managing = true }
                     .shortcut("app.passwords")
             }
             QuitAndHelp()
@@ -408,15 +412,17 @@ struct SearchApp: App {
 /// Quit Search, which can ask first (Settings › General), and Help. One
 /// value, because a scene's commands take at most ten.
 private struct QuitAndHelp: Commands {
+    @ObservedObject private var language = Language.shared
+
     var body: some Commands {
         CommandGroup(replacing: .appTermination) {
-            Button("Quit Search") {
+            Button(language.text("ui.quit_search", fallback: "Quit Search")) {
                 if Links.shouldQuit() { NSApp.terminate(nil) }
             }
             .keyboardShortcut("q", modifiers: .command)
         }
         CommandGroup(replacing: .help) {
-            Button("Send Feedback…") { Links.writeFeedback() }
+            Button(language.text("ui.send_feedback", fallback: "Send Feedback…")) { Links.writeFeedback() }
         }
     }
 }
@@ -484,6 +490,7 @@ private final class WeakWindow {
 }
 
 struct ContentView: View {
+    @ObservedObject private var language = Language.shared
     @ObservedObject var browser: Browser
 
     /// Its window, held weakly: the window holds this view's state, and
@@ -990,13 +997,13 @@ struct ContentView: View {
     /// A line that rises from the bottom, says one thing, and leaves.
     @ViewBuilder
     private var announcement: some View {
-        if let text = browser.announcement {
+        if let text = browser.displayedAnnouncement {
             HStack(spacing: 8) {
                 Text(text)
                     .foregroundStyle(Palette.ink)
                 // A file just saved: the line shows it in the Finder.
                 if browser.announcedFile != nil {
-                    Text("Show in Finder")
+                    Text("ui.show_in_finder", bundle: Language.resources)
                         .foregroundStyle(Palette.muted)
                 }
             }
@@ -1912,17 +1919,17 @@ private struct UpdateMenuItem: View {
     var body: some View {
         switch updater.stage {
         case .none:
-            Button(updater.checking ? "Checking for Updates…" : "Check for Updates…") { updater.checkByHand() }
+            Button { updater.checkByHand() } label: { Text(LocalizedStringKey(updater.checking ? "Checking for Updates…" : "Check for Updates…"), bundle: Language.resources) }
                 .disabled(updater.checking)
         case .waiting:
-            Button("Install Update") { updater.install() }
+            Button { updater.install() } label: { Text("ui.install_update", bundle: Language.resources) }
         case .fetching:
-            Button("Downloading Update…") {}
+            Button {} label: { Text("ui.downloading_update", bundle: Language.resources) }
                 .disabled(true)
         case .ready:
-            Button("Restart to Update") { updater.relaunch() }
+            Button { updater.relaunch() } label: { Text("ui.restart_to_update", bundle: Language.resources) }
         case .offered:
-            Button(updater.fetchingDisk ? "Downloading Update…" : "Download Update…") { updater.openDisk() }
+            Button { updater.openDisk() } label: { Text(LocalizedStringKey(updater.fetchingDisk ? "Downloading Update…" : "Download Update…"), bundle: Language.resources) }
                 .disabled(updater.fetchingDisk)
         }
     }
@@ -1944,6 +1951,7 @@ struct SceneRoot: View {
 /// has got, and Cancel — in the corner, in the quiet grey of everything
 /// else that floats over the page.
 private struct ImportProgress: View {
+    @ObservedObject private var language = Language.shared
     @ObservedObject var browser: Browser
     let job: Browser.FileImportJob
 
@@ -1959,7 +1967,7 @@ private struct ImportProgress: View {
                 .foregroundStyle(Palette.ink)
                 .lineLimit(1)
                 .truncationMode(.middle)
-            Text(job.message)
+            Text(status)
                 .font(.system(size: 12))
                 .foregroundStyle(Palette.muted)
                 .lineLimit(1)
@@ -1974,7 +1982,18 @@ private struct ImportProgress: View {
         .padding(20)
         .transition(.opacity)
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("Importing \(job.filename), \(job.message)")
+        .accessibilityLabel(Text(language.format("import.progress.accessibility", fallback: "Importing %1$@, %2$@", job.filename, status)))
+    }
+
+    private var status: String {
+        let stages = ["Files read", "Scanning folders", "Reading bookmark file", "Parsing bookmarks", "Reading CSV",
+                      "File complete", "Reading history", "Parsing history", "Extracting ZIP", "ZIP extracted"]
+        if let stage = stages.first(where: { job.message.hasSuffix(": " + $0) }) {
+            let name = String(job.message.dropLast(stage.count + 2))
+            let localizedStage = language.text("import.stage.\(stage)", fallback: stage)
+            return language.format("import.stage.file", fallback: "%1$@: %2$@", name, localizedStage)
+        }
+        return language.text(job.message, fallback: job.message)
     }
 
     private var bar: some View {
@@ -1992,13 +2011,13 @@ private struct ImportProgress: View {
     private var footer: some View {
         HStack {
             if let total = job.total, total > 0 {
-                Text("\(job.completed.formatted()) of \(total.formatted())")
+                Text(language.format("import.progress.count", fallback: "%1$@ of %2$@", job.completed.formatted(), total.formatted()))
                     .font(.system(size: 11))
                     .foregroundStyle(Palette.muted)
             }
             Spacer(minLength: 0)
             Button { browser.cancelFileImport() } label: {
-                Text(job.cancelling ? "Cancelling…" : "Cancel")
+                Text(LocalizedStringKey(job.cancelling ? "Cancelling…" : "Cancel"), bundle: Language.resources)
                     .font(.system(size: 12))
                     .foregroundStyle(Palette.ink)
                     .padding(.horizontal, 10)

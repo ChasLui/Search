@@ -12,6 +12,7 @@ extension EnvironmentValues {
 }
 
 struct TabShortcutNumber: View {
+    @ObservedObject private var language = Language.shared
     let number: Int
 
     var body: some View {
@@ -21,6 +22,6 @@ struct TabShortcutNumber: View {
             .foregroundStyle(Palette.ink.opacity(0.65))
             .frame(width: 15, height: 15)
             .allowsHitTesting(false)
-            .accessibilityLabel("Command \(number)")
+            .accessibilityLabel(Text(Language.shared.format("accessibility.command_number", fallback: "Command %1$ld", number)))
     }
 }

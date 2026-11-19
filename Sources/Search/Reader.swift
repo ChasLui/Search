@@ -601,7 +601,7 @@ struct ReaderLook: View {
                         .contentShape(Capsule())
                 }
                 .buttonStyle(.plain)
-                .help(each == .system ? "As the window is" : each.title)
+                .help(Text(LocalizedStringKey(each == .system ? "As the window is" : each.title), bundle: Language.resources))
             }
         }
         .padding(3)

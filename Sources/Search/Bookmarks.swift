@@ -606,7 +606,7 @@ final class Bookmarks {
     /// A folder of your own, its name asked for as a rename's is: inside
     /// `parent`, or at the top level for nil. An empty name makes none.
     func askNewFolder(in parent: Bookmark.ID?, made: @escaping (Bookmark.ID) -> Void = { _ in }) {
-        Ask.name("New Folder", placeholder: "Folder name", confirm: "Make") { name in
+        Ask.name("New Folder", placeholder: "Folder name", localizePlaceholder: true, confirm: "Make") { name in
             made(self.insert(.folder(name, []), into: parent).id)
         }
     }
@@ -616,12 +616,14 @@ final class Bookmarks {
     func askRemove(_ node: Bookmark) {
         guard node.isFolder, let kids = node.children, !kids.isEmpty else { return remove(node.id) }
         let count = Bookmarks.count(kids)
-        let detail = switch count {
-        case 0: "The empty folders in it go too."
-        case 1: "The bookmark in it goes too."
-        default: "The \(count) bookmarks in it go too."
+        func detail() -> String {
+            switch count {
+            case 0: return Language.shared.text("bookmark.remove_empty_folders", fallback: "The empty folders in it go too.")
+            case 1: return Language.shared.text("bookmark.remove_one", fallback: "The bookmark in it goes too.")
+            default: return Language.shared.count("count.bookmarks_removed", count)
+            }
         }
-        Ask.sure("Remove \u{201C}\(node.title)\u{201D}?", detail: detail, confirm: "Remove") {
+        Ask.sure(Language.shared.format("bookmark.remove_title", fallback: "Remove “%1$@”?", node.title), detail: detail(), confirm: "Remove") {
             self.remove(node.id)
         }
     }
@@ -820,7 +822,7 @@ struct BookmarkOutline: View {
                 } else {
                     // Where its first bookmark would be, so a drop here goes
                     // in, shown as the folder's own lower edge shows it.
-                    Text("Empty")
+                    Text("ui.empty", bundle: Language.resources)
                         .font(.system(size: 12))
                         .foregroundStyle(Palette.faint)
                         .padding(.leading, indent(depth + 1) + 26)
@@ -1026,15 +1028,15 @@ struct BookmarkOutline: View {
             .onHover { hovering = $0 }
             .contextMenu {
                 if let open {
-                    Button("Open", action: open)
+                    Button(action: open) { Text("ui.open", bundle: Language.resources) }
                     Divider()
                 }
-                Button("Rename…", action: rename)
+                Button(action: rename) { Text("ui.rename", bundle: Language.resources) }
                 if let newFolder {
-                    Button("New Folder Inside…", action: newFolder)
+                    Button(action: newFolder) { Text("ui.new_folder_inside", bundle: Language.resources) }
                 }
-                Menu("Move to") {
-                    Button("Top Level", action: { moveTo(nil) })
+                Menu {
+                    Button(action: { moveTo(nil) }) { Text("ui.top_level", bundle: Language.resources) }
                     if !moveTargets.isEmpty {
                         Divider()
                         ForEach(moveTargets, id: \.node.id) { target in
@@ -1043,9 +1045,9 @@ struct BookmarkOutline: View {
                             }
                         }
                     }
-                }
+                } label: { Text("ui.move_to", bundle: Language.resources) }
                 Divider()
-                Button("Remove", role: .destructive, action: remove)
+                Button(role: .destructive, action: remove) { Text("Remove", bundle: Language.resources) }
             }
             .animation(Motion.quick, value: hovering)
             .animation(Motion.quick, value: dragging)
@@ -1114,7 +1116,7 @@ struct BookmarkCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Bookmarked")
+            Text("ui.bookmarked", bundle: Language.resources)
                 .font(.system(size: 13, weight: .semibold))
                 .foregroundStyle(Palette.ink)
 
@@ -1141,7 +1143,7 @@ struct BookmarkCard: View {
                     bookmarks.remove(id)
                 }
                 Spacer(minLength: 0)
-                Pill("Done", filled: true, action: close)
+                Pill("ui.done", filled: true, action: close)
             }
         }
         .padding(14)
@@ -1159,7 +1161,7 @@ struct BookmarkCard: View {
     private var folder: some View {
         let here = bookmarks.path(to: id)?.last
         return Menu {
-            Button("Top Level") { bookmarks.move(id, into: nil) }
+            Button { bookmarks.move(id, into: nil) } label: { Text("ui.top_level", bundle: Language.resources) }
             let folders = Bookmarks.folders(bookmarks.roots)
             if !folders.isEmpty {
                 Divider()
@@ -1170,18 +1172,18 @@ struct BookmarkCard: View {
                 }
             }
             Divider()
-            Button("New Folder\u{2026}") {
-                Ask.name("New Folder", placeholder: "Name", confirm: "Create") { name in
+            Button {
+                Ask.name("New Folder", placeholder: "Name", localizePlaceholder: true, confirm: "Create") { name in
                     let made = bookmarks.insert(.folder(name, []), into: nil)
                     bookmarks.move(id, into: made.id)
                 }
-            }
+            } label: { Text("New Folder…", bundle: Language.resources) }
         } label: {
             HStack(spacing: 6) {
                 Image(systemName: "folder")
                     .font(.system(size: 10.5))
                     .foregroundStyle(Palette.muted)
-                Text(here?.title ?? "Top Level")
+                Text(here?.title ?? Language.shared.text("Top Level", fallback: "Top Level"))
                     .font(.system(size: 12.5))
                     .foregroundStyle(Palette.ink)
                     .lineLimit(1)
@@ -1253,7 +1255,7 @@ struct BookmarksDropdown: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             if bookmarks.isEmpty {
-                Text("No bookmarks yet")
+                Text("ui.no_bookmarks_yet", bundle: Language.resources)
                     .font(.system(size: 12.5))
                     .foregroundStyle(Palette.muted)
                     .padding(14)
@@ -1352,13 +1354,13 @@ struct BookmarksPanel: View {
     @State private var shown: Bookmark.ID?
 
     var body: some View {
-        Plate("Bookmarks", width: 600, close: { browser.bookmarking = false }) {
+        Plate("page.bookmarks", localizedTitle: true, width: 600, close: { browser.bookmarking = false }) {
             VStack(alignment: .leading, spacing: 14) {
                 Hunt(text: $query, prompt: "Search bookmarks", focus: $hunting)
                     .onSubmit(openFirst)
 
                 if bookmarks.isEmpty {
-                    Card { Nothing("Nothing kept yet. Add this page with ⇧⌘B, or bring yours in below.") }
+                    Card { Nothing("ui.nothing_kept_yet_add_this_page_with_b_or_bring_yours_in") }
                 } else if !query.isEmpty {
                     found
                 } else {
@@ -1391,14 +1393,14 @@ struct BookmarksPanel: View {
             }
         } foot: {
             HStack(spacing: 8) {
-                Text("Bring in from")
+                Text("ui.bring_in_from", bundle: Language.resources)
                     .font(.system(size: 12))
                     .foregroundStyle(Palette.muted)
-                Pill("Bring in…") { browser.lead(to: InternalPage(.importing)) }
-                Pill("File…") { browser.importFile() }
+                Pill("ui.bring_in") { browser.lead(to: InternalPage(.importing)) }
+                Pill("ui.file") { browser.importFile() }
                 Spacer()
-                Pill("New Folder…") { bookmarks.askNewFolder(in: nil) }
-                Text(bookmarks.count == 1 ? "1 bookmark" : "\(bookmarks.count) bookmarks")
+                Pill("ui.new_folder") { bookmarks.askNewFolder(in: nil) }
+                CountText(key: "count.bookmarks", count: bookmarks.count)
                     .font(.system(size: 12))
                     .foregroundStyle(Palette.muted)
             }
@@ -1413,7 +1415,7 @@ struct BookmarksPanel: View {
     private var found: some View {
         let hits = bookmarks.matches(query)
         if hits.isEmpty {
-            Card { Nothing("Nothing matches.") }
+            Card { Nothing("ui.nothing_matches") }
         } else {
             ScrollView(showsIndicators: false) {
                 Card {
@@ -1493,8 +1495,8 @@ struct BookmarksPanel: View {
             .onTapGesture { open?() ?? show() }
             .onHover { hovering = $0 }
             .contextMenu {
-                if let open { Button("Open", action: open) }
-                Button("Show in Folder", action: show)
+                if let open { Button(action: open) { Text("ui.open", bundle: Language.resources) } }
+                Button(action: show) { Text("ui.show_in_folder", bundle: Language.resources) }
             }
             .animation(Motion.quick, value: hovering)
         }
@@ -1600,7 +1602,9 @@ final class BookmarkMenu: NSObject, NSMenuDelegate {
         if tracking, !menu.items.contains(where: { $0.tag == Self.mark }) { fill(menu) }
     }
 
-    private var menu: NSMenu? { NSApp.mainMenu?.items.first(where: { $0.title == "Bookmarks" })?.submenu }
+    private var menu: NSMenu? {
+        NSApp.mainMenu?.items.first(where: { Language.matches($0.title, english: "Bookmarks") })?.submenu
+    }
 
     /// The window in front's: its profile's bookmarks (see Profiles.swift).
     private var shown: Browser? { Browsers.front.flatMap { !$0.isPopup ? $0 : nil } ?? browser }
@@ -1642,7 +1646,7 @@ final class BookmarkMenu: NSObject, NSMenuDelegate {
         let menu = NSMenu(title: folder.title)
         let made = items(for: folder.children ?? [])
         if made.isEmpty {
-            let empty = NSMenuItem(title: "Empty", action: nil, keyEquivalent: "")
+            let empty = NSMenuItem(title: Language.shared.text("context.empty", fallback: "Empty"), action: nil, keyEquivalent: "")
             empty.isEnabled = false
             menu.addItem(empty)
         }
@@ -1722,7 +1726,7 @@ final class BookmarkMenu: NSObject, NSMenuDelegate {
         menu.removeAllItems()
         let made = items(for: kids)
         if made.isEmpty {
-            let empty = NSMenuItem(title: "Empty", action: nil, keyEquivalent: "")
+            let empty = NSMenuItem(title: Language.shared.text("context.empty", fallback: "Empty"), action: nil, keyEquivalent: "")
             empty.isEnabled = false
             menu.addItem(empty)
         }
@@ -1738,7 +1742,8 @@ final class BookmarkMenu: NSObject, NSMenuDelegate {
         let line = NSMenuItem.separator()
         line.tag = Self.foot
         menu.addItem(line)
-        let item = NSMenuItem(title: "Open All in New Tabs", action: #selector(openAll(_:)), keyEquivalent: "")
+        let item = NSMenuItem(title: Language.shared.text("context.open_all_tabs", fallback: "Open All in New Tabs"),
+                              action: #selector(openAll(_:)), keyEquivalent: "")
         item.target = self
         item.representedObject = urls
         item.tag = Self.foot

@@ -115,6 +115,7 @@ struct PinGhost: View {
 /// The line opened among the rows for a tab carried there: its mark and
 /// name, faint, on the hover grey.
 struct RowGhost: View {
+    @ObservedObject private var language = Language.shared
     @Environment(\.greys) private var greys
     @ObservedObject var tab: Tab
     let height: CGFloat
@@ -124,7 +125,7 @@ struct RowGhost: View {
         let shape = RoundedRectangle(cornerRadius: 9, style: .continuous)
         HStack(spacing: 8) {
             Mark(icon: tab.icon, letter: tab.monogram, size: 15)
-            Text(tab.label)
+            Text(tab.displayLabel)
                 .font(.system(size: size))
                 .lineLimit(1)
                 .foregroundStyle(Palette.muted)

@@ -181,7 +181,7 @@ final class LittleWindow: NSObject, NSWindowDelegate {
         }
         window.delegate = self
         let id = tab.id
-        window.contentView = NSHostingView(rootView: LittleView(tab: tab, note: note, keep: { [weak self] in self?.keep() })
+        window.contentView = NSHostingView(rootView: LanguageRoot(content: LittleView(tab: tab, note: note, keep: { [weak self] in self?.keep() })
             .overlay {
                 TabSwitcherOverlay(
                     switcher: LittleWindow.switcher,
@@ -189,7 +189,7 @@ final class LittleWindow: NSObject, NSWindowDelegate {
                     current: id, host: id,
                     pick: { LittleWindow.commit(picking: $0) }
                 )
-            })
+            }))
         // Back from the page it opened on is back to before it opened: a
         // swipe closes it (see PageView.leave).
         tab.leave = { [weak self] in self?.close() }
@@ -390,6 +390,7 @@ final class LittleWindow: NSObject, NSWindowDelegate {
 /// The page, and the line over it: the site, and Open in Search when there
 /// is somewhere to keep it (an extension's popup window has no such button).
 struct LittleView: View {
+    @ObservedObject private var language = Language.shared
     @ObservedObject var tab: Tab
     /// Its window's line at the foot; an extension's popup has none.
     var note: LittleNote? = nil
@@ -410,8 +411,8 @@ struct LittleView: View {
                     .truncationMode(.head)
                 Spacer(minLength: 0)
                 if let keep {
-                    Pill("Open in Search", action: keep)
-                        .help("Open in Search   ⌘O")
+                    Pill("ui.open_in_search", action: keep)
+                        .help(Text("ui.open_in_search_o", bundle: Language.resources))
                 } else {
                     Spacer().frame(width: 64)
                 }
@@ -447,9 +448,9 @@ struct LittleView: View {
         guard let url = arrived ?? opened else { return "" }
         switch url.scheme?.lowercased() {
         case "https": return SiteCard.site(url)
-        case "http": return "Not secure — " + SiteCard.site(url)
-        case "chrome-extension", "webkit-extension": return "Extension page"
-        default: return url.absoluteString == "about:blank" ? "" : "Not a website"
+        case "http": return language.format("site.not_secure_host", fallback: "Not secure — %1$@", SiteCard.site(url))
+        case "chrome-extension", "webkit-extension": return language.text("site.extension_page", fallback: "Extension page")
+        default: return url.absoluteString == "about:blank" ? "" : language.text("site.not_website", fallback: "Not a website")
         }
     }
 

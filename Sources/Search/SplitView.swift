@@ -121,6 +121,7 @@ private struct SplitDropHint: View {
 /// What is drawn over one page of the stage. Nothing here takes a click
 /// meant for the page: where it draws nothing, the page is under the pointer.
 private struct PaneLayers: View {
+    @ObservedObject private var language = Language.shared
     @ObservedObject var browser: Browser
     @ObservedObject var tab: Tab
     let paired: Bool
@@ -193,9 +194,9 @@ private struct PaneLayers: View {
         .animation(Motion.quick, value: hovered)
         .background { SplitDropZone(browser: browser, tab: tab, kind: .stage) }
         .accessibilityElement(children: .contain)
-        .accessibilityLabel(tab.label.isEmpty ? "New Tab" : tab.label)
-        .accessibilityHint(paired && !focused ? "Click to focus this page" : "")
-        .accessibilityAction(named: "Focus page") {
+        .accessibilityLabel(tab.displayLabel)
+        .accessibilityHint(Text(LocalizedStringKey(paired && !focused ? "Click to focus this page" : ""), bundle: Language.resources))
+        .accessibilityAction(named: Text("Focus page", bundle: Language.resources)) {
             if paired { browser.focusPane(tab) }
         }
         .clipped()
@@ -203,6 +204,7 @@ private struct PaneLayers: View {
 }
 
 private struct SplitDropPreview: View {
+    @ObservedObject private var language = Language.shared
     let preview: TabDrag.Preview
     let tabs: [Tab]
     /// The split the page under the hand is in, which the carried tab
@@ -243,7 +245,7 @@ private struct SplitDropPreview: View {
             RoundedRectangle(cornerRadius: 10, style: .continuous)
                 .strokeBorder(proposed ? Palette.ink.opacity(0.3) : Palette.ink.opacity(0.12), lineWidth: 1)
                 .padding(6)
-            Text(title.isEmpty ? "New Tab" : title)
+            Text(title.isEmpty ? Language.shared.text("tab.new", fallback: "New Tab") : title)
                 .font(.system(size: 13, weight: proposed ? .medium : .regular))
                 .foregroundStyle(Palette.ink.opacity(proposed ? 0.78 : 0.48))
                 .lineLimit(1)
@@ -291,7 +293,7 @@ private struct OpenTabs: View {
         GeometryReader { geo in
             if !list.isEmpty {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Or bring in an open tab")
+                    Text("ui.or_bring_in_an_open_tab", bundle: Language.resources)
                         .font(.system(size: 11.5))
                         .foregroundStyle(Palette.muted)
                         .padding(.horizontal, 10)
@@ -312,6 +314,7 @@ private struct OpenTabs: View {
 }
 
 private struct OpenTabRow: View {
+    @ObservedObject private var language = Language.shared
     @ObservedObject var tab: Tab
     let bring: () -> Void
     @State private var hovering = false
@@ -320,7 +323,7 @@ private struct OpenTabRow: View {
         HStack(spacing: 8) {
             Mark(icon: tab.icon, letter: tab.monogram, size: 15)
                 .frame(width: 15, height: 15)
-            Text(tab.label.isEmpty ? "New Tab" : tab.label)
+            Text(tab.displayLabel)
                 .font(.system(size: 12.5))
                 .lineLimit(1)
                 .truncationMode(.tail)
@@ -334,9 +337,9 @@ private struct OpenTabRow: View {
         .onTapGesture(perform: bring)
         .onHover { hovering = $0 }
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(tab.label)
+        .accessibilityLabel(tab.displayLabel)
         .accessibilityAddTraits(.isButton)
-        .accessibilityHint("Bring this tab into the split")
+        .accessibilityHint(Text("ui.bring_this_tab_into_the_split", bundle: Language.resources))
     }
 }
 
@@ -348,6 +351,7 @@ private struct OpenTabRow: View {
 /// also focuses the page. For its first half second it takes no click, so
 /// one already on its way can't land on OK.
 private struct PaneQuestionCard: View {
+    @ObservedObject private var language = Language.shared
     @ObservedObject var browser: Browser
     let tab: Tab
     let question: PaneQuestion
@@ -366,7 +370,7 @@ private struct PaneQuestionCard: View {
                 .contentShape(Rectangle())
                 .onTapGesture { browser.focusPane(tab) }
             VStack(alignment: .leading, spacing: 10) {
-                Text(question.host.isEmpty ? "This page says" : question.host)
+                Text(question.host.isEmpty ? Language.shared.text("dialog.page_says", fallback: "This page says") : question.host)
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(Palette.ink)
                     .lineLimit(1)
@@ -409,7 +413,7 @@ private struct PaneQuestionCard: View {
             DispatchQueue.main.asyncAfter(deadline: .now() + wait) { ready = true }
         }
         .accessibilityElement(children: .contain)
-        .accessibilityLabel("\(question.host.isEmpty ? "This page" : question.host) asks")
+        .accessibilityLabel(Text(Language.shared.format("dialog.page_asks", fallback: "%1$@ asks", question.host.isEmpty ? Language.shared.text("dialog.this_page", fallback: "This page") : question.host)))
     }
 
     private func answer(_ ok: Bool) {

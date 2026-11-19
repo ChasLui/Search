@@ -153,7 +153,7 @@ struct StylePanel: View {
     var body: some View {
         Plate(host, width: 420, close: close) {
             VStack(alignment: .leading, spacing: 6) {
-                Caption("CSS for every page of this site")
+                Caption("ui.css_for_every_page_of_this_site", localized: true)
                 TextEditor(text: $text)
                     .font(.system(size: 12, design: .monospaced))
                     .foregroundStyle(Palette.ink)
@@ -166,9 +166,9 @@ struct StylePanel: View {
             }
         } foot: {
             HStack(spacing: 8) {
-                Pill("Done", filled: true, action: close)
+                Pill("ui.done", filled: true, action: close)
                 if !text.isEmpty {
-                    Pill("Clear") { text = "" }
+                    Pill("ui.clear") { text = "" }
                 }
                 Spacer()
             }
@@ -203,13 +203,13 @@ struct SiteStylesControl: View {
     var body: some View {
         HStack(spacing: 10) {
             if !styles.hosts.isEmpty {
-                Menu(styles.hosts.count == 1 ? "1 site" : "\(styles.hosts.count) sites") {
+                Menu {
                     ForEach(styles.hosts, id: \.self) { host in
                         Menu(host) {
-                            Button("Remove Style") { styles.remove(on: host) }
+                            Button { styles.remove(on: host) } label: { Text("ui.remove_style", bundle: Language.resources) }
                         }
                     }
-                }
+                } label: { CountText(key: "count.sites", count: styles.hosts.count) }
                 .menuStyle(.borderlessButton)
                 .fixedSize()
             }

@@ -143,12 +143,12 @@ struct GroupHeading: View {
         .onTapGesture { browser.toggleTabGroup(group.id) }
         .modifier(GroupHeadingShared(browser: browser, group: group, dragSpace: dragSpace, dropping: $dropping))
         .onHover { hovering = $0 }
-        .help(group.collapsed ? "\(group.name) — folded" : group.name)
+        .help(group.collapsed ? Language.shared.format("group.folded", fallback: "%1$@ — folded", group.name) : group.name)
         .accessibilityLabel(group.name)
         // Rename Group: no room for the name here, so it is typed beside.
         .popover(isPresented: Binding(get: { editing }, set: { if !$0 { browser.editingGroupID = nil } }),
                  arrowEdge: browser.prefs.sidePosition == .right ? .leading : .trailing) {
-            TextField("Group name", text: $draft)
+            TextField(text: $draft, prompt: Text("ui.group_name", bundle: Language.resources)) { Text("ui.group_name", bundle: Language.resources) }
                 .textFieldStyle(.plain)
                 .font(.system(size: 12.5, weight: .medium))
                 .frame(width: 160)
@@ -166,7 +166,7 @@ struct GroupHeading: View {
     private var long: some View {
         HStack(spacing: 8) {
             if editing {
-                TextField("Group name", text: $draft)
+                TextField(text: $draft, prompt: Text("ui.group_name", bundle: Language.resources)) { Text("ui.group_name", bundle: Language.resources) }
                     .textFieldStyle(.plain)
                     .font(.system(size: 12.5, weight: .medium))
                     .frame(width: horizontal ? max(60, Self.width(for: group.name) - 20) : nil)
@@ -259,12 +259,12 @@ private struct GroupHeadingShared: ViewModifier {
             }
             .onDrag { NSItemProvider(object: "search-group:\(group.id.uuidString)" as NSString) }
             .contextMenu {
-                Button("Rename Group") { browser.editingGroupID = group.id }
-                Button(group.collapsed ? "Expand Group" : "Collapse Group") { browser.toggleTabGroup(group.id) }
+                Button { browser.editingGroupID = group.id } label: { Text("ui.rename_group", bundle: Language.resources) }
+                Button { browser.toggleTabGroup(group.id) } label: { Text(LocalizedStringKey(group.collapsed ? "Expand Group" : "Collapse Group"), bundle: Language.resources) }
                 // The whole group into another space, still a group there: Arc's
                 // folders came in wherever Arc had them.
                 if browser.prefs.usesSpaces, browser.spaces.count > 1 {
-                    Menu("Move Group to Space") {
+                    Menu {
                         ForEach(browser.spaces.filter { $0.id != browser.spaceID }) { space in
                             Button {
                                 browser.move(group: group.id, toSpace: space.id)
@@ -272,11 +272,11 @@ private struct GroupHeadingShared: ViewModifier {
                                 Label(space.name, systemImage: space.symbol)
                             }
                         }
-                    }
+                    } label: { Text("ui.move_group_to_space", bundle: Language.resources) }
                 }
                 Divider()
-                Button("Ungroup Tabs") { browser.removeTabGroup(group.id) }
-                Button("Close Group") { browser.closeTabGroup(group.id) }
+                Button { browser.removeTabGroup(group.id) } label: { Text("ui.ungroup_tabs", bundle: Language.resources) }
+                Button { browser.closeTabGroup(group.id) } label: { Text("ui.close_group", bundle: Language.resources) }
             }
     }
 }

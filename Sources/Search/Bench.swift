@@ -22,6 +22,10 @@ import WebKit
 
 @MainActor
 final class Bench {
+    private static func menu(_ name: String) -> NSMenu? {
+        NSApp.mainMenu?.items.first { Language.matches($0.title, english: name) }?.submenu
+    }
+
     static let shared = Bench()
     private var awake: NSObjectProtocol?
 
@@ -1240,10 +1244,14 @@ final class Bench {
                 _ = browser.bookmarks.add(url, title: tab.title)
             }
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                let menu = NSApp.mainMenu?.items.first { $0.title == "Bookmarks" }?.submenu
+                let menu = Bench.menu("Bookmarks")
                 if let menu { menu.delegate?.menuNeedsUpdate?(menu) }
                 answer(["kept": browser.pageKept,
-                        "items": menu?.items.prefix(2).map(\.title) ?? [],
+                        "items": menu?.items.prefix(2).map { item in
+                            ["Edit Bookmark…", "Add This Page", "Show Bookmarks…"].first {
+                                Language.matches(item.title, english: $0)
+                            } ?? item.title
+                        } ?? [],
                         "bar": Bench.bodies["bar"] ?? 0])
             }
 
@@ -1444,7 +1452,7 @@ final class Bench {
                 var out: [String: Any] = [
                     "lines": pill.lines.map { [$0.id, $0.name, $0.what] },
                     "recordingTabs": browser.tabs.filter(\.recording).map { Bench.short($0) },
-                    "onScreen": NSApp.windows.contains { $0 is NSPanel && $0.isVisible && $0.contentView?.subviews.contains { $0 is NSHostingView<PillView> } == true },
+                    "onScreen": NSApp.windows.contains { $0 is NSPanel && $0.isVisible && $0.contentView?.subviews.contains { $0 is NSHostingView<LanguageRoot<PillView>> } == true },
                 ]
                 out.merge(extra) { _, new in new }
                 return out
@@ -1651,7 +1659,7 @@ final class Bench {
                 ["folder": folder.title, "items": BookmarkMenu.shared.walk(folder).map { line($0.depth, $0.item) }]
             }
             var menu: [[String: Any]] = []
-            if let main = NSApp.mainMenu?.items.first(where: { $0.title == "Bookmarks" })?.submenu {
+            if let main = Bench.menu("Bookmarks") {
                 main.delegate?.menuNeedsUpdate?(main)
                 func down(_ items: [NSMenuItem], _ depth: Int) {
                     for item in items where item.tag == 0x5EAC && !item.isSeparatorItem {
@@ -1953,9 +1961,9 @@ final class Bench {
                     kept[kind.rawValue] = domain[kind.key] ?? NSNull()
                 }
                 var items: [[String: Any]] = []
-                if let edit = NSApp.mainMenu?.items.first(where: { $0.title == "Edit" })?.submenu {
+                if let edit = Bench.menu("Edit") {
                     edit.delegate?.menuNeedsUpdate?(edit)
-                    if let sub = edit.items.first(where: { $0.title == "Substitutions" })?.submenu {
+                    if let sub = edit.items.first(where: { Language.matches($0.title, english: "Substitutions") })?.submenu {
                         sub.delegate?.menuNeedsUpdate?(sub)
                         items = sub.items.filter { !$0.isSeparatorItem && !$0.isHidden }
                             .map { ["title": $0.title, "on": $0.state == .on] }
@@ -1970,7 +1978,7 @@ final class Bench {
             // first folder opened — then what each holds. Only on a
             // SEARCH_PROBE run; nothing is drawn.
             guard Store.testing else { answer(["error": "menu only works on a --test run"]); return }
-            guard let main = NSApp.mainMenu, let menu = main.items.first(where: { $0.title == "Bookmarks" })?.submenu
+            guard let main = NSApp.mainMenu, let menu = Bench.menu("Bookmarks")
             else { answer(["error": "no Bookmarks menu"]); return }
             // "peek": only what is in it now, nothing opened or filled — to
             // see what an update while it is open left of the bookmarks.
@@ -2679,34 +2687,39 @@ final class Bench {
                 let title = all == "fold" ? "Fold All Groups" : "Unfold All Groups"
                 switch request["via"] as? String {
                 case "view":
-                    guard let view = NSApp.mainMenu?.items.first(where: { $0.title == "View" })?.submenu else {
+                    guard let view = Bench.menu("View") else {
                         answer(["error": "no View menu"]); return
                     }
                     view.delegate?.menuNeedsUpdate?(view)
                     view.update()
-                    guard let at = view.items.firstIndex(where: { $0.title == title }) else { answer(["error": "no “\(title)” in View"]); return }
+                    guard let at = view.items.firstIndex(where: { Language.matches($0.title, english: title) }) else { answer(["error": "no “\(title)” in View"]); return }
                     view.performActionForItem(at: at)
                 case "space":
                     let menu = SpaceMenu.menu(for: browser)
-                    guard let at = menu.items.firstIndex(where: { $0.title == title }) else { answer(["error": "no “\(title)” in the space's menu"]); return }
+                    guard let at = menu.items.firstIndex(where: { Language.matches($0.title, english: title) }) else { answer(["error": "no “\(title)” in the space's menu"]); return }
                     menu.performActionForItem(at: at)
                 default:
                     browser.foldAllGroups(all == "fold")
                 }
             }
             func items(_ menu: NSMenu?) -> [[String: Any]] {
-                (menu?.items ?? []).filter { $0.title.hasSuffix("All Groups") }.map {
-                    ["title": $0.title, "enabled": $0.isEnabled, "key": $0.keyEquivalent,
-                     "option": $0.keyEquivalentModifierMask.contains(.option),
-                     "command": $0.keyEquivalentModifierMask.contains(.command)] as [String: Any]
+                (menu?.items ?? []).compactMap { item in
+                    guard let title = ["Fold All Groups", "Unfold All Groups"].first(where: {
+                        Language.matches(item.title, english: $0)
+                    }) else { return nil }
+                    return ["title": title, "enabled": item.isEnabled, "key": item.keyEquivalent,
+                            "option": item.keyEquivalentModifierMask.contains(.option),
+                            "command": item.keyEquivalentModifierMask.contains(.command)] as [String: Any]
                 }
             }
-            let view = NSApp.mainMenu?.items.first(where: { $0.title == "View" })?.submenu
+            let view = Bench.menu("View")
             view?.delegate?.menuNeedsUpdate?(view!)
             view?.update()
             // ⌘[ and ⌘] as this keyboard types them, beside which the two sit.
-            let tabsMenu = NSApp.mainMenu?.items.first(where: { $0.title == "Tabs" })?.submenu
-            let brackets = ["Back", "Forward"].map { title in tabsMenu?.items.first { $0.title == title }?.keyEquivalent ?? "" }
+            let tabsMenu = Bench.menu("Tabs")
+            let brackets = ["Back", "Forward"].map { title in
+                tabsMenu?.items.first { Language.matches($0.title, english: title) }?.keyEquivalent ?? ""
+            }
             answer(["viewItems": items(view), "spaceItems": items(SpaceMenu.menu(for: browser)), "brackets": brackets,
                     "on": browser.prefs.usesTabGroups, "groups": browser.tabGroups.map { group in
                 ["id": String(group.id.uuidString.prefix(8)).lowercased(), "name": group.name, "collapsed": group.collapsed,
@@ -2742,7 +2755,7 @@ final class Bench {
                 answer(["window": "there"])
                 return
             }
-            let items = NSApp.mainMenu?.items.first { $0.submenu?.title == "Window" }?.submenu?.items ?? []
+            let items = Bench.menu("Window")?.items ?? []
             guard let item = items.first(where: { $0.title == "Search" }), let action = item.action else {
                 answer(["error": "no Search item in the Window menu", "items": items.map(\.title)])
                 return
@@ -3831,7 +3844,8 @@ final class Bench {
                 // The space's menu as it would open: section headers and spaces,
                 // with their ⌃ keys and the one ticked.
                 "menu": SpaceMenu.menu(for: browser).items.map { item -> [String: Any] in
-                    ["title": item.title, "header": item.isSectionHeader, "key": item.keyEquivalent, "on": item.state == .on]
+                    ["title": item.representedObject as? String ?? item.title, "header": item.isSectionHeader,
+                     "key": item.keyEquivalent, "on": item.state == .on]
                 },
                 "every": browser.everySpace.map(\.name),
                 "on": browser.prefs.usesSpaces,

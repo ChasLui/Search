@@ -21,6 +21,7 @@ struct SettingsPanel: View {
     @ObservedObject private var updater = Updater.shared
     @ObservedObject private var shield = Shield.shared
     @ObservedObject private var sync = Sync.shared
+    @ObservedObject private var language = Language.shared
     /// The keys rows name, as Settings › Shortcuts has them now.
     @ObservedObject private var shortcuts = ShortcutStore.shared
     @State private var isDefault = Links.isDefault
@@ -53,6 +54,9 @@ struct SettingsPanel: View {
             case .keyboard: return "Keyboard & Mouse"
             case .about: return "About"
             }
+        }
+        @MainActor var localizedTitle: String {
+            Language.shared.text("settings.page.\(rawValue)", fallback: title)
         }
         var icon: String {
             switch self {
@@ -156,7 +160,7 @@ struct SettingsPanel: View {
     private var pages: some View {
         let counts = Dictionary(grouping: hits, by: \.page).mapValues(\.count)
         return VStack(alignment: .leading, spacing: 2) {
-            Text("Settings")
+            Text("Settings", bundle: Language.resources)
                 .font(.system(size: 13, weight: .semibold))
                 .foregroundStyle(Palette.ink)
                 .padding(.horizontal, 10)
@@ -198,14 +202,14 @@ struct SettingsPanel: View {
                     .foregroundStyle(Palette.muted)
                 ZStack(alignment: .leading) {
                     if text.isEmpty {
-                        Text("Find a setting").foregroundStyle(Palette.muted.opacity(0.8))
+                        Text("ui.find_a_setting", bundle: Language.resources).foregroundStyle(Palette.muted.opacity(0.8))
                     }
                     TextField("", text: $text)
                         .textFieldStyle(.plain)
                         .foregroundStyle(Palette.ink)
                         .focused(focus)
                         .onExitCommand { text = "" }
-                        .accessibilityLabel("Find a setting")
+                        .accessibilityLabel(Text("ui.find_a_setting", bundle: Language.resources))
                 }
                 .font(.system(size: 12.5))
                 if text.isEmpty {
@@ -229,6 +233,7 @@ struct SettingsPanel: View {
     }
 
     private struct PageRow: View {
+        @ObservedObject private var language = Language.shared
         let page: Page
         let on: Bool
         /// While searching: how many rows of this section match.
@@ -242,7 +247,7 @@ struct SettingsPanel: View {
                     Image(systemName: page.icon)
                         .font(.system(size: 12, weight: .medium))
                         .frame(width: 16)
-                    Text(page.title)
+                    Text(page.localizedTitle)
                         .font(.system(size: 13, weight: on ? .medium : .regular))
                     Spacer(minLength: 0)
                     if let count, count > 0 {
@@ -281,7 +286,8 @@ struct SettingsPanel: View {
                         .font(.system(size: 15, weight: .medium))
                         .foregroundStyle(Palette.ink)
                 }
-                Text(searching ? "Settings matching “\(query.trimmingCharacters(in: .whitespaces))”" : page.title)
+                Text(searching ? String(format: language.text("settings.search.results", fallback: "Settings matching “%@”"),
+                                        locale: language.locale, query.trimmingCharacters(in: .whitespaces)) : page.localizedTitle)
                     .font(.system(size: 17, weight: .semibold))
                     .foregroundStyle(Palette.ink)
                     .lineLimit(1)
@@ -327,12 +333,12 @@ struct SettingsPanel: View {
             groups(of: page)
         case .keyboard:
             groups(of: page)
-            GroupBlock(title: "Shortcuts", icon: "command") {
+            GroupBlock(title: language.text("settings.group.shortcuts", fallback: "Shortcuts"), icon: "command") {
                 ShortcutsPage(browser: browser, store: .shared, prefs: prefs)
             }
         case .privacy:
             groups(of: page)
-            GroupBlock(title: "Proxy", icon: "network") {
+            GroupBlock(title: language.text("settings.group.proxy", fallback: "Proxy"), icon: "network") {
                 ProxySettings()
             }
         case .extensions:
@@ -346,7 +352,7 @@ struct SettingsPanel: View {
 
     private func groups(of page: Page) -> some View {
         ForEach(SettingsIndex.groups(of: page)) { group in
-            GroupBlock(title: group.title, icon: group.icon) {
+            GroupBlock(title: group.localizedTitle, icon: group.icon) {
                 Card { rows(SettingsIndex.items(in: group.id).filter(shown), searched: false) }
             }
         }
@@ -365,11 +371,14 @@ struct SettingsPanel: View {
 
     private func row(_ item: SettingsItem) -> some View {
         let counts = SettingsIndex.applies(item, prefs)
+        let title = title(of: item)
+        let need = counts ? "" : SettingsIndex.needs(item)
+        let detail = counts ? detail(of: item) : language.text(need, fallback: need)
         return SettingRow(
             icon: item.icon,
-            title: shortcuts.relabel(title(of: item)),
-            detail: shortcuts.relabel(counts ? detail(of: item) : SettingsIndex.needs(item)),
-            more: counts ? item.more.map(shortcuts.relabel) : nil,
+            title: shortcuts.relabel(title == item.title ? item.localizedTitle : title),
+            detail: shortcuts.relabel(detail == item.detail ? item.localizedDetail : detail),
+            more: counts ? item.localizedMore.map(shortcuts.relabel) : nil,
             wide: item.kind == .wide,
             lit: lit == item.id
         ) {
@@ -386,7 +395,7 @@ struct SettingsPanel: View {
     private var results: some View {
         let found = hits
         if found.isEmpty {
-            Card { Nothing("No setting called that. Try other words, like dark, tabs or video") }
+            Card { Nothing("ui.no_setting_called_that_try_other_words_like_dark_tabs_o") }
         }
         let byGroup = Dictionary(grouping: found, by: \.group)
         ForEach(SettingsIndex.groups.filter { byGroup[$0.id] != nil }) { group in
@@ -400,7 +409,7 @@ struct SettingsPanel: View {
                 } label: {
                     HStack(spacing: 6) {
                         Image(systemName: group.icon).font(.system(size: 10.5, weight: .medium))
-                        Text("\(group.page.title)  ›  \(group.title)".uppercased())
+                        Text("\(group.page.localizedTitle)  ›  \(group.localizedTitle)".uppercased())
                             .font(.system(size: 10.5, weight: .semibold))
                             .tracking(0.4)
                         Image(systemName: "arrow.right").font(.system(size: 9, weight: .semibold)).opacity(0.6)
@@ -410,7 +419,7 @@ struct SettingsPanel: View {
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .help("Open \(group.page.title) at \(group.title)")
+                .help("\(group.page.localizedTitle) › \(group.localizedTitle)")
                 Card { rows(byGroup[group.id] ?? [], searched: true) }
             }
         }
@@ -428,7 +437,7 @@ struct SettingsPanel: View {
     private func detail(of item: SettingsItem) -> String {
         switch item.id {
         case "general.default":
-            return isDefault ? "Search is the default browser on this Mac" : item.detail
+            return isDefault ? language.text("Search is the default browser on this Mac", fallback: "Search is the default browser on this Mac") : item.detail
         case "downloads.folder":
             return prefs.downloads.path.replacingOccurrences(of: NSHomeDirectory(), with: "~")
         case "sync": return sync.on ? sync.summary : item.detail
@@ -439,14 +448,27 @@ struct SettingsPanel: View {
         case "passwords.save": return savingDetail
         case "passkeys":
             return !prefs.passkeysPossible
-                ? "Needs an Apple entitlement this build doesn't have"
+                ? language.text("settings.passkeys.entitlement", fallback: "Needs an Apple entitlement this build doesn't have")
                 : Passkeys.access == .denied
-                ? "macOS was told no: System Settings › Privacy & Security › Passkeys"
+                ? language.text("settings.passkeys.denied", fallback: "macOS was told no: System Settings › Privacy & Security › Passkeys")
                 : item.detail
-        case "shield": return shield.trouble ?? item.detail
+        case "shield": return shield.trouble.map(shieldTrouble) ?? item.detail
         case "updates.version": return versionDetail
-        case "arc.import": return arcHere ? item.detail : "Arc isn't on this Mac. Bring Things Over can read an export"
+        case "arc.import": return arcHere ? item.detail : language.text("settings.arc.absent", fallback: "Arc isn't on this Mac. Bring Things Over can read an export")
         default: return item.detail
+        }
+    }
+
+    func shieldTrouble(_ trouble: String) -> String {
+        switch trouble {
+        case "Couldn't build the block list":
+            return language.text("settings.shield.build_failed", fallback: trouble)
+        case "WebKit has nowhere to compile it":
+            return language.text("settings.shield.store_missing", fallback: trouble)
+        case "Compiling the block list failed":
+            return language.text("settings.shield.compile_failed", fallback: trouble)
+        default:
+            return trouble
         }
     }
 
@@ -478,7 +500,7 @@ struct SettingsPanel: View {
                     .foregroundStyle(Palette.ink)
                     .frame(width: 24)
             } else {
-                Pill("Make default", filled: true) {
+                Pill("ui.make_default", filled: true) {
                     Links.becomeDefault { worked in
                         isDefault = Links.isDefault
                         browser.announce(worked && isDefault ? "Links now open here" : "macOS didn't change it")
@@ -488,18 +510,26 @@ struct SettingsPanel: View {
         case "general.import":
             // Coming from another browser, now or any time later: the same
             // page as File › Bring Things Over… and the Welcome's.
-            Pill("Bring Things Over…") { browser.lead(to: InternalPage(.importing)) }
+            Pill("ui.bring_things_over") { browser.lead(to: InternalPage(.importing)) }
+        case "general.language":
+            Picker(language.text("settings.general.language.title", fallback: "Interface language"),
+                   selection: Binding(get: { language.selection }, set: { language.select($0) })) {
+                ForEach(InterfaceLanguage.allCases) { Text($0.title).tag($0) }
+            }
+            .labelsHidden()
+            .pickerStyle(.menu)
+            .fixedSize()
         case "sync":
             // On asks for the folder first; cancelled, it stays off.
             Switch(on: Binding(get: { sync.on }, set: { $0 ? sync.choose() : sync.turnOff() }))
         case "quit.confirm": Switch(on: $prefs.confirmsQuit)
-        case "downloads.folder": Pill("Change…") { chooseFolder() }
+        case "downloads.folder": Pill("ui.change") { chooseFolder() }
         case "downloads.ask": Switch(on: $prefs.asksWhereToSave)
         case "downloads.button": Switch(on: $prefs.alwaysShowsDownloads)
         case "downloads.open":
-            Picker("Open Downloads", selection: $prefs.downloadsOpening) {
-                ForEach(DownloadsOpening.allCases) { Text($0.title).tag($0) }
-            }
+            Picker(selection: $prefs.downloadsOpening) {
+                ForEach(DownloadsOpening.allCases) { Text(LocalizedStringKey($0.title), bundle: Language.resources).tag($0) }
+            } label: { Text("ui.open_downloads", bundle: Language.resources) }
             .labelsHidden()
             .pickerStyle(.menu)
             .fixedSize()
@@ -545,7 +575,7 @@ struct SettingsPanel: View {
                 set: { on in withAnimation(Motion.glide) { prefs.roomyTabs = on } }
             ))
         case "sidebar.player": Switch(on: $prefs.showsPlayer)
-        case "glyph": Segmented(options: Glyph.allCases.map { ($0, $0.title) }, selection: $prefs.glyph)
+        case "glyph": Segmented(options: Glyph.allCases.map { ($0, $0.title) }, selection: $prefs.glyph, localized: true)
         case "tabs.reading": Switch(on: $prefs.showsReading)
         case "tabs.give": Switch(on: $prefs.tabsGive)
         case "bookmarks.bar": Switch(on: $prefs.bookmarksBar)
@@ -560,11 +590,11 @@ struct SettingsPanel: View {
     private func tabsControl(_ id: String) -> some View {
         switch id {
         case "tabs.newPlace":
-            Picker("New tab position", selection: $prefs.newTabPlace) {
-                Text("After current").tag(NewTabPlace.next)
-                Text(prefs.sidebar ? "Top" : "Leftmost").tag(NewTabPlace.top)
-                Text(prefs.sidebar ? "Bottom" : "Rightmost").tag(NewTabPlace.end)
-            }
+            Picker(selection: $prefs.newTabPlace) {
+                Text("ui.after_current", bundle: Language.resources).tag(NewTabPlace.next)
+                Text(LocalizedStringKey(prefs.sidebar ? "Top" : "Leftmost"), bundle: Language.resources).tag(NewTabPlace.top)
+                Text(LocalizedStringKey(prefs.sidebar ? "Bottom" : "Rightmost"), bundle: Language.resources).tag(NewTabPlace.end)
+            } label: { Text("ui.new_tab_position", bundle: Language.resources) }
             .labelsHidden()
             .pickerStyle(.menu)
             .fixedSize()
@@ -579,16 +609,16 @@ struct SettingsPanel: View {
         case "tabs.popupWindows": Switch(on: $prefs.popupWindows)
         case "tabs.sleep":
             VStack(alignment: .leading, spacing: 7) {
-                Segmented(options: SleepChoice.allCases.map { ($0, $0.title) }, selection: $prefs.sleepChoice, wide: true)
+                Segmented(options: SleepChoice.allCases.map { ($0, $0.title) }, selection: $prefs.sleepChoice, wide: true, localized: true)
                     .frame(maxWidth: 340)
-                Text(prefs.sleepChoice.detail)
+                Text(language.text("settings.sleep.\(prefs.sleepChoice.rawValue)", fallback: prefs.sleepChoice.detail))
                     .font(.system(size: 11))
                     .foregroundStyle(Palette.muted)
             }
         case "tabs.close.after":
             Picker("", selection: $prefs.tabLife) {
                 ForEach(TabLife.allCases) { life in
-                    Text(life.title).tag(life)
+                    Text(LocalizedStringKey(life.title), bundle: Language.resources).tag(life)
                 }
             }
             .labelsHidden()
@@ -611,7 +641,7 @@ struct SettingsPanel: View {
         case "search.engine":
             Picker("", selection: $prefs.engine) {
                 ForEach(Engine.allCases) { engine in
-                    Text(engine.title).tag(engine)
+                    Text(engine == .custom ? language.text("settings.search.custom_engine", fallback: engine.title) : engine.title).tag(engine)
                 }
             }
             .labelsHidden()
@@ -619,10 +649,10 @@ struct SettingsPanel: View {
             .fixedSize()
         case "search.shift":
             Picker("", selection: $prefs.shiftEngine) {
-                Text("Off").tag(Engine?.none)
+                Text("ui.off", bundle: Language.resources).tag(Engine?.none)
                 Divider()
                 ForEach(Engine.allCases) { engine in
-                    Text(engine.title).tag(Engine?.some(engine))
+                    Text(engine == .custom ? language.text("settings.search.custom_engine", fallback: engine.title) : engine.title).tag(Engine?.some(engine))
                 }
             }
             .labelsHidden()
@@ -631,11 +661,11 @@ struct SettingsPanel: View {
         case "search.suggest": Switch(on: $prefs.engineSuggests)
         case "search.keywords":
             if draft == nil {
-                Pill("Add") { draft = Keyword() }
+                Pill("ui.add") { draft = Keyword() }
             } else {
                 HStack(spacing: 6) {
-                    Pill("Cancel") { draft = nil }
-                    Pill("Save", filled: true) { saveDraft() }
+                    Pill("ui.cancel") { draft = nil }
+                    Pill("ui.save", filled: true) { saveDraft() }
                         .disabled(draftProblem != nil)
                         .opacity(draftProblem == nil ? 1 : 0.4)
                 }
@@ -644,9 +674,9 @@ struct SettingsPanel: View {
         case "links.little.tabs": Switch(on: $prefs.littleFindsTabs)
         case "reader.twins": Switch(on: $prefs.readsTwins)
         case "reader.follows": Switch(on: $prefs.readerFollowsLook)
-        case "float.style": Segmented(options: FloatStyle.allCases.map { ($0, $0.title) }, selection: $prefs.floatStyle)
+        case "float.style": Segmented(options: FloatStyle.allCases.map { ($0, $0.title) }, selection: $prefs.floatStyle, localized: true)
         case "float.own":
-            Segmented(options: FloatOwn.allCases.map { ($0, $0.title) }, selection: $prefs.floatOwn, wide: true)
+            Segmented(options: FloatOwn.allCases.map { ($0, $0.title) }, selection: $prefs.floatOwn, wide: true, localized: true)
                 .frame(maxWidth: 340)
         case "float.minimize": Switch(on: $prefs.floatMinimizes)
         case "media.click": Switch(on: $prefs.waitsForPlay)
@@ -654,11 +684,11 @@ struct SettingsPanel: View {
         case "fullscreen.keepsWindow": Switch(on: $prefs.keepsWindow)
         case "translate.target":
             if PageTranslator.available { TranslateTargetPicker(prefs: prefs) }
-            else { Text("Requires macOS 15").foregroundStyle(Palette.muted) }
+            else { Text("ui.requires_macos_15", bundle: Language.resources).foregroundStyle(Palette.muted) }
         case "pageZoom":
             // The number itself takes it back to 100%.
             Steps(stops: Preferences.zooms, value: $prefs.pageZoom, home: 1) { "\(Int(($0 * 100).rounded()))%" }
-        case "pages.120": Segmented(options: FastPages.allCases.map { ($0, $0.title) }, selection: $prefs.fastPages)
+        case "pages.120": Segmented(options: FastPages.allCases.map { ($0, $0.title) }, selection: $prefs.fastPages, localized: true)
         case "pages.capture": Switch(on: $prefs.capturesPages)
         case "sites.styles": SiteStylesControl(prefs: prefs)
         case "autocorrect": Switch(on: $prefs.autocorrect)
@@ -672,7 +702,7 @@ struct SettingsPanel: View {
         switch id {
         case "arc.setup":
             if let before = arcBefore, prefs.looksLikeArc {
-                Pill("Undo") {
+                Pill("ui.undo") {
                     withAnimation(Motion.glide) { prefs.restore(before) }
                     arcBefore = nil
                     SettingsPanel.arcBefore = nil
@@ -681,14 +711,14 @@ struct SettingsPanel: View {
             } else if prefs.looksLikeArc {
                 Always(text: "Set up")
             } else {
-                Pill("Set Up", filled: true) { setUpLikeArc() }
+                Pill("ui.set_up", filled: true) { setUpLikeArc() }
             }
         case "arc.import":
-            Pill("Bring Over…") { browser.lead(to: InternalPage(.importing, "Arc")) }
+            Pill("ui.bring_over") { browser.lead(to: InternalPage(.importing, "Arc")) }
                 .disabled(!arcHere)
                 .opacity(arcHere ? 1 : 0.4)
         case "spaces": Switch(on: $prefs.usesSpaces)
-        case "profiles": Pill("New Profile…") { ProfileMenu.askNew() }
+        case "profiles": Pill("ui.new_profile") { ProfileMenu.askNew() }
         case "profiles.oneWindow": Switch(on: $prefs.profilesInOneWindow)
         case "spaces.links": Switch(on: $prefs.sendsLinksToSpaces)
         case "pins.keep": Switch(on: $prefs.pinsKeepSite)
@@ -707,7 +737,7 @@ struct SettingsPanel: View {
     @ViewBuilder
     private func keptControl(_ id: String) -> some View {
         switch id {
-        case "passwords.open": Pill("Open…") { browser.lead(to: InternalPage(.passwords)) }
+        case "passwords.open": Pill("ui.open_22b676") { browser.lead(to: InternalPage(.passwords)) }
         case "passwords.save": Switch(on: $prefs.savesPasswords)
         case "passwords.fill": Switch(on: $prefs.fillsPasswords)
         case "passkeys": Switch(on: $prefs.passkeys)
@@ -734,10 +764,10 @@ struct SettingsPanel: View {
         case "privacy.clickIDs": Switch(on: $prefs.removesClickIDs)
         case "privacy.gpc": Switch(on: $prefs.sendsPrivacySignal)
         case "notifications.ask": Switch(on: $prefs.siteNotifications)
-        case "privacy.forget": Pill("Forget choices") { browser.forgetCaptureChoices() }
-        case "clear.history": Pill("Clear") { browser.clearHistory() }
-        case "clear.cookies": Pill("Sign out of everything") { browser.clearSites() }
-        case "clear.cache": Pill("Clear") { browser.clearCache() }
+        case "privacy.forget": Pill("ui.forget_choices") { browser.forgetCaptureChoices() }
+        case "clear.history": Pill("ui.clear") { browser.clearHistory() }
+        case "clear.cookies": Pill("ui.sign_out_of_everything") { browser.clearSites() }
+        case "clear.cache": Pill("ui.clear") { browser.clearCache() }
         default: EmptyView()
         }
     }
@@ -746,11 +776,11 @@ struct SettingsPanel: View {
     private func otherControl(_ id: String) -> some View {
         switch id {
         case "links.peek":
-            Picker("Peek at a link", selection: $prefs.peekChoice) {
+            Picker(selection: $prefs.peekChoice) {
                 ForEach(PeekChoice.allCases) { choice in
-                    Text(choice.title).tag(choice)
+                    Text(LocalizedStringKey(choice.title), bundle: Language.resources).tag(choice)
                 }
-            }
+            } label: { Text("ui.peek_at_a_link", bundle: Language.resources) }
             .labelsHidden()
             .pickerStyle(.menu)
             .fixedSize()
@@ -763,8 +793,8 @@ struct SettingsPanel: View {
         case "note.switcher": Always()
         case "updates.version": versionControl
         case "updates.auto": Switch(on: $prefs.installsUpdates)
-        case "about.feedback": Pill("Send Feedback") { Links.writeFeedback() }
-        case "about.notes": Pill("What's New…") { browser.lead(to: InternalPage(.notes)) }
+        case "about.feedback": Pill("ui.send_feedback_083a7a") { Links.writeFeedback() }
+        case "about.notes": Pill("ui.what_s_new") { browser.lead(to: InternalPage(.notes)) }
         case "bench": Switch(on: $prefs.bench)
         case "agents": Switch(on: $prefs.agents)
         default: EmptyView()
@@ -791,8 +821,8 @@ struct SettingsPanel: View {
         case "shield":
             if let trouble = shield.trouble {
                 Rule()
-                Line(trouble, "Nothing is being blocked until this clears. Try again, or restart Search") {
-                    Pill("Try again") { shield.compile() }
+                Line(shieldTrouble(trouble), "ui.nothing_is_being_blocked_until_this_clears_try_again_or", localizedDetail: true) {
+                    Pill("ui.try_again_042c86") { shield.compile() }
                 }
                 .under()
             }
@@ -807,9 +837,9 @@ struct SettingsPanel: View {
         case "passkeys":
             if !searched, !Vault.never.isEmpty {
                 Rule()
-                SettingRow(icon: "hand.raised.slash", title: "Sites never asked",
-                           detail: "\(Vault.never.count) sites told to stop offering") {
-                    Pill("Forget") {
+                SettingRow(icon: "hand.raised.slash", title: language.text("Sites never asked", fallback: "Sites never asked"),
+                           detail: language.count("count.never_sites", Vault.never.count)) {
+                    Pill("ui.forget") {
                         Vault.never = []
                         browser.announce("Every site can ask again")
                     }
@@ -901,7 +931,7 @@ struct SettingsPanel: View {
                 }
                 .contentShape(Rectangle())
                 .onTapGesture { draft = entry }
-                .help("Click to change")
+                .help(Text("ui.click_to_change", bundle: Language.resources))
                 Button {
                     prefs.keywords.removeAll { $0.id == entry.id }
                 } label: {
@@ -932,9 +962,16 @@ struct SettingsPanel: View {
     private var keywordDetail: String {
         guard let draft else { return SettingsIndex.item("search.keywords")?.detail ?? "" }
         if draft.keyword.isEmpty, draft.template.isEmpty {
-            return "A word, then the site's search address with %s where the words go"
+            return language.text("settings.keyword.explain", fallback: "A word, then the site's search address with %s where the words go")
         }
-        return draftProblem ?? "\(draft.keyword.trimmingCharacters(in: .whitespacesAndNewlines)) will search \(draft.name)"
+        if let problem = draftProblem {
+            let word = draft.keyword.trimmingCharacters(in: .whitespacesAndNewlines)
+            if let taken = prefs.keywords.first(where: { $0.id != draft.id && $0.keyword.caseInsensitiveCompare(word) == .orderedSame }) {
+                return language.format("settings.keyword.taken", fallback: "%1$@ already goes to %2$@", taken.keyword, taken.name)
+            }
+            return language.text(problem, fallback: problem)
+        }
+        return language.format("settings.keyword.will_search", fallback: "%1$@ will search %2$@", draft.keyword.trimmingCharacters(in: .whitespacesAndNewlines), draft.name)
     }
 
     private func saveDraft() {
@@ -957,36 +994,36 @@ struct SettingsPanel: View {
     private var suggestDetail: String {
         let name = prefs.engine.name(custom: prefs.customEngine)
         guard EngineSuggest.endpoint(for: prefs.engine) != nil else {
-            return "A custom engine has no suggestions to give, so nothing is sent"
+            return language.text("settings.search.no_suggestions", fallback: "A custom engine has no suggestions to give, so nothing is sent")
         }
-        return "What you type is sent to \(name) as you type"
+        return language.format("settings.search.sent_to", fallback: "What you type is sent to %1$@ as you type", name)
     }
 
     private var searchDetail: String {
-        guard prefs.engine == .custom else { return "Where words that aren't an address go" }
+        guard prefs.engine == .custom else { return language.text("settings.search.where", fallback: "Where words that aren't an address go") }
         guard Engine.accepts(Engine.written(prefs.customEngine)) else {
-            return "An http or https address with %s where the words go. Until then, Google"
+            return language.text("An http or https address with %s where the words go. Until then, Google", fallback: "An http or https address with %s where the words go. Until then, Google")
         }
-        return "Words go to \(prefs.engine.name(custom: prefs.customEngine))"
+        return language.format("settings.search.words_to", fallback: "Words go to %1$@", prefs.engine.name(custom: prefs.customEngine))
     }
 
     private var shiftDetail: String {
         guard let engine = prefs.shiftEngine else {
             return SettingsIndex.item("search.shift")?.detail ?? ""
         }
-        guard engine == .custom else { return "Shift-Return sends what you typed to \(engine.title)" }
+        guard engine == .custom else { return language.format("settings.search.shift_to", fallback: "Shift-Return sends what you typed to %1$@", engine.title) }
         guard Engine.accepts(Engine.written(prefs.shiftCustom)) else {
-            return "An http or https address with %s where the words go. Until then, Google"
+            return language.text("An http or https address with %s where the words go. Until then, Google", fallback: "An http or https address with %s where the words go. Until then, Google")
         }
-        return "Shift-Return sends what you typed to \(engine.name(custom: prefs.shiftCustom))"
+        return language.format("settings.search.shift_to", fallback: "Shift-Return sends what you typed to %1$@", engine.name(custom: prefs.shiftCustom))
     }
 
     /// Says so when a password manager extension has taken the saving over.
     private var savingDetail: String {
         if #available(macOS 15.4, *), let name = Extensions.shared.passwordSavingTakenBy {
-            return "\(name) does the saving; it asked Search not to offer"
+            return language.format("settings.passwords.extension_saves", fallback: "%1$@ does the saving; it asked Search not to offer", name)
         }
-        return "Asked once per site, never again for a site you refuse"
+        return language.text("settings.passwords.asked_once", fallback: "Asked once per site, never again for a site you refuse")
     }
 
     private func setUpLikeArc() {
@@ -994,7 +1031,14 @@ struct SettingsPanel: View {
         let changed = withAnimation(Motion.glide) { prefs.setUpLikeArc() }
         arcBefore = before
         SettingsPanel.arcBefore = before
-        browser.announce(changed.isEmpty ? "Already set up like Arc" : "Turned on: " + changed.joined(separator: ", "))
+        browser.announce(changed.isEmpty ? "Already set up like Arc" : "Turned on: " + changed.joined(separator: ", "), localized: {
+            let language = Language.shared
+            if changed.isEmpty { return language.text("Already set up like Arc", fallback: "Already set up like Arc") }
+            let list = ListFormatter()
+            list.locale = language.locale
+            let names = changed.map { language.text($0, fallback: $0) }
+            return language.format("announcement.turned_on", fallback: "Turned on: %1$@", list.string(from: names) ?? names.joined(separator: ", "))
+        })
     }
 
     // MARK: - about
@@ -1006,10 +1050,10 @@ struct SettingsPanel: View {
                 .aspectRatio(Logomark.canvas.width / Logomark.canvas.height, contentMode: .fit)
                 .frame(height: 34)
             VStack(alignment: .leading, spacing: 3) {
-                Text("Search")
+                Text("ui.search", bundle: Language.resources)
                     .font(.system(size: 15, weight: .semibold))
                     .foregroundStyle(Palette.ink)
-                Text("by Office Commun · version \(Updater.version)")
+                Text(language.format("settings.by_version", fallback: "by Office Commun · version %1$@", Updater.version))
                     .font(.system(size: 12))
                     .foregroundStyle(Palette.muted)
             }
@@ -1021,25 +1065,25 @@ struct SettingsPanel: View {
     private var versionTitle: String {
         switch updater.stage {
         case .none: return "Updates"
-        case .fetching(let next): return "Search \(next.version) is downloading…"
-        case .ready(let next): return "Search \(next.version) is ready"
-        case .offered(let next), .waiting(let next): return "Search \(next.version) is out"
+        case .fetching(let next): return language.format("settings.update.downloading", fallback: "Search %1$@ is downloading…", next.version)
+        case .ready(let next): return language.format("settings.update.ready", fallback: "Search %1$@ is ready", next.version)
+        case .offered(let next), .waiting(let next): return language.format("settings.update.out", fallback: "Search %1$@ is out", next.version)
         }
     }
 
     private var versionDetail: String {
         switch updater.stage {
         case .none:
-            return updater.lastChecked.map { "Checked \($0.formatted(.relative(presentation: .named))), every hour on its own" }
-                ?? "Checked every hour on its own"
+            return updater.lastChecked.map { language.format("settings.update.checked", fallback: "Checked %1$@, every hour on its own", $0.formatted(.relative(presentation: .named).locale(language.locale))) }
+                ?? language.text("settings.update.hourly", fallback: "Checked every hour on its own")
         case .fetching(let next):
-            return next.notes ?? "Quietly, in the background. Nothing you have set is touched"
+            return next.notes ?? language.text("settings.update.background", fallback: "Quietly, in the background. Nothing you have set is touched")
         case .ready(let next):
-            return next.notes ?? "It's there the next time you open Search"
+            return next.notes ?? language.text("settings.update.next_launch", fallback: "It's there the next time you open Search")
         case .offered(let next):
-            return next.notes ?? "Open the disk image, the same as the first time"
+            return next.notes ?? language.text("settings.update.disk", fallback: "Open the disk image, the same as the first time")
         case .waiting(let next):
-            return next.notes ?? "Checked and put in place when you press Install"
+            return next.notes ?? language.text("settings.update.install", fallback: "Checked and put in place when you press Install")
         }
     }
 
@@ -1056,12 +1100,12 @@ struct SettingsPanel: View {
         case .fetching:
             Ring(size: 12)
         case .ready:
-            Pill("Relaunch now", filled: true) { updater.relaunch() }
+            Pill("ui.relaunch_now", filled: true) { updater.relaunch() }
         case .offered:
             Pill(updater.fetchingDisk ? "Downloading…" : "Download", filled: true) { updater.openDisk() }
                 .disabled(updater.fetchingDisk)
         case .waiting:
-            Pill("Install", filled: true) { updater.install() }
+            Pill("ui.install", filled: true) { updater.install() }
         }
     }
 
@@ -1073,7 +1117,7 @@ struct SettingsPanel: View {
         panel.canChooseFiles = false
         panel.canCreateDirectories = true
         panel.directoryURL = prefs.downloads
-        panel.prompt = "Use this folder"
+        panel.prompt = language.text("settings.downloads.use_folder", fallback: "Use this folder")
         guard panel.runModal() == .OK, let url = panel.url else { return }
         prefs.downloads = url
     }
@@ -1151,7 +1195,7 @@ struct SettingRow<Control: View>: View {
                             }
                             .buttonStyle(.plain)
                             .help(more ?? "")
-                            .accessibilityLabel("More about \(title)")
+                            .accessibilityLabel(Text(Language.shared.format("settings.more_about", fallback: "More about %1$@", title)))
                         }
                     }
                     if !detail.isEmpty {
@@ -1189,7 +1233,7 @@ struct SettingRow<Control: View>: View {
 struct Always: View {
     var text = "Always on"
     var body: some View {
-        Text(text)
+        Text(LocalizedStringKey(text), bundle: Language.resources)
             .font(.system(size: 11))
             .foregroundStyle(Palette.muted)
             .padding(.horizontal, 8)
@@ -1222,14 +1266,14 @@ struct Pictures<Option: Hashable>: View {
                                 RoundedRectangle(cornerRadius: 9.5, style: .continuous)
                                     .strokeBorder(on ? Palette.ink : .clear, lineWidth: 2)
                             )
-                        Text(title)
+                        Text(LocalizedStringKey(title), bundle: Language.resources)
                             .font(.system(size: 11.5, weight: on ? .medium : .regular))
                             .foregroundStyle(on ? Palette.ink : Palette.muted)
                     }
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel(title)
+                .accessibilityLabel(Text(LocalizedStringKey(title), bundle: Language.resources))
                 .accessibilityAddTraits(on ? .isSelected : [])
             }
         }
@@ -1394,13 +1438,14 @@ struct Segmented<Option: Hashable>: View {
     /// True when the control has the whole width to itself, so the choices
     /// share it evenly instead of each taking only what its word needs.
     var wide = false
+    var localized = false
 
     @Namespace private var slide
 
     var body: some View {
         HStack(spacing: 2) {
             ForEach(options, id: \.0) { option, title in
-                Text(title)
+                (localized ? Text(LocalizedStringKey(title), bundle: Language.resources) : Text(title))
                     .font(.system(size: 11.5, weight: option == selection ? .medium : .regular))
                     .foregroundStyle(option == selection ? Palette.ink : Palette.muted)
                     .lineLimit(1)
@@ -1473,7 +1518,7 @@ struct Steps: View {
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .help("Back to \(label(home))")
+            .help(Text(Language.shared.format("settings.back_to", fallback: "Back to %1$@", label(home))))
             Step(icon: "plus", to: above) { value = $0 }
         }
         .padding(.horizontal, 2)
@@ -1524,7 +1569,7 @@ struct Pill: View {
 
     var body: some View {
         Button(action: action) {
-            Text(title)
+            Text(LocalizedStringKey(title), bundle: Language.resources)
                 .font(.system(size: 11.5))
                 .foregroundStyle(filled ? Palette.ground : tint)
                 .padding(.horizontal, 10)
@@ -1549,8 +1594,8 @@ private struct NotificationSites: View {
         if !sites.isEmpty {
             ForEach(sites, id: \.self) { site in
                 Rule()
-                Line(URL(string: site).map(SiteCard.site) ?? site, "Can send notifications") {
-                    Pill("Remove") { SiteNotifications.forget(site) }
+                Line(URL(string: site).map(SiteCard.site) ?? site, "ui.can_send_notifications", localizedDetail: true) {
+                    Pill("ui.remove") { SiteNotifications.forget(site) }
                 }
             }
         }

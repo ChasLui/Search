@@ -1095,7 +1095,7 @@ struct SideBar: View {
     private var newTab: some View {
         if icons {
             Quiet(icon: "plus", title: "", height: rowHeight, size: prefs.sideTitle, centred: true) { browser.launch() }
-                .help("New Tab   ⌘T")
+                .help(Text("ui.new_tab_t", bundle: Language.resources))
                 .padding(.top, SideBar.gap)
         } else {
             Quiet(icon: "plus", title: "New tab", height: rowHeight, size: prefs.sideTitle) { browser.launch() }
@@ -1201,6 +1201,7 @@ private struct PinGrid: Layout {
 /// its row asks for, but never taller than the classic square, so a row with
 /// room to spare turns into a wide, short button rather than a bigger icon.
 private struct PinSquare: View, Equatable {
+    @ObservedObject private var language = Language.shared
     @Environment(\.greys) private var greys
     @Environment(\.tabShortcutNumbers) private var shortcutNumbers
     let browser: Browser
@@ -1315,7 +1316,7 @@ private struct PinSquare: View, Equatable {
         .overlay { MiddleClick { browser.close(tab) } }
         .onHover { hovering = $0 }
         .contextMenu { TabMenu(browser: browser, tab: tab, close: { browser.close(tab) }) }
-        .help(tab.label)
+        .help(tab.displayLabel)
         .animation(nil, value: hovering)
         .transition(.scale(scale: 0.8).combined(with: .opacity))
     }
@@ -1329,6 +1330,7 @@ private struct PinSquare: View, Equatable {
 /// again for anything that changed in the window. The Browser is kept for
 /// what a click on the row does.
 private struct SideRow: View, Equatable {
+    @ObservedObject private var language = Language.shared
     @Environment(\.greys) private var greys
     @Environment(\.tabShortcutNumbers) private var shortcutNumbers
     let browser: Browser
@@ -1427,7 +1429,7 @@ private struct SideRow: View, Equatable {
                         Image(systemName: tab.agent ? "cursorarrow.rays" : "flask")
                             .font(.system(size: 9))
                             .foregroundStyle(colour.opacity(0.7))
-                            .help(tab.agent ? "Opened by a coding agent" : "Opened by a script")
+                            .help(Text(LocalizedStringKey(tab.agent ? "Opened by a coding agent" : "Opened by a script"), bundle: Language.resources))
                     }
                     if tab.shy {
                         Image(systemName: "eye.slash")
@@ -1439,13 +1441,13 @@ private struct SideRow: View, Equatable {
                         Image(systemName: "record.circle")
                             .font(.system(size: 10))
                             .foregroundStyle(colour.opacity(0.8))
-                            .help("Recording")
+                            .help(Text("ui.recording", bundle: Language.resources))
                     }
                     // A window the page asked for was refused (BlockedPopups).
                     PopupSign(browser: browser, tab: tab, colour: colour)
                     // The page is translated (Translate.swift).
                     TranslateSign(tab: tab, colour: colour)
-                    TitleAtRest(label: tab.label, rest: rest, shown: atRest, hovering: hovering,
+                    TitleAtRest(label: tab.displayLabel, rest: rest, shown: atRest, hovering: hovering,
                                 size: prefs.sideTitle, colour: colour, roomy: true)
                 }
                 Spacer(minLength: 0)
@@ -1667,14 +1669,14 @@ struct KeepLine: View {
                     HStack(spacing: 3) {
                         Image(systemName: "arrow.down")
                             .font(.system(size: 8, weight: .semibold))
-                        Text("Clear")
+                        Text("ui.clear", bundle: Language.resources)
                             .font(.system(size: 11))
                     }
                     .foregroundStyle(Palette.muted)
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .help("Close the tabs under the line. Pins and groups stay; ⇧⌘T brings them all back.")
+                .help(Text("ui.close_the_tabs_under_the_line_pins_and_groups_stay_t_br", bundle: Language.resources))
                 .transition(.opacity)
             }
         }
@@ -1708,7 +1710,7 @@ struct Speaker: View {
         }
         .buttonStyle(.plain)
         .onHover { hovering = $0 }
-        .help(tab.muted ? "Unmute Tab" : "Mute Tab")
+        .help(Text(LocalizedStringKey(tab.muted ? "Unmute Tab" : "Mute Tab"), bundle: Language.resources))
         .animation(Motion.quick, value: hovering)
     }
 }
@@ -1761,7 +1763,7 @@ struct Door: View {
         // A right-click opens the same menu at once, as in Chrome.
         .overlay { if let held { RightClick(menu: held) } }
         .onHover { hovering = $0 }
-        .help(help)
+        .help(Text(LocalizedStringKey(help), bundle: Language.resources))
         .animation(Motion.quick, value: hovering)
         .animation(Motion.quick, value: on)
     }

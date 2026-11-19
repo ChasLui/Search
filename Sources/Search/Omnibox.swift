@@ -190,6 +190,7 @@ struct Omnibox: View {
 
     /// One row of a list of places, here and under the field in the tab.
     struct Row: View {
+        @ObservedObject private var language = Language.shared
         let offer: Suggestion
         /// Where the arrow keys have walked to. The pointer gets its own,
         /// quieter mark, and changes nothing but the look of the row.
@@ -232,7 +233,7 @@ struct Omnibox: View {
                 .frame(width: 14, height: 14)
                 // The row reads as 1.0.4's did, without the www; the key
                 // itself keeps it, for completing and going there.
-                Text(offer.kind == .suggested || offer.kind == .searched ? offer.key : Address.withoutWWW(offer.key))
+                Text(label)
                     .font(.system(size: 13))
                     .foregroundStyle(Palette.ink)
                     .lineLimit(1)
@@ -278,6 +279,11 @@ struct Omnibox: View {
                 .foregroundStyle(Palette.muted)
         }
 
+        private var label: String {
+            if case .command(let command) = offer.kind { return command.title }
+            return offer.kind == .suggested || offer.kind == .searched ? offer.key : Address.withoutWWW(offer.key)
+        }
+
         /// The site's first letter, as History's lines wear it: an open
         /// tab's row leads with its title, so the address is asked instead.
         private var letter: String {
@@ -314,6 +320,7 @@ private struct SiteIcon: View {
 /// The site Tab put in the field: its icon and name, in the field's grey,
 /// before what is typed.
 private struct SiteChip: View {
+    @ObservedObject private var language = Language.shared
     let site: SearchSite
     var body: some View {
         HStack(spacing: 6) {
@@ -328,23 +335,24 @@ private struct SiteChip: View {
         .frame(height: 22)
         .background(Palette.wash, in: RoundedRectangle(cornerRadius: 7, style: .continuous))
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Searching \(site.name)")
+        .accessibilityLabel(Text(Language.shared.format("search.site.searching", fallback: "Searching %1$@", site.name)))
     }
 }
 
 /// "Search Reddit", first in the list, with the key that takes it.
 private struct SiteOfferRow: View {
+    @ObservedObject private var language = Language.shared
     let site: SearchSite
     @State private var hovering = false
     var body: some View {
         HStack(spacing: 10) {
             SiteIcon(site: site)
-            Text("Search \(site.name)")
+            Text(Language.shared.format("search.site.action", fallback: "Search %1$@", site.name))
                 .font(.system(size: 13))
                 .foregroundStyle(Palette.ink)
                 .lineLimit(1)
             Spacer(minLength: 0)
-            Text("Tab")
+            Text("ui.tab", bundle: Language.resources)
                 .font(.system(size: 11, weight: .medium))
                 .foregroundStyle(Palette.muted)
                 .padding(.horizontal, 6)
@@ -358,7 +366,7 @@ private struct SiteOfferRow: View {
         }
         .onHover { hovering = $0 }
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Search \(site.name), press Tab")
+        .accessibilityLabel(Text(Language.shared.format("search.site.accessibility", fallback: "Search %1$@, press Tab", site.name)))
     }
 }
 
@@ -451,6 +459,7 @@ private struct Breath: NSViewRepresentable {
 /// selected, so carrying on typing replaces it and Return accepts it. That
 /// needs a real text field and its delegate.
 struct AddressField: NSViewRepresentable {
+    @ObservedObject private var language = Language.shared
     @ObservedObject var browser: Browser
     @ObservedObject private var typing: FieldState
     /// The pane's page, for a field standing on one (see Coordinator.focus).
@@ -499,23 +508,25 @@ struct AddressField: NSViewRepresentable {
     /// words to search that site for; otherwise an address, and where it
     /// will open, since the field looks the same whichever key raised it.
     private static func placeholderWords(for browser: Browser) -> String {
-        if let site = browser.siteChip { return "Search \(site.name)" }
+        let language = Language.shared
+        if let site = browser.siteChip { return language.format("search.site.action", fallback: "Search %1$@", site.name) }
         switch browser.fieldMode {
-        case .blank: return "Enter a web address"
-        case .newTab: return "New tab: enter a web address"
-        case .thisTab: return "This tab: enter a web address"
-        case .switcher: return "Switch to an open tab"
+        case .blank: return language.text("address.enter", fallback: "Enter a web address")
+        case .newTab: return language.text("address.new_tab", fallback: "New tab: enter a web address")
+        case .thisTab: return language.text("address.this_tab", fallback: "This tab: enter a web address")
+        case .switcher: return language.text("address.switch", fallback: "Switch to an open tab")
         }
     }
 
     /// The field's name for VoiceOver, which reads it beside what is typed,
     /// after the placeholder has gone.
     private static func accessibilityName(for browser: Browser) -> String {
+        let language = Language.shared
         switch browser.fieldMode {
-        case .blank: return "Address"
-        case .newTab: return "Address, new tab"
-        case .thisTab: return "Address, this tab"
-        case .switcher: return "Switch to an open tab"
+        case .blank: return language.text("address.accessibility", fallback: "Address")
+        case .newTab: return language.text("address.accessibility_new_tab", fallback: "Address, new tab")
+        case .thisTab: return language.text("address.accessibility_this_tab", fallback: "Address, this tab")
+        case .switcher: return language.text("address.switch", fallback: "Switch to an open tab")
         }
     }
 
@@ -543,7 +554,7 @@ struct AddressField: NSViewRepresentable {
         // it back in. That is a field you cannot shorten, and it reads exactly
         // like one that has stopped responding.
         let want = browser.completed
-        if want != coordinator.synced {
+        if want != coordinator.synced, (field.currentEditor() as? NSTextView)?.hasMarkedText() != true {
             coordinator.synced = want
             field.stringValue = want
             coordinator.select(from: browser.typed.count, in: field)
@@ -646,7 +657,7 @@ struct AddressField: NSViewRepresentable {
         /// whatever was selected put back where they were.
         @MainActor func showPlaceholder(in field: Field) {
             guard let window = field.window, let editor = field.currentEditor() as? NSTextView,
-                  window.firstResponder === editor else { return }
+                  window.firstResponder === editor, editor.string.isEmpty, !editor.hasMarkedText() else { return }
             let selected = editor.selectedRange()
             window.makeFirstResponder(field)
             guard let again = field.currentEditor() as? NSTextView else { return }
@@ -661,6 +672,12 @@ struct AddressField: NSViewRepresentable {
             let text = field.stringValue
 
             browser.typed = text
+            if (field.currentEditor() as? NSTextView)?.hasMarkedText() == true {
+                browser.stopCompleting()
+                deleting = false
+                synced = browser.completed
+                return
+            }
             guard !deleting, let ending = browser.ending else {
                 if deleting { browser.stopCompleting() }
                 deleting = false
@@ -697,6 +714,8 @@ struct AddressField: NSViewRepresentable {
             textView: NSTextView,
             doCommandBy command: Selector
         ) -> Bool {
+            // Let the input method handle Return and navigation while it owns marked text.
+            guard !textView.hasMarkedText() else { return false }
             switch command {
             case #selector(NSResponder.insertNewline(_:)):
                 browser.submit()

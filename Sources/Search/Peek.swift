@@ -273,7 +273,7 @@ struct PeekPanel: View {
                     .overlay(Circle().strokeBorder(Palette.hairline, lineWidth: 1))
             }
             .buttonStyle(.plain)
-            .help(help)
+            .help(Text(LocalizedStringKey(help), bundle: Language.resources))
             .onHover { hovering = $0 }
         }
     }

@@ -729,6 +729,14 @@ final class Extensions: NSObject, ObservableObject {
 
     // MARK: - installing
 
+    private func announceInstallError(_ error: Error) {
+        if let refused = error as? Crx.Refused, case .download(let code) = refused {
+            browser?.announce(error.localizedDescription, localizedKey: "extension.store_answered", arguments: [code])
+        } else {
+            browser?.announce(error.localizedDescription)
+        }
+    }
+
     /// A store link or an id, from the field in Settings or the bar that
     /// shows on a store page.
     /// `confirm: false` is for the bench in a test run only — there is no
@@ -758,7 +766,7 @@ final class Extensions: NSObject, ObservableObject {
             try ExtensionShims.prepare(staged, fresh: true)
             try await admit(staged, as: id, fromStore: true, finalFolder: Extensions.folder(for: id), confirm: false)
         } catch {
-            browser?.announce(error.localizedDescription)
+            announceInstallError(error)
         }
     }
 
@@ -782,7 +790,7 @@ final class Extensions: NSObject, ObservableObject {
             try ExtensionShims.prepare(staged, fresh: true)
             try await admit(staged, as: id, fromStore: true, finalFolder: target, confirm: confirm || !Store.testing)
         } catch {
-            browser?.announce(error.localizedDescription)
+            announceInstallError(error)
         }
     }
 
@@ -792,8 +800,8 @@ final class Extensions: NSObject, ObservableObject {
         let panel = NSOpenPanel()
         panel.canChooseDirectories = true
         panel.canChooseFiles = false
-        panel.prompt = "Load Extension"
-        panel.message = "Choose the folder that holds the extension's manifest.json."
+        panel.prompt = Language.shared.text("panel.extension.prompt", fallback: "Load Extension")
+        panel.message = Language.shared.text("panel.extension.message", fallback: "Choose the folder that holds the extension's manifest.json.")
         guard panel.runModal() == .OK, let source = panel.url else { return }
         installFolder(at: source)
     }
@@ -820,7 +828,7 @@ final class Extensions: NSObject, ObservableObject {
                 try ExtensionShims.prepare(staged, fresh: true)
                 try await admit(staged, as: id, fromStore: false, finalFolder: Extensions.folder(for: id), confirm: confirm || !Store.testing, source: source)
             } catch {
-                browser?.announce("Couldn't install the extension: \(error.localizedDescription)")
+                browser?.announce("Couldn't install the extension: \(error.localizedDescription)", localizedKey: "announcement.extension_install_failed", arguments: [error.localizedDescription])
             }
         }
     }
@@ -842,11 +850,11 @@ final class Extensions: NSObject, ObservableObject {
             if let path = original.source, let staged {
                 let source = URL(fileURLWithPath: path, isDirectory: true)
                 guard FileManager.default.fileExists(atPath: source.appendingPathComponent("manifest.json").path) else {
-                    browser?.announce("The folder \(original.name) was loaded from is gone")
+                    browser?.announce("The folder \(original.name) was loaded from is gone", localizedKey: "announcement.extension_folder_gone", arguments: [original.name])
                     return
                 }
                 guard original.sourceKeepsID else {
-                    browser?.announce("\(original.name) wasn't reloaded — its folder now leads somewhere else")
+                    browser?.announce("\(original.name) wasn't reloaded — its folder now leads somewhere else", localizedKey: "announcement.extension_folder_changed", arguments: [original.name])
                     return
                 }
                 do {
@@ -854,14 +862,14 @@ final class Extensions: NSObject, ObservableObject {
                     try Extensions.unlinkOutside(staged)
                     try ExtensionShims.prepare(staged, fresh: true)
                 } catch {
-                    browser?.announce("Couldn't copy \(original.name) again: \(error.localizedDescription)")
+                    browser?.announce("Couldn't copy \(original.name) again: \(error.localizedDescription)", localizedKey: "announcement.extension_copy_failed", arguments: [original.name, error.localizedDescription])
                     return
                 }
             }
             let resource = staged ?? target
             let found = try? await WKWebExtension(resourceBaseURL: resource)
             if found == nil, staged != nil {
-                browser?.announce("\(original.name) wasn't reloaded — its manifest couldn't be read")
+                browser?.announce("\(original.name) wasn't reloaded — its manifest couldn't be read", localizedKey: "announcement.extension_manifest_failed", arguments: [original.name])
                 return
             }
             var wants: [String]?
@@ -871,7 +879,7 @@ final class Extensions: NSObject, ObservableObject {
                 if !Set(permissions).isSubset(of: Set(original.permissions)) {
                     let name = [found.displayName ?? original.name, found.version].compactMap { $0 }.joined(separator: " ")
                     guard await ask(install: name, wants: Extensions.describe(found, in: resource), icon: found.icon(for: CGSize(width: 64, height: 64))) else {
-                        browser?.announce("\(original.name) wasn't reloaded — it asks for more than before")
+                        browser?.announce("\(original.name) wasn't reloaded — it asks for more than before", localizedKey: "announcement.extension_permissions_changed", arguments: [original.name])
                         return
                     }
                 }
@@ -883,7 +891,7 @@ final class Extensions: NSObject, ObservableObject {
                 do {
                     try ExtensionFiles.replace(staged, at: target)
                 } catch {
-                    browser?.announce("Couldn't replace \(original.name): \(error.localizedDescription)")
+                    browser?.announce("Couldn't replace \(original.name): \(error.localizedDescription)", localizedKey: "announcement.extension_replace_failed", arguments: [original.name, error.localizedDescription])
                     return
                 }
             }
@@ -897,7 +905,9 @@ final class Extensions: NSObject, ObservableObject {
                 save()
             }
             guard let item = installed.first(where: { $0.id == id }), item.enabled else { return }
-            browser?.announce(await load(item) ? "\(item.name) reloaded" : "\(item.name) couldn't start — see Settings › Extensions")
+            let loaded = await load(item)
+            browser?.announce(loaded ? "\(item.name) reloaded" : "\(item.name) couldn't start — see Settings › Extensions",
+                              localizedKey: loaded ? "announcement.extension_reloaded" : "announcement.extension_reload_failed", arguments: [item.name])
         }
     }
 
@@ -1038,9 +1048,9 @@ final class Extensions: NSObject, ObservableObject {
         installed.append(item)
         save()
         if await load(item) {
-            browser?.announce("\(name) is installed")
+            browser?.announce("\(name) is installed", localizedKey: "announcement.extension_installed", arguments: [name])
         } else {
-            browser?.announce("\(name) is installed, but WebKit couldn't start it")
+            browser?.announce("\(name) is installed, but WebKit couldn't start it", localizedKey: "announcement.extension_start_failed", arguments: [name])
         }
     }
 
@@ -2336,6 +2346,7 @@ private struct ExtensionIcon: View {
 /// What a right-click on an extension offers, in the row and in the list.
 @available(macOS 15.4, *)
 private struct ExtensionActions: View {
+    @ObservedObject private var language = Language.shared
     let id: String
     let name: String
     var browser: Browser? = nil
@@ -2343,14 +2354,18 @@ private struct ExtensionActions: View {
 
     var body: some View {
         let pinned = extensions.installed.first { $0.id == id }?.pinned ?? false
-        SwiftUI.Button(pinned ? "Unpin" : "Pin to Toolbar") { extensions.setPinned(id, !pinned) }
-        if extensions.contexts[id]?.optionsPageURL != nil {
-            SwiftUI.Button("Options…") { extensions.openOptions(id) }
+        SwiftUI.Button { extensions.setPinned(id, !pinned) } label: {
+            Text(LocalizedStringKey(pinned ? "Unpin" : "Pin to Toolbar"), bundle: Language.resources)
         }
-        SwiftUI.Button("Reload") { extensions.reload(id) }
+        if extensions.contexts[id]?.optionsPageURL != nil {
+            SwiftUI.Button { extensions.openOptions(id) } label: { Text("Options…", bundle: Language.resources) }
+        }
+        SwiftUI.Button { extensions.reload(id) } label: { Text("Reload", bundle: Language.resources) }
         sites
         Divider()
-        SwiftUI.Button("Remove “\(name)”…") { ExtensionActions.confirmRemove(id, name: name, extensions) }
+        SwiftUI.Button { ExtensionActions.confirmRemove(id, name: name, extensions) } label: {
+            Text(Language.shared.format("extension.remove.menu", fallback: "Remove “%1$@”…", name))
+        }
     }
 
     /// Where it runs, from where you are: once here, always here, and the
@@ -2364,29 +2379,29 @@ private struct ExtensionActions: View {
             Divider()
             if let here, access.restricted {
                 if !extensions.runsHere(id, in: target) {
-                    SwiftUI.Button("Run on This Site") { extensions.runHere(id, in: target) }
+                    SwiftUI.Button { extensions.runHere(id, in: target) } label: { Text("Run on This Site", bundle: Language.resources) }
                 }
-                Toggle("Always on \(here)", isOn: Binding(
+                Toggle(isOn: Binding(
                     get: { access.covers(here) },
                     set: { extensions.setSiteAccess(id, $0 ? access.adding(here) : access.removing(here)) }
-                ))
+                )) { Text(Language.shared.format("extension.always_on", fallback: "Always on %1$@", here)) }
             }
-            Picker("Runs On", selection: Binding(
+            Picker(selection: Binding(
                 get: { access.mode },
                 set: { extensions.setSiteAccess(id, SiteAccess(mode: $0, hosts: access.hosts)) }
             )) {
-                ForEach(SiteAccess.Mode.allCases) { Text($0.title).tag($0) }
-            }
+                ForEach(SiteAccess.Mode.allCases) { Text(LocalizedStringKey($0.title), bundle: Language.resources).tag($0) }
+            } label: { Text("ui.runs_on_d1709d", bundle: Language.resources) }
             .pickerStyle(.menu)
         }
     }
 
     static func confirmRemove(_ id: String, name: String, _ extensions: Extensions) {
         let alert = NSAlert()
-        alert.messageText = "Remove “\(name)”?"
-        alert.informativeText = "Its settings and data go with it."
-        alert.addButton(withTitle: "Remove")
-        alert.addButton(withTitle: "Cancel")
+        alert.messageText = Language.shared.format("extension.remove.title", fallback: "Remove “%1$@”?", name)
+        alert.informativeText = Language.shared.text("extension.remove.detail", fallback: "Its settings and data go with it.")
+        alert.addButton(withTitle: Language.shared.text("Remove", fallback: "Remove"))
+        alert.addButton(withTitle: Language.shared.text("Cancel", fallback: "Cancel"))
         if alert.runModal() == .alertFirstButtonReturn { extensions.remove(id) }
     }
 }
@@ -2418,7 +2433,7 @@ private struct ExtensionMenu: View {
         VStack(alignment: .leading, spacing: 0) {
             let buttons = extensions.buttons
             if buttons.isEmpty {
-                Text("None of your extensions is on")
+                Text("ui.none_of_your_extensions_is_on", bundle: Language.resources)
                     .font(.system(size: 12.5))
                     .foregroundStyle(Palette.muted)
                     .padding(14)
@@ -2516,7 +2531,7 @@ private struct ExtensionMenu: View {
             }
             .buttonStyle(.plain)
             .onHover { hovering = $0 }
-            .help(help)
+            .help(Text(LocalizedStringKey(help), bundle: Language.resources))
         }
     }
 

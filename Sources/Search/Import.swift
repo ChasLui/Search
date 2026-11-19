@@ -219,6 +219,28 @@ enum Chromium {
             return "Search couldn't read \(source.name)'s data in \(looked): \(failure.localizedDescription)"
         }
 
+        @MainActor var localizedMessage: String {
+            let language = Language.shared
+            let looked = source.root.path.replacingOccurrences(of: NSHomeDirectory(), with: "~")
+            guard let error else {
+                return language.format("import.no_profile", fallback: "%1$@ is on this Mac, but no browser profile was found in %2$@.", source.name, looked)
+            }
+            let failure = error as NSError
+            if failure.domain == NSCocoaErrorDomain && failure.code == NSFileReadNoSuchFileError {
+                return language.format("import.no_folder", fallback: "%1$@ is on this Mac, but its data folder was not found at %2$@.", source.name, looked)
+            }
+            if partial {
+                let reason = Self.permissionDenied(failure)
+                    ? language.text("import.partial_denied", fallback: "macOS hasn't allowed Search to read all of them.")
+                    : failure.localizedDescription
+                return language.format("import.partial", fallback: "Some of %1$@'s profiles in %2$@ couldn't be read: %3$@ Choose its data folder in Settings › Bring Things Over to allow access for this session.", source.name, looked, reason)
+            }
+            if Self.permissionDenied(failure) {
+                return language.format("import.denied", fallback: "macOS hasn't allowed Search to read %1$@'s data in %2$@. Choose its data folder in Settings › Bring Things Over to allow access for this session.", source.name, looked)
+            }
+            return language.format("import.read_error", fallback: "Search couldn't read %1$@'s data in %2$@: %3$@", source.name, looked, failure.localizedDescription)
+        }
+
         private static func permissionDenied(_ error: NSError) -> Bool {
             if error.domain == NSCocoaErrorDomain && error.code == NSFileReadNoPermissionError { return true }
             if error.domain == NSPOSIXErrorDomain && [Int(EACCES), Int(EPERM)].contains(error.code) { return true }

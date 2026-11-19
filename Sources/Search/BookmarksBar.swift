@@ -50,12 +50,12 @@ struct BookmarksBar: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .contentShape(Rectangle())
         .contextMenu {
-            Button("New Folder…") { bookmarks.askNewFolder(in: nil) }
+            Button { bookmarks.askNewFolder(in: nil) } label: { Text("ui.new_folder", bundle: Language.resources) }
             Divider()
-            Button("Show Bookmarks…") { browser.bookmarking = true }
-            Button("Hide Bookmarks Bar") {
+            Button { browser.bookmarking = true } label: { Text("ui.show_bookmarks", bundle: Language.resources) }
+            Button {
                 withAnimation(Motion.glide) { browser.prefs.bookmarksBar = false }
-            }
+            } label: { Text("ui.hide_bookmarks_bar", bundle: Language.resources) }
         }
         .background {
             ZStack {
@@ -72,56 +72,56 @@ struct BookmarksBar: View {
 
     @ViewBuilder
     private func bookmarkMenu(_ node: Bookmark, _ url: URL) -> some View {
-        Button("Open in New Tab") { browser.pickBookmark(url, inNewTab: true) }
-        Button("Open in New Window") { browser.openInNewWindow([url]) }
+        Button { browser.pickBookmark(url, inNewTab: true) } label: { Text("ui.open_in_new_tab", bundle: Language.resources) }
+        Button { browser.openInNewWindow([url]) } label: { Text("ui.open_in_new_window", bundle: Language.resources) }
         if browser.prefs.splitView {
-            Button("Open in Split View") { browser.openInSplit(url) }
+            Button { browser.openInSplit(url) } label: { Text("ui.open_in_split_view", bundle: Language.resources) }
         }
-        Button("Open in Private Tab") { browser.openShy(url) }
+        Button { browser.openShy(url) } label: { Text("ui.open_in_private_tab", bundle: Language.resources) }
         Divider()
-        Button("Rename…") { bookmarks.askRename(node) }
-        Button("Edit Address…") { bookmarks.askAddress(node) }
-        Button("Copy Link") {
+        Button { bookmarks.askRename(node) } label: { Text("ui.rename", bundle: Language.resources) }
+        Button { bookmarks.askAddress(node) } label: { Text("ui.edit_address", bundle: Language.resources) }
+        Button {
             NSPasteboard.general.clearContents()
             NSPasteboard.general.setString(url.absoluteString, forType: .string)
-        }
+        } label: { Text("ui.copy_link", bundle: Language.resources) }
         Divider()
         moveMenu(node)
-        Button("Remove", role: .destructive) { bookmarks.askRemove(node) }
+        Button(role: .destructive) { bookmarks.askRemove(node) } label: { Text("Remove", bundle: Language.resources) }
     }
 
     @ViewBuilder
     private func folderMenu(_ node: Bookmark) -> some View {
         let urls = (node.children ?? []).compactMap { $0.url.flatMap(URL.init(string:)) }
-        Button("Open All in New Tabs") {
+        Button {
             for url in urls { browser.open(url, foreground: false, atEnd: true, from: browser.active, mayWait: true) }
-        }
+        } label: { Text("ui.open_all_in_new_tabs", bundle: Language.resources) }
         .disabled(urls.isEmpty)
-        Button("Open All in New Window") { browser.openInNewWindow(urls) }
+        Button { browser.openInNewWindow(urls) } label: { Text("ui.open_all_in_new_window", bundle: Language.resources) }
             .disabled(urls.isEmpty)
         if browser.prefs.usesTabGroups {
-            Button("Open All in Tab Group") { browser.openInTabGroup(urls, named: node.title) }
+            Button { browser.openInTabGroup(urls, named: node.title) } label: { Text("ui.open_all_in_tab_group", bundle: Language.resources) }
                 .disabled(urls.isEmpty)
         }
         Divider()
-        Button("Rename…") { bookmarks.askRename(node) }
-        Button("New Folder Inside…") { bookmarks.askNewFolder(in: node.id) }
+        Button { bookmarks.askRename(node) } label: { Text("ui.rename", bundle: Language.resources) }
+        Button { bookmarks.askNewFolder(in: node.id) } label: { Text("ui.new_folder_inside", bundle: Language.resources) }
         Divider()
         moveMenu(node)
-        Button("Remove", role: .destructive) { bookmarks.askRemove(node) }
+        Button(role: .destructive) { bookmarks.askRemove(node) } label: { Text("Remove", bundle: Language.resources) }
     }
 
     @ViewBuilder
     private func moveMenu(_ node: Bookmark) -> some View {
         let targets = Bookmarks.folders(bookmarks.roots).filter { !Bookmarks.holds($0.node.id, node) }
         if !targets.isEmpty {
-            Menu("Move to") {
+            Menu {
                 ForEach(targets, id: \.node.id) { target in
                     Button(String(repeating: "   ", count: target.depth) + target.node.title) {
                         bookmarks.move(node.id, into: target.node.id)
                     }
                 }
-            }
+            } label: { Text("ui.move_to", bundle: Language.resources) }
         }
     }
 

@@ -9,6 +9,7 @@ import SwiftUI
 /// your card in Contacts, and a click fills the form. It follows the box
 /// when the page scrolls, and goes when the caret does.
 struct AccountList: View {
+    @ObservedObject private var language = Language.shared
     @ObservedObject var browser: Browser
     let asked: Browser.Suggesting
     /// Where the card came out in its host, for a host that has to know
@@ -19,7 +20,8 @@ struct AccountList: View {
         VStack(alignment: .leading, spacing: 0) {
             ForEach(asked.passkeys) { passkey in
                 Row(mark: .symbol("person.badge.key"), name: passkey.name,
-                    detail: "Passkey" + (passkey.provider.map { " · \($0)" } ?? "")) { browser.choose(passkey) }
+                    detail: passkey.provider.map { Language.shared.format("account.passkey_provider", fallback: "Passkey · %1$@", $0) }
+                        ?? Language.shared.text("account.passkey", fallback: "Passkey")) { browser.choose(passkey) }
             }
             // The page's own host first, from both places; the rest of its
             // site under a line, so a login saved for example.com is still
@@ -27,7 +29,7 @@ struct AccountList: View {
             ForEach(ownLogins) { loginRow($0) }
             ForEach(ownApple) { appleRow($0) }
             if !(ownLogins.isEmpty && ownApple.isEmpty) && !(siteLogins.isEmpty && siteApple.isEmpty) {
-                Text("Other accounts on \(Vault.registrable(asked.host))")
+                Text(Language.shared.format("account.other_on", fallback: "Other accounts on %1$@", Vault.registrable(asked.host)))
                     .font(.system(size: 10.5))
                     .foregroundStyle(Palette.faint)
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -38,12 +40,12 @@ struct AccountList: View {
             ForEach(siteLogins) { loginRow($0) }
             ForEach(siteApple) { appleRow($0) }
             ForEach(asked.codes) { code in
-                Row(mark: .symbol("number"), name: code.user.isEmpty ? "Verification code" : code.user,
-                    detail: code.user.isEmpty ? "Apple Passwords" : "Verification code · Apple Passwords") { browser.choose(code) }
+                Row(mark: .symbol("number"), name: code.user.isEmpty ? Language.shared.text("account.code", fallback: "Verification code") : code.user,
+                    detail: code.user.isEmpty ? Language.shared.text("account.apple_passwords", fallback: "Apple Passwords") : Language.shared.text("account.code_apple", fallback: "Verification code · Apple Passwords")) { browser.choose(code) }
             }
             if asked.appleConnect {
-                Row(mark: .symbol("key.icloud"), name: "Connect Apple Passwords…",
-                    detail: "Pair once with a code from your Mac") { browser.connectApplePasswords() }
+                Row(mark: .symbol("key.icloud"), name: Language.shared.text("account.connect", fallback: "Connect Apple Passwords…"),
+                    detail: Language.shared.text("account.pair", fallback: "Pair once with a code from your Mac")) { browser.connectApplePasswords() }
             }
             if asked.appleOffer != nil {
                 OfferRow(use: browser.useApplePasswords, never: browser.neverOfferApplePasswords)
@@ -53,7 +55,7 @@ struct AccountList: View {
                 Row(mark: .symbol("person.crop.circle"), name: contact.title, detail: contact.detail) {
                     browser.choose(contact, alone: NSEvent.modifierFlags.contains(.shift))
                 }
-                .help("Fills the form. Shift-click fills only this box.")
+                .help(Text("ui.fills_the_form_shift_click_fills_only_this_box", bundle: Language.resources))
             }
             if !offerOnly {
             HStack(spacing: 6) {
@@ -95,14 +97,14 @@ struct AccountList: View {
 
     private func loginRow(_ login: Kept) -> some View {
         Row(mark: .letter(login.user.first.map { String($0).uppercased() } ?? "•"),
-            name: login.user.isEmpty ? "No name" : login.user, detail: login.host) { browser.choose(login) }
+            name: login.user.isEmpty ? Language.shared.text("account.no_name", fallback: "No name") : login.user, detail: login.host) { browser.choose(login) }
     }
 
     /// The Mac's Passwords app, when turned on (ApplePasswords.swift):
     /// marked as Apple's.
     private func appleRow(_ login: AppleLogin) -> some View {
         Row(mark: .letter(login.user.first.map { String($0).uppercased() } ?? "•"),
-            name: login.user.isEmpty ? "No name" : login.user, detail: "Apple Passwords") { browser.choose(login) }
+            name: login.user.isEmpty ? Language.shared.text("account.no_name", fallback: "No name") : login.user, detail: Language.shared.text("account.apple_passwords", fallback: "Apple Passwords")) { browser.choose(login) }
     }
 
     /// Nothing but the offer: no footer under it, the row says it all.
@@ -118,10 +120,10 @@ struct AccountList: View {
     }
 
     private var footer: String {
-        if contactsOnly { return "From your card in Contacts" }
-        if asked.logins.isEmpty && asked.apple.isEmpty && asked.codes.isEmpty && !asked.appleConnect { return "Passkeys on this Mac" }
-        if asked.logins.isEmpty { return "From Apple Passwords" }
-        return asked.apple.isEmpty ? "From your keychain" : "From your keychain and Apple Passwords"
+        if contactsOnly { return Language.shared.text("account.from_contacts", fallback: "From your card in Contacts") }
+        if asked.logins.isEmpty && asked.apple.isEmpty && asked.codes.isEmpty && !asked.appleConnect { return Language.shared.text("account.passkeys_mac", fallback: "Passkeys on this Mac") }
+        if asked.logins.isEmpty { return Language.shared.text("account.from_apple", fallback: "From Apple Passwords") }
+        return asked.apple.isEmpty ? Language.shared.text("From your keychain", fallback: "From your keychain") : Language.shared.text("account.from_both", fallback: "From your keychain and Apple Passwords")
     }
 
     private enum Mark { case letter(String), symbol(String) }
@@ -142,7 +144,7 @@ struct AccountList: View {
                         Image(systemName: "key")
                             .font(.system(size: 9, weight: .medium))
                             .frame(width: 22)
-                        Text("Use your Apple passwords?")
+                        Text("ui.use_your_apple_passwords", bundle: Language.resources)
                             .font(.system(size: 11.5))
                             .lineLimit(1)
                         Spacer(minLength: 0)
@@ -151,7 +153,7 @@ struct AccountList: View {
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .help("Turns on Apple Passwords and pairs with a code from your Mac. Settings › Passwords turns it off.")
+                .help(Text("ui.turns_on_apple_passwords_and_pairs_with_a_code_from_you", bundle: Language.resources))
                 Button(action: never) {
                     Image(systemName: "xmark")
                         .font(.system(size: 7.5, weight: .semibold))
@@ -162,8 +164,8 @@ struct AccountList: View {
                 }
                 .buttonStyle(.plain)
                 .onHover { onCross = $0 }
-                .help("Don't offer again")
-                .accessibilityLabel("Don't offer again")
+                .help(Text("ui.don_t_offer_again", bundle: Language.resources))
+                .accessibilityLabel(Text("ui.don_t_offer_again", bundle: Language.resources))
             }
             .padding(.leading, 10)
             .padding(.trailing, 8)

@@ -161,6 +161,13 @@ struct Command: Identifiable {
         self.run = run
     }
 
+    @MainActor var localizedTitle: String {
+        if id.hasPrefix("spaces."), let number = Int(id.dropFirst("spaces.".count)) {
+            return Language.shared.format("shortcut.space", fallback: "Space %1$ld", number)
+        }
+        return Language.shared.text(title, fallback: title)
+    }
+
     static func named(_ id: String) -> Command? { byID[id] }
     private static let byID = Dictionary(uniqueKeysWithValues: all.map { ($0.id, $0) })
 

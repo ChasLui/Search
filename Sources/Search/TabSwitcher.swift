@@ -399,6 +399,7 @@ final class TabSwitcher: ObservableObject {
 /// The switcher stays in the window it came up in, above its page and
 /// address field: a browser window, or a small window.
 struct TabSwitcherOverlay: View {
+    @ObservedObject private var language = Language.shared
     @ObservedObject var switcher: TabSwitcher
     @ObservedObject private var prefs = Shared.prefs
     /// A card's tab by its id: one of the row's, or a small window's.
@@ -594,12 +595,12 @@ struct TabSwitcherOverlay: View {
         Image(systemName: "speaker.slash.fill")
             .font(.system(size: 9.5))
             .foregroundStyle(Palette.muted)
-            .accessibilityLabel("Muted")
+            .accessibilityLabel(Text("ui.muted", bundle: Language.resources))
     }
 
     private func card(_ tab: Tab, width: CGFloat, previewHeight: CGFloat, height: CGFloat) -> some View {
         let partner: Tab? = switcher.partners[tab.id].flatMap(self.tab)
-        let caption: String = partner.map { tab.label + " · " + $0.label } ?? tab.label
+        let caption: String = partner.map { tab.displayLabel + " · " + $0.displayLabel } ?? tab.displayLabel
         let side: CGFloat = partner == nil ? width - 16 : (width - 18) / 2
         return Button { pick(tab.id) } label: {
             VStack(spacing: 7) {
@@ -633,8 +634,9 @@ struct TabSwitcherOverlay: View {
         .background(GeometryReader { box in
             Color.clear.preference(key: CardFrames.self, value: [tab.id: box.frame(in: .global)])
         })
-        .accessibilityLabel("Switch to \(tab.label)")
-        .accessibilityValue(tab.id == switcher.selectedID ? "Selected" : "")
+        .accessibilityLabel(String(format: language.text("tab.switch_to", fallback: "Switch to %@"),
+                                   locale: language.locale, tab.displayLabel))
+        .accessibilityValue(Text(LocalizedStringKey(tab.id == switcher.selectedID ? "Selected" : ""), bundle: Language.resources))
     }
 
     /// A small window's card: its page under a thin line, as the window
@@ -653,7 +655,7 @@ struct TabSwitcherOverlay: View {
                 .overlay(RoundedRectangle(cornerRadius: 4, style: .continuous).strokeBorder(Palette.hairline))
 
                 HStack(spacing: 4) {
-                    Text(tab.label)
+                    Text(tab.displayLabel)
                         .font(.system(size: 10.5))
                         .foregroundStyle(Palette.ink)
                         .lineLimit(1)
@@ -671,7 +673,8 @@ struct TabSwitcherOverlay: View {
         .background(GeometryReader { box in
             Color.clear.preference(key: CardFrames.self, value: [tab.id: box.frame(in: .global)])
         })
-        .accessibilityLabel("Switch to the small window \(tab.label)")
-        .accessibilityValue(selected ? "Selected" : "")
+        .accessibilityLabel(String(format: language.text("tab.switch_small", fallback: "Switch to the small window %@"),
+                                   locale: language.locale, tab.displayLabel))
+        .accessibilityValue(Text(LocalizedStringKey(selected ? "Selected" : ""), bundle: Language.resources))
     }
 }

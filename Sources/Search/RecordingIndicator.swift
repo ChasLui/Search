@@ -56,6 +56,8 @@ final class RecordingIndicator: ObservableObject {
     /// A line's Stop.
     func stop(_ id: String) { onStop?(id) }
 
+    func refit() { panel?.fit() }
+
     // MARK: - lending an offscreen page (phase 2)
 
     /// An offscreen document's page, lent to the pill so that WebKit counts
@@ -126,12 +128,12 @@ final class RecordingIndicator: ObservableObject {
 /// The panel: borderless, never key or main, over every space and full
 /// screen app, at the foot of the screen Search is on.
 private final class PillPanel: NSPanel {
-    private let content: NSHostingView<PillView>
+    private let content: NSHostingView<LanguageRoot<PillView>>
     /// Where lent pages go: behind the pill's own content, 2×2 points.
     private let lending = NSView(frame: NSRect(x: 2, y: 2, width: 2, height: 2))
 
     init(indicator: RecordingIndicator) {
-        content = NSHostingView(rootView: PillView(indicator: indicator))
+        content = NSHostingView(rootView: LanguageRoot(content: PillView(indicator: indicator)))
         super.init(contentRect: NSRect(x: 0, y: 0, width: 320, height: 40),
                    styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: true)
         isFloatingPanel = true
@@ -174,6 +176,7 @@ private final class PillPanel: NSPanel {
 
 /// What the pill draws: a line per extension recording, each with Stop.
 struct PillView: View {
+    @ObservedObject private var language = Language.shared
     @ObservedObject var indicator: RecordingIndicator
 
     var body: some View {
@@ -185,14 +188,14 @@ struct PillView: View {
                     Circle()
                         .fill(Color(nsColor: .systemRed))
                         .frame(width: 7, height: 7)
-                    (Text(line.name).font(.system(size: 12.5, weight: .semibold))
-                        + Text(" \(line.what)").font(.system(size: 12.5)))
+                    Text(recording(line))
+                        .font(.system(size: 12.5))
                         .foregroundStyle(Palette.ink)
                         .lineLimit(1)
                         .fixedSize()
                     Spacer(minLength: 12)
                     Button { indicator.stop(line.id) } label: {
-                        Text("Stop")
+                        Text("ui.stop", bundle: Language.resources)
                             .font(.system(size: 12, weight: .medium))
                             .foregroundStyle(Palette.ground)
                             .padding(.horizontal, 11)
@@ -200,7 +203,7 @@ struct PillView: View {
                             .background(Palette.ink, in: Capsule())
                     }
                     .buttonStyle(.plain)
-                    .accessibilityLabel("Stop \(line.name)")
+                    .accessibilityLabel(Text(language.format("recording.stop", fallback: "Stop %1$@", line.name)))
                 }
             }
         }
@@ -212,6 +215,21 @@ struct PillView: View {
         .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous).strokeBorder(Palette.hairline, lineWidth: 1))
         .fixedSize()
         .accessibilityElement(children: .contain)
-        .accessibilityLabel("Recording")
+        .accessibilityLabel(Text("ui.recording", bundle: Language.resources))
+        .onChange(of: language.effective) { _, _ in DispatchQueue.main.async { indicator.refit() } }
+    }
+
+    private func recording(_ line: RecordingLine) -> String {
+        let key: String
+        let fallback: String
+        switch line.what {
+        case "is sharing your screen": (key, fallback) = ("recording.sharing_screen", "%1$@ is sharing your screen")
+        case "is recording your screen": (key, fallback) = ("recording.recording_screen", "%1$@ is recording your screen")
+        case "is using your camera and microphone": (key, fallback) = ("recording.camera_microphone", "%1$@ is using your camera and microphone")
+        case "is using your camera": (key, fallback) = ("recording.camera", "%1$@ is using your camera")
+        case "is using your microphone": (key, fallback) = ("recording.microphone", "%1$@ is using your microphone")
+        default: return "\(line.name) \(line.what)"
+        }
+        return language.format(key, fallback: fallback, line.name)
     }
 }

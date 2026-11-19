@@ -16,6 +16,7 @@ import SwiftUI
 enum WhatsNew {
     /// A switch the card offers: the same setting as in Settings.
     struct Toggle {
+        let key: String
         let title: String
         let detail: String
         /// The version it came in.
@@ -35,88 +36,88 @@ enum WhatsNew {
     /// Every switch worth meeting, oldest last. The card shows this
     /// version's, and the older ones still off.
     static let toggles: [Toggle] = (AI.shipped ? [
-        Toggle(title: "AI on pages", detail: "Summarize a page or ask about it. Choose where it runs in Settings › AI.",
+        Toggle(key: "ai", title: "AI on pages", detail: "Summarize a page or ask about it. Choose where it runs in Settings › AI.",
                since: "1.0.5", get: { $0.ai }, set: { $0.ai = $1 }),
     ] : []) + [
-        Toggle(title: "Your own style for a site", detail: "Edit Site Style… in the View menu: your CSS for the site you're on, as Arc's Boosts.",
+        Toggle(key: "site_style", title: "Your own style for a site", detail: "Edit Site Style… in the View menu: your CSS for the site you're on, as Arc's Boosts.",
                since: "1.0.14", get: { $0.sitesStyles }, set: { $0.sitesStyles = $1 }),
-        Toggle(title: "Keep the card in full screen", detail: "The page keeps its room and rounded corners when the window fills the screen.",
+        Toggle(key: "fullscreen_card", title: "Keep the card in full screen", detail: "The page keeps its room and rounded corners when the window fills the screen.",
                since: "1.0.14", get: { $0.cardsInFullScreen }, set: { $0.cardsInFullScreen = $1 },
                shown: { $0.sidebar && $0.cards }),
-        Toggle(title: "⌘-click on a pin opens a new tab", detail: "As in Arc, or takes a page that wandered off into the loose tabs.",
+        Toggle(key: "command_click_pin", title: "⌘-click on a pin opens a new tab", detail: "As in Arc, or takes a page that wandered off into the loose tabs.",
                since: "1.0.14", get: { $0.pinCommandOpensTab }, set: { $0.pinCommandOpensTab = $1 }),
 
-        Toggle(title: "Commands in the address field", detail: "Type the name of any menu command or setting, as in Arc's Command Bar.",
+        Toggle(key: "address_commands", title: "Commands in the address field", detail: "Type the name of any menu command or setting, as in Arc's Command Bar.",
                since: "1.0.13", get: { $0.commandBar }, set: { $0.commandBar = $1 }),
-        Toggle(title: "Capture", detail: "View › Capture… takes a picture of part of a page, or all of it.",
+        Toggle(key: "capture", title: "Capture", detail: "View › Capture… takes a picture of part of a page, or all of it.",
                since: "1.0.13", get: { $0.capturesPages }, set: { $0.capturesPages = $1 }),
-        Toggle(title: "Folders in pinned rows", detail: "Pinned rows in folders that fold, as in Arc.",
+        Toggle(key: "pin_folders", title: "Folders in pinned rows", detail: "Pinned rows in folders that fold, as in Arc.",
                since: "1.0.13", get: { $0.pinFolders }, set: { $0.pinFolders = $1 },
                shown: { $0.listsPins }),
 
-        Toggle(title: "Send links to a space", detail: "Links to the sites you choose open in their space, with its sign-ins, as in Arc.",
+        Toggle(key: "space_routes", title: "Send links to a space", detail: "Links to the sites you choose open in their space, with its sign-ins, as in Arc.",
                since: "1.0.11", get: { $0.sendsLinksToSpaces }, set: { $0.sendsLinksToSpaces = $1 },
                shown: { $0.usesSpaces }),
 
-        Toggle(title: "Profiles in one window", detail: "A space of another profile opens in the same window, with that profile's sign-ins, as in Arc.",
+        Toggle(key: "profiles_one_window", title: "Profiles in one window", detail: "A space of another profile opens in the same window, with that profile's sign-ins, as in Arc.",
                since: "1.0.9", get: { $0.profilesInOneWindow }, set: { $0.profilesInOneWindow = $1 }),
 
-        Toggle(title: "Close goes back", detail: "Closing the tab you're on takes you to the one you were on before it, as ⌃Tab would.",
+        Toggle(key: "close_goes_back", title: "Close goes back", detail: "Closing the tab you're on takes you to the one you were on before it, as ⌃Tab would.",
                since: "1.0.8", get: { $0.closeGoesBack }, set: { $0.closeGoesBack = $1 }),
 
-        Toggle(title: "Your Apple passwords", detail: "Accounts from Apple's Passwords app under the sign-in field, with a code from your Mac.",
+        Toggle(key: "apple_passwords", title: "Your Apple passwords", detail: "Accounts from Apple's Passwords app under the sign-in field, with a code from your Mac.",
                since: "1.0.7", get: { $0.applePasswords }, set: { $0.applePasswords = $1 }),
-        Toggle(title: "Ask before quitting", detail: "⌘Q asks first, so a slip doesn't close every window.",
+        Toggle(key: "confirm_quit", title: "Ask before quitting", detail: "⌘Q asks first, so a slip doesn't close every window.",
                since: "1.0.7", get: { $0.confirmsQuit }, set: { $0.confirmsQuit = $1 }),
-        Toggle(title: "Tab numbers while ⌘ is held", detail: "See which tab ⌘1–⌘9 goes to.",
+        Toggle(key: "tab_numbers", title: "Tab numbers while ⌘ is held", detail: "See which tab ⌘1–⌘9 goes to.",
                since: "1.0.7", get: { $0.showsTabShortcuts }, set: { $0.showsTabShortcuts = $1 }),
-        Toggle(title: "A column of icons only", detail: "The tabs as icons down the side, nothing that grows under the pointer.",
+        Toggle(key: "icon_sidebar", title: "A column of icons only", detail: "The tabs as icons down the side, nothing that grows under the pointer.",
                since: "1.0.7", get: { $0.sideIcons }, set: { $0.sideIcons = $1 }),
-        Toggle(title: "Escape twice to leave full screen", detail: "One Escape stays with the page, a second leaves full screen.",
+        Toggle(key: "escape_fullscreen", title: "Escape twice to leave full screen", detail: "One Escape stays with the page, a second leaves full screen.",
                since: "1.0.7", get: { $0.escapeTwice }, set: { $0.escapeTwice = $1 }),
 
-        Toggle(title: "Suggestions from your search engine", detail: "Searches suggested as you type. What you type is sent to your engine; never from a private tab.",
+        Toggle(key: "engine_suggestions", title: "Suggestions from your search engine", detail: "Searches suggested as you type. What you type is sent to your engine; never from a private tab.",
                since: "1.0.6", get: { $0.engineSuggests }, set: { $0.engineSuggests = $1 }),
-        Toggle(title: "Pins keep their site", detail: "Links elsewhere open in a peek, and ⌘W takes a pin back to its page, as in Arc.",
+        Toggle(key: "pin_site", title: "Pins keep their site", detail: "Links elsewhere open in a peek, and ⌘W takes a pin back to its page, as in Arc.",
                since: "1.0.6", get: { $0.pinsKeepSite }, set: { $0.pinsKeepSite = $1 }),
-        Toggle(title: "Darken light pages", detail: "While Search is dark, pages with no dark look of their own are darkened.",
+        Toggle(key: "darken", title: "Darken light pages", detail: "While Search is dark, pages with no dark look of their own are darkened.",
                since: "1.0.6", get: { $0.darkensPages }, set: { $0.darkensPages = $1 }),
-        Toggle(title: "Roomier tabs", detail: "Taller rows and larger titles in the sidebar.",
+        Toggle(key: "roomier_tabs", title: "Roomier tabs", detail: "Taller rows and larger titles in the sidebar.",
                since: "1.0.6", get: { $0.roomyTabs }, set: { $0.roomyTabs = $1 }),
-        Toggle(title: "New tab in a floating field", detail: "⌘T raises the address field over the page you are on, as in Arc.",
+        Toggle(key: "floating_field", title: "New tab in a floating field", detail: "⌘T raises the address field over the page you are on, as in Arc.",
                since: "1.0.6", get: { $0.floatingNewTab }, set: { $0.floatingNewTab = $1 }),
 
-        Toggle(title: "Pinned rows", detail: "Pins as rows with their names, under the squares, as in Arc. Right-click a tab to pin it as a row.",
+        Toggle(key: "pinned_rows", title: "Pinned rows", detail: "Pins as rows with their names, under the squares, as in Arc. Right-click a tab to pin it as a row.",
                since: "1.0.5", get: { $0.listsPins }, set: { $0.listsPins = $1 }),
-        Toggle(title: "Start with a fresh window", detail: "Your pinned tabs, tab groups and named tabs, and none of last time's others.",
+        Toggle(key: "fresh_window", title: "Start with a fresh window", detail: "Your pinned tabs, tab groups and named tabs, and none of last time's others.",
                since: "1.0.5", get: { $0.startsFresh }, set: { $0.startsFresh = $1 }),
 
-        Toggle(title: "Sidebar on the right", detail: "The tabs down the right edge of the window.",
+        Toggle(key: "right_sidebar", title: "Sidebar on the right", detail: "The tabs down the right edge of the window.",
                since: "1.0.4", get: { $0.sidebar && $0.sidePosition == .right },
                set: { prefs, on in
                    if on { prefs.sidebar = true }
                    prefs.sidePosition = on ? .right : .left
                }),
-        Toggle(title: "Videos wait for a click", detail: "Videos don't start by themselves, even without sound.",
+        Toggle(key: "video_click", title: "Videos wait for a click", detail: "Videos don't start by themselves, even without sound.",
                since: "1.0.4", get: { $0.waitsForPlay }, set: { $0.waitsForPlay = $1 }),
-        Toggle(title: "Always show the downloads button", detail: "Your downloads one click away, beside the other buttons.",
+        Toggle(key: "downloads_button", title: "Always show the downloads button", detail: "Your downloads one click away, beside the other buttons.",
                since: "1.0.4", get: { $0.alwaysShowsDownloads }, set: { $0.alwaysShowsDownloads = $1 }),
 
-        Toggle(title: "Spaces", detail: "Separate sets of tabs, each with its own sign-ins. ⌃1–⌃9 to switch.",
+        Toggle(key: "spaces", title: "Spaces", detail: "Separate sets of tabs, each with its own sign-ins. ⌃1–⌃9 to switch.",
                since: "1.0.1", get: { $0.usesSpaces }, set: { $0.usesSpaces = $1 }),
-        Toggle(title: "A sidebar that hides", detail: "The page takes the whole window; the tabs come out at the edge.",
+        Toggle(key: "hidden_sidebar", title: "A sidebar that hides", detail: "The page takes the whole window; the tabs come out at the edge.",
                since: "1.0.1", get: { $0.sidebar && $0.sideHides },
                set: { prefs, on in
                    if on { prefs.sidebar = true }
                    prefs.sideHides = on
                }),
-        Toggle(title: "Bookmarks bar", detail: "Your bookmarks in a row above the page.",
+        Toggle(key: "bookmarks_bar", title: "Bookmarks bar", detail: "Your bookmarks in a row above the page.",
                since: "1.0.2", get: { $0.bookmarksBar }, set: { $0.bookmarksBar = $1 }),
-        Toggle(title: "Float the video when you switch apps", detail: "A playing video follows you out into a small window.",
+        Toggle(key: "float_video", title: "Float the video when you switch apps", detail: "A playing video follows you out into a small window.",
                since: "1.0.2", get: { $0.floatsAway }, set: { prefs, on in if on { prefs.floatOwn = .tabsOrApps } else { prefs.floatsAway = false } }),
-        Toggle(title: "Pages at 120 Hz", detail: "Smoother scrolling and animations on screens that can. Uses more battery.",
+        Toggle(key: "pages_120hz", title: "Pages at 120 Hz", detail: "Smoother scrolling and animations on screens that can. Uses more battery.",
                since: "1.0.2", get: { $0.fastPages != .never }, set: { $0.fastPages = $1 ? .onPower : .never }),
-        Toggle(title: "Scroll with the middle button", detail: "Click the wheel, then move the mouse to scroll, as on Windows.",
+        Toggle(key: "middle_scroll", title: "Scroll with the middle button", detail: "Click the wheel, then move the mouse to scroll, as on Windows.",
                since: "1.0.3", get: { $0.autoScroll }, set: { $0.autoScroll = $1 }),
     ]
 
@@ -566,7 +567,7 @@ struct WhatsNewCard: View {
                 VStack(alignment: .leading, spacing: 14) {
                     rows(fresh)
                     if let earlier, !earlier.isEmpty {
-                        Caption("From earlier versions, in case you missed them")
+                        Caption("ui.from_earlier_versions_in_case_you_missed_them", localized: true)
                             .padding(.top, 6)
                         rows(earlier)
                     }
@@ -577,13 +578,13 @@ struct WhatsNewCard: View {
         } foot: {
             HStack {
                 Button(action: notes) {
-                    Text("Everything that's new…")
+                    Text("ui.everything_that_s_new", bundle: Language.resources)
                         .font(.system(size: 12))
                         .foregroundStyle(Palette.muted)
                 }
                 .buttonStyle(.plain)
                 Spacer()
-                Pill("Close", filled: true, action: close)
+                Pill("ui.close", filled: true, action: close)
             }
         }
         .onAppear {
@@ -599,10 +600,10 @@ struct WhatsNewCard: View {
                 if index > 0 { Rule() }
                 HStack(alignment: .center, spacing: 16) {
                     VStack(alignment: .leading, spacing: 3) {
-                        Text(toggle.title)
+                        Text(LocalizedStringKey("whatsnew.toggle.\(toggle.key).title"), bundle: Language.resources)
                             .font(.system(size: 13))
                             .foregroundStyle(Palette.ink)
-                        Text(toggle.detail)
+                        Text(LocalizedStringKey("whatsnew.toggle.\(toggle.key).detail"), bundle: Language.resources)
                             .font(.system(size: 11.5))
                             .foregroundStyle(Palette.muted)
                             .fixedSize(horizontal: false, vertical: true)
@@ -619,10 +620,18 @@ struct WhatsNewCard: View {
 
 /// Every version's notes, newest first: Settings › About › What's New…
 struct ReleaseNotesPanel: View {
+    @ObservedObject private var language = Language.shared
     let close: () -> Void
 
+    private static let sourceDate: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "d MMMM yyyy"
+        return formatter
+    }()
+
     var body: some View {
-        Plate("What's New", width: 560, close: close) {
+        Plate("page.release-notes", localizedTitle: true, width: 560, close: close) {
             ScrollView {
                 VStack(alignment: .leading, spacing: 26) {
                     ForEach(WhatsNew.notes, id: \.version) { note in
@@ -643,32 +652,32 @@ struct ReleaseNotesPanel: View {
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundStyle(Palette.ink)
                 if !note.date.isEmpty {
-                    Text(note.date)
+                    Text(Self.sourceDate.date(from: note.date).map { $0.formatted(.dateTime.day().month(.wide).year().locale(language.locale)) } ?? note.date)
                         .font(.system(size: 12))
                         .foregroundStyle(Palette.faint)
                 }
             }
-            Text(note.headline)
+            Text(LocalizedStringKey("whatsnew.notes.\(note.version).headline"), bundle: Language.resources)
                 .font(.system(size: 13))
                 .foregroundStyle(Palette.ink)
                 .fixedSize(horizontal: false, vertical: true)
-            list("New", note.new)
-            list("Better", note.better)
-            list("Fixed", note.fixed)
+            list(note.new, version: note.version, section: "new")
+            list(note.better, version: note.version, section: "better")
+            list(note.fixed, version: note.version, section: "fixed")
         }
     }
 
     @ViewBuilder
-    private func list(_ title: String, _ lines: [String]) -> some View {
+    private func list(_ lines: [String], version: String, section: String) -> some View {
         if !lines.isEmpty {
             VStack(alignment: .leading, spacing: 5) {
-                Text(title)
+                Text(LocalizedStringKey("whatsnew.section.\(section)"), bundle: Language.resources)
                     .font(.system(size: 11.5, weight: .medium))
                     .foregroundStyle(Palette.muted)
-                ForEach(lines, id: \.self) { line in
+                ForEach(Array(lines.enumerated()), id: \.offset) { index, _ in
                     HStack(alignment: .firstTextBaseline, spacing: 8) {
                         Text("•").foregroundStyle(Palette.faint)
-                        Text(line)
+                        Text(LocalizedStringKey("whatsnew.notes.\(version).\(section).\(index)"), bundle: Language.resources)
                             .foregroundStyle(Palette.ink)
                             .fixedSize(horizontal: false, vertical: true)
                     }
