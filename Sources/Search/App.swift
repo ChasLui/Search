@@ -251,6 +251,14 @@ struct SearchApp: App {
                     .shortcut("view.console")
                 Button(language.text("ui.inspect_element", fallback: "Inspect Element")) { browser.inspectElement() }
                     .shortcut("view.inspect")
+                // The system's own item, which replacing the toolbar group
+                // above took with it: ⌃⌘F did nothing (#1176). The key is
+                // the Mac's, never offered in Settings › Shortcuts.
+                Divider()
+                Button(browser.fullScreen ? "Exit Full Screen" : "Enter Full Screen") {
+                    (NSApp.keyWindow ?? browser.window)?.toggleFullScreen(nil)
+                }
+                .keyboardShortcut("f", modifiers: [.control, .command])
             }
             CommandMenu(language.text("menu.tabs", fallback: "Tabs")) {
                 Button(language.text("ui.back", fallback: "Back")) { browser.back() }
