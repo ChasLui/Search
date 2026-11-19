@@ -386,7 +386,7 @@ struct NewSpaceCard: View {
         .buttonStyle(.plain)
         .onHover { hovering = $0 }
         .help(Text(LocalizedStringKey(inline ? "New space — choose its icon" : "Choose an icon"), bundle: Language.resources))
-        .popover(isPresented: $choosing, arrowEdge: .bottom) { icons }
+        .popover(isPresented: $choosing, hangingFrom: .bottom) { icons }
     }
 
     private var field: some View {

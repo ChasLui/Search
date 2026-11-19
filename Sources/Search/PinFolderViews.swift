@@ -64,7 +64,7 @@ struct PinFolderHeading: View {
         .frame(height: GroupHeading.compactHeight)
         .help(folder.collapsed ? Language.shared.format("group.folded", fallback: "%1$@ — folded", folder.name) : (tip.isEmpty ? folder.name : "\(folder.name) — \(tip)"))
         .popover(isPresented: Binding(get: { editing }, set: { if !$0 { browser.editingPinFolder = nil } }),
-                 arrowEdge: browser.prefs.sidePosition == .right ? .leading : .trailing) {
+                 hangingFrom: browser.prefs.sidePosition == .right ? .leading : .trailing) {
             field
                 .frame(width: 160)
                 .padding(10)
