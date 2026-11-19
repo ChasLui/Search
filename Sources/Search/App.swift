@@ -131,8 +131,8 @@ struct SearchApp: App {
                         ))
                     }
                 }
-                // Moved here from Settings, as Safari has it. WebKit reads it
-                // once, so it counts from the next page on.
+                // Moved here from Settings, as Safari has it: every page,
+                // open or to come (Preferences.switchWebKit).
                 Menu(language.text("ui.spelling_and_grammar", fallback: "Spelling and Grammar")) {
                     Toggle(isOn: Binding(
                         get: { browser.prefs.autocorrect },
