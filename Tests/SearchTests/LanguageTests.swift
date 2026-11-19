@@ -211,12 +211,15 @@ final class LanguageTests: XCTestCase {
         _ = NSApplication.shared
         let language = Language.shared
         let before = language.selection
+        let previousSession = Session.read()
+        Session.write(now: true, Session.Shape(tabs: [], active: 0))
         defer { language.select(before) }
         var browsers: [Browser] = []
         var windows: [NSWindow] = []
         defer {
             for window in windows { window.contentView = nil; window.close() }
             for browser in browsers { browser.closeAll() }
+            Session.write(now: true, previousSession)
         }
         for count in [20, 200] {
             let browser = Browser(record: WindowRecord())
