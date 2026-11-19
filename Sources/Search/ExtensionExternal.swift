@@ -16,7 +16,8 @@ import Foundation
 // this is Chrome. Only a page some loaded extension lists, by the same rules
 // as Chrome's match patterns, gets `chrome.runtime` — the same two calls,
 // with Chrome's callbacks as well as promises — and only if it has no
-// `chrome` of its own. The list is read again for every page that loads.
+// `chrome` of its own. Each page checks its own URL against the list.
+// Search rebuilds that list when its loaded extension contexts change.
 //
 // A message for an extension that isn't there, or doesn't list the page,
 // fails as in Chrome ("Receiving end does not exist") instead of going to
@@ -25,6 +26,17 @@ import Foundation
 // done: given nothing, it never asked the real one and spun for good.
 
 enum ExtensionExternal {
+    private enum ScriptCache {
+        case stale
+        case ready(String?)
+    }
+
+    @MainActor private static var cachedScript: ScriptCache = .stale
+
+    @MainActor static func contextsChanged() {
+        cachedScript = .stale
+    }
+
     /// The `externally_connectable` patterns of every extension loaded now,
     /// those Chrome would take and no others, by the extension's id.
     @MainActor static var listings: [String: [String]] {
@@ -67,12 +79,16 @@ enum ExtensionExternal {
     /// For the page about to load, in its own world before any of its
     /// scripts; nil with nothing listed anywhere.
     @MainActor static var script: String? {
+        if case let .ready(script) = cachedScript { return script }
         let found = listings
         guard !found.isEmpty,
               let data = try? JSONSerialization.data(withJSONObject: found, options: .sortedKeys),
               let list = String(data: data, encoding: .utf8)
-        else { return nil }
-        return """
+        else {
+            cachedScript = .ready(nil)
+            return nil
+        }
+        let script = """
         (function (listings) {
           var made = window.browser, runtime = made && made.runtime;
           if (typeof window.chrome !== 'undefined' || !runtime || typeof runtime.sendMessage !== 'function') return;
@@ -124,5 +140,7 @@ enum ExtensionExternal {
           } catch (e) {}
         })(\(list));
         """
+        cachedScript = .ready(script)
+        return script
     }
 }

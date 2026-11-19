@@ -46,7 +46,7 @@ enum Crx {
     /// manifest's "key" is ignored, as nothing checks it and store keys are
     /// public, so a folder could otherwise take any extension's id.
     static func unpackedID(for folder: URL) -> String {
-        letters(Array(SHA256.hash(data: Data(realPath(of: folder).utf8)).prefix(16)))
+        letters(SHA256.hash(data: Data(realPath(of: folder).utf8)).prefix(16))
     }
 
     /// Where a folder really is, every link on the way resolved.
@@ -98,57 +98,60 @@ enum Crx {
         return parts.url!
     }
 
-    static func fetch(_ id: String) async throws -> Data {
+    static func fetch(_ id: String, using session: URLSession = ProxyNetwork.session) async throws -> Data {
         var request = URLRequest(url: downloadURL(for: id))
         request.timeoutInterval = 60
         // Not URLSession.shared, which takes no configuration and so could
         // never be proxied: the Web Store would name every extension you add.
-        let (data, response) = try await ProxyNetwork.session.data(for: request)
+        let (file, response) = try await session.download(for: request)
+        defer { try? FileManager.default.removeItem(at: file) }
         if let http = response as? HTTPURLResponse, !(200..<300).contains(http.statusCode) {
             throw Refused.download(http.statusCode)
         }
+        // A mapping keeps the downloaded bytes available after unlinking the temporary file.
+        let data = try Data(contentsOf: file, options: .mappedIfSafe)
         guard !data.isEmpty else { throw Refused.empty }
         return data
     }
 
-    /// The zip inside a CRX3, once its signature has been checked against
-    /// `id`.
+    /// A slice of the CRX3 containing the zip authenticated for `id`.
     static func verifiedZip(_ crx: Data, id: String) throws -> Data {
-        let bytes = [UInt8](crx)
-        guard bytes.count > 12, Array(bytes[0..<4]) == Array("Cr24".utf8) else { throw Refused.notCrx }
-        let version = le32(bytes, 4)
+        guard crx.count > 12, crx.starts(with: "Cr24".utf8) else { throw Refused.notCrx }
+        let version = le32(crx, 4)
         guard version == 3 else { throw Refused.notCrx }
-        let headerSize = Int(le32(bytes, 8))
-        guard 12 + headerSize <= bytes.count else { throw Refused.notCrx }
-        let header = Array(bytes[12..<(12 + headerSize)])
-        let zip = Data(bytes[(12 + headerSize)...])
+        let headerSize = Int(le32(crx, 8))
+        guard headerSize <= crx.count - 12 else { throw Refused.notCrx }
+        let header = crx.dropFirst(12).prefix(headerSize)
+        let zip = crx[header.endIndex...]
 
         // CrxFileHeader: 2 = sha256_with_rsa proofs, 3 = sha256_with_ecdsa
         // proofs, 10000 = signed_header_data (SignedData: 1 = crx_id).
-        let fields = protobuf(header)
+        let fields = try protobuf(header)
         guard let signedHeader = fields.first(where: { $0.0 == 10000 })?.1 else { throw Refused.unsignedOrWrong }
-        guard let crxID = protobuf(signedHeader).first(where: { $0.0 == 1 })?.1,
-              letters(crxID) == id
+        guard let crxID = try protobuf(signedHeader).first(where: { $0.0 == 1 })?.1,
+              crxID.count == 16, letters(crxID) == id
         else { throw Refused.unsignedOrWrong }
+        let proofs = try fields.filter { $0.0 == 2 }.map { try protobuf($0.1) }
+        guard !proofs.isEmpty else { throw Refused.unsignedOrWrong }
 
-        // What is signed: a fixed prefix, the signed header, and the zip.
-        var message = Data("CRX3 SignedData".utf8)
-        message.append(0)
-        var length = UInt32(signedHeader.count).littleEndian
-        message.append(Data(bytes: &length, count: 4))
-        message.append(Data(signedHeader))
-        message.append(zip)
+        // Hash the signed parts in order so the archive never needs a second buffer.
+        var hash = SHA256()
+        hash.update(data: Data("CRX3 SignedData\0".utf8))
+        let length = UInt32(signedHeader.count).littleEndian
+        withUnsafeBytes(of: length) { hash.update(bufferPointer: $0) }
+        hash.update(data: signedHeader)
+        hash.update(data: zip)
+        let digest = Data(hash.finalize())
 
         // One RSA proof, whose key is the one the id is made from, and whose
         // signature holds over the message. The store adds a proof of its
         // own; that one is fine to hold too but is not the one that counts.
-        let proofs = fields.filter { $0.0 == 2 }.map { protobuf($0.1) }
         let owns = proofs.contains { proof in
             guard let key = proof.first(where: { $0.0 == 1 })?.1,
                   let signature = proof.first(where: { $0.0 == 2 })?.1,
-                  letters(Array(SHA256.hash(data: Data(key)).prefix(16))) == id
+                  letters(SHA256.hash(data: key).prefix(16)) == id
             else { return false }
-            return verify(rsaSPKI: Data(key), signature: Data(signature), message: message)
+            return verify(rsaSPKI: key, signature: signature, digest: digest)
         }
         guard owns else { throw Refused.unsignedOrWrong }
         return zip
@@ -187,50 +190,66 @@ enum Crx {
 
     // MARK: - pieces
 
-    private static func le32(_ b: [UInt8], _ at: Int) -> UInt32 {
-        UInt32(b[at]) | UInt32(b[at + 1]) << 8 | UInt32(b[at + 2]) << 16 | UInt32(b[at + 3]) << 24
+    private static func le32(_ data: Data, _ offset: Int) -> UInt32 {
+        data.withUnsafeBytes { UInt32(littleEndian: $0.loadUnaligned(fromByteOffset: offset, as: UInt32.self)) }
     }
 
     /// The id's letters: each half-byte is a letter from a (0) to p (15).
-    static func letters(_ bytes: [UInt8]) -> String {
+    static func letters(_ bytes: some Sequence<UInt8>) -> String {
         String(bytes.flatMap { [$0 >> 4, $0 & 0x0f] }.map { Character(UnicodeScalar(UInt8(97) + $0)) })
     }
 
-    /// Length-delimited fields only, which is all a CRX header holds.
-    private static func protobuf(_ b: [UInt8]) -> [(Int, [UInt8])] {
-        var out: [(Int, [UInt8])] = []
-        var i = 0
-        func varint() -> Int? {
-            var value = 0, shift = 0
-            while i < b.count {
-                let byte = Int(b[i]); i += 1
-                value |= (byte & 0x7f) << shift
-                if byte & 0x80 == 0 { return value }
-                shift += 7
-                if shift > 56 { return nil }
+    /// Return the top-level length-delimited fields only after reading the whole message.
+    private static func protobuf(_ b: Data) throws -> [(Int, Data)] {
+        var out: [(Int, Data)] = []
+        var i = b.startIndex
+        func varint() throws -> UInt64 {
+            var value: UInt64 = 0
+            for shift in stride(from: 0, through: 63, by: 7) {
+                guard i < b.endIndex else { break }
+                let byte = b[i]
+                i += 1
+                guard shift < 63 || byte <= 1 else { break }
+                value |= UInt64(byte & 0x7f) << shift
+                if byte < 0x80 { return value }
             }
-            return nil
+            throw Refused.notCrx
         }
-        while i < b.count {
-            guard let key = varint() else { break }
-            let field = key >> 3, wire = key & 7
+        var groups: [Int] = []
+        while i < b.endIndex {
+            let key = try varint()
+            guard key >= 8, key <= UInt32.max else { throw Refused.notCrx }
+            let field = Int(key >> 3), wire = key & 7
             switch wire {
+            case 0:
+                _ = try varint()
+            case 1, 5:
+                let width = wire == 1 ? 8 : 4
+                guard width <= b.endIndex - i else { throw Refused.notCrx }
+                i += width
             case 2:
-                guard let length = varint(), i + length <= b.count else { return out }
-                out.append((field, Array(b[i..<(i + length)])))
-                i += length
-            case 0: _ = varint()
-            case 1: i += 8
-            case 5: i += 4
-            default: return out
+                let length = try varint()
+                guard length <= UInt64(b.endIndex - i) else { throw Refused.notCrx }
+                let end = i + Int(length)
+                if groups.isEmpty { out.append((field, b[i..<end])) }
+                i = end
+            case 3:
+                // Match the usual protobuf nesting limit when skipping unknown groups.
+                guard groups.count < 100 else { throw Refused.notCrx }
+                groups.append(field)
+            case 4:
+                guard groups.popLast() == field else { throw Refused.notCrx }
+            default:
+                throw Refused.notCrx
             }
         }
+        guard groups.isEmpty else { throw Refused.notCrx }
         return out
     }
 
     /// An RSA public key as Chrome writes it (SubjectPublicKeyInfo DER),
     /// checked against a PKCS#1 v1.5 SHA-256 signature.
-    private static func verify(rsaSPKI: Data, signature: Data, message: Data) -> Bool {
+    private static func verify(rsaSPKI: Data, signature: Data, digest: Data) -> Bool {
         var format = SecExternalFormat.formatOpenSSL
         var type = SecExternalItemType.itemTypePublicKey
         var items: CFArray?
@@ -238,8 +257,8 @@ enum Crx {
               let key = (items as? [Any])?.first
         else { return false }
         return SecKeyVerifySignature(
-            key as! SecKey, .rsaSignatureMessagePKCS1v15SHA256,
-            message as CFData, signature as CFData, nil
+            key as! SecKey, .rsaSignatureDigestPKCS1v15SHA256,
+            digest as CFData, signature as CFData, nil
         )
     }
 }

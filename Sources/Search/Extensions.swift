@@ -62,7 +62,9 @@ final class Extensions: NSObject, ObservableObject {
     let controller: WKWebExtensionController
     @Published private(set) var installed: [Installed] = []
     /// The loaded ones, by id.
-    @Published private(set) var contexts: [String: WKWebExtensionContext] = [:]
+    @Published private(set) var contexts: [String: WKWebExtensionContext] = [:] {
+        didSet { ExtensionExternal.contextsChanged() }
+    }
     /// Bumped when any extension's button changes — icon, badge, enabled.
     @Published private(set) var actionsChanged = 0
     /// Store ids being fetched and installed right now.
@@ -753,6 +755,14 @@ final class Extensions: NSObject, ObservableObject {
         Task { await install(id: id, confirm: confirm) }
     }
 
+    /// Stage the store package away from the main actor. Only the finished
+    /// folder is handed to WebKit or shown for approval.
+    nonisolated private static func prepareStorePackage(_ crx: Data, id: String, in staged: URL) async throws {
+        let zip = try Crx.verifiedZip(crx, id: id)
+        try Crx.unpack(zip, into: staged)
+        try ExtensionShims.prepare(staged, fresh: true)
+    }
+
     /// Test runs only: a store package already on disk (Tests/panel_lax.py),
     /// checked against its id exactly as one fetched from the store is.
     func installForTests(crx: Data, id: String) async {
@@ -761,9 +771,7 @@ final class Extensions: NSObject, ObservableObject {
         let staged = Extensions.stagingFolder(for: id)
         defer { try? FileManager.default.removeItem(at: staged) }
         do {
-            let zip = try Crx.verifiedZip(crx, id: id)
-            try Crx.unpack(zip, into: staged)
-            try ExtensionShims.prepare(staged, fresh: true)
+            try await Extensions.prepareStorePackage(crx, id: id, in: staged)
             try await admit(staged, as: id, fromStore: true, finalFolder: Extensions.folder(for: id), confirm: false)
         } catch {
             announceInstallError(error)
@@ -783,11 +791,8 @@ final class Extensions: NSObject, ObservableObject {
         let staged = Extensions.stagingFolder(for: id)
         defer { try? FileManager.default.removeItem(at: staged) }
         do {
-            let crx = try await Crx.fetch(id)
-            let zip = try Crx.verifiedZip(crx, id: id)
             let target = Extensions.folder(for: id)
-            try Crx.unpack(zip, into: staged)
-            try ExtensionShims.prepare(staged, fresh: true)
+            try await Extensions.prepareStorePackage(Crx.fetch(id), id: id, in: staged)
             try await admit(staged, as: id, fromStore: true, finalFolder: target, confirm: confirm || !Store.testing)
         } catch {
             announceInstallError(error)
@@ -1284,11 +1289,9 @@ final class Extensions: NSObject, ObservableObject {
               version != item.version
         else { return }
         do {
-            let zip = try Crx.verifiedZip(try await Crx.fetch(item.id), id: item.id)
             let staged = Extensions.stagingFolder(for: item.id)
             defer { try? FileManager.default.removeItem(at: staged) }
-            try Crx.unpack(zip, into: staged)
-            try ExtensionShims.prepare(staged, fresh: true)
+            try await Extensions.prepareStorePackage(Crx.fetch(item.id), id: item.id, in: staged)
             let found = try await WKWebExtension(resourceBaseURL: staged)
             guard let current = installed.first(where: { $0.id == item.id }), current.fromStore,
                   current.version == item.version else { return }
