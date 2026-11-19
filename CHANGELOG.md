@@ -13,6 +13,10 @@ in [ROADMAP.md](ROADMAP.md).
 
 ### Fixed
 
+- Installing or updating a Chrome Web Store extension uses less memory. Search downloads the package to disk and checks its signature without making extra copies of the ZIP. Verification, unpacking, and script preparation run off the main thread.
+- Search rejects truncated CRX3 metadata and can read a signed package with unfamiliar protobuf metadata before its proof.
+- Preparing an extension after installation or a shim update reads each JavaScript file once to collect its events and list its bundled scripts.
+- Pages that talk to extensions reuse the same connection script until the set of loaded extensions changes. Opening another page no longer rereads each extension's manifest to build that script.
 - The top tab bar does less repeated work with many tabs, and collapsing a group saves the session with fewer repeated lookups.
 - Copying large images from a page's blob URLs is quicker and uses less memory in the page's process.
 - Signing in with a passkey from 1Password no longer leaves the site on its sign-in page when you take more than a few seconds to pick it. While 1Password showed its menu or a prompt in another tab, that tab answered for 1Password after ten seconds, with nothing; the passkey you then picked never reached the site. Any extension's long answer, a password manager's or another's, now waits for the extension itself.

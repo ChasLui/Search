@@ -25,6 +25,9 @@ Read [CONTRIBUTING.md](CONTRIBUTING.md) for project conventions and
   and preserve or revalidate its behavior and benchmarks.
 - When syncing upstream, review the [interface localization spec](docs/specs/interface-localization-upstream.md)
   and preserve or revalidate language switching, resources, and translations.
+- When syncing or contributing extension changes upstream, use the
+  [extension performance spec](docs/specs/extension-performance-upstream.md)
+  to check CRX3 verification, shim generation, and external messaging.
 - Browser features live in `Sources/Search/`, with Swift tests in
   `Tests/SearchTests/` and live browser probes under `Tests/`.
 - For visual changes, start with the shared appearance values in

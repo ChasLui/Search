@@ -439,30 +439,29 @@ enum ExtensionShims {
     /// can take their listeners late (see the end of the script).
     nonisolated static func shim(for folder: URL) -> String {
         var found = Set<String>()
+        var scripts: [String] = []
+        let folderPathLength = folder.standardizedFileURL.path.count
         let walker = FileManager.default.enumerator(at: folder, includingPropertiesForKeys: nil)
         while let url = walker?.nextObject() as? URL {
-            guard url.pathExtension == "js", url.lastPathComponent != file,
-                  var text = try? String(contentsOf: url, encoding: .utf8) else { continue }
+            guard url.pathExtension == "js" else { continue }
+            let text = try? String(contentsOf: url, encoding: .utf8)
+            let path = String(url.standardizedFileURL.path.dropFirst(folderPathLength))
+            // An empty one is marked: there is nothing to run in it.
+            let empty = text?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == true
+            scripts.append((empty ? "-" : "") + path)
+
+            guard url.lastPathComponent != file, var source = text else { continue }
             // Not the shim's own words, in a worker that already carries it.
-            if text.hasPrefix(marker), let end = text.range(of: ender) { text = String(text[end.upperBound...]) }
-            let range = NSRange(text.startIndex..., in: text)
-            for match in eventExpression.matches(in: text, range: range) {
-                guard let a = Range(match.range(at: 1), in: text), let b = Range(match.range(at: 2), in: text) else { continue }
-                found.insert("\(text[a]).\(text[b])")
+            if source.hasPrefix(marker), let end = source.range(of: ender) { source = String(source[end.upperBound...]) }
+            let range = NSRange(source.startIndex..., in: source)
+            for match in eventExpression.matches(in: source, range: range) {
+                guard let a = Range(match.range(at: 1), in: source), let b = Range(match.range(at: 2), in: source) else { continue }
+                found.insert("\(source[a]).\(source[b])")
             }
         }
         let list = (try? JSONSerialization.data(withJSONObject: found.sorted())).flatMap { String(data: $0, encoding: .utf8) } ?? "[]"
         // And the scripts it ships, so its worker can be told at once that
         // one isn't there (see importScripts in the script).
-        var scripts: [String] = []
-        let all = FileManager.default.enumerator(at: folder, includingPropertiesForKeys: nil)
-        while let url = all?.nextObject() as? URL {
-            guard url.pathExtension == "js" else { continue }
-            let path = String(url.standardizedFileURL.path.dropFirst(folder.standardizedFileURL.path.count))
-            // An empty one is marked: there is nothing to run in it.
-            let empty = ((try? String(contentsOf: url, encoding: .utf8)) ?? "x").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-            scripts.append((empty ? "-" : "") + path)
-        }
         let shipped = (try? JSONSerialization.data(withJSONObject: scripts.sorted())).flatMap { String(data: $0, encoding: .utf8) } ?? "[]"
         return script.replacingOccurrences(of: "__SEARCH_EVENTS__", with: list)
             .replacingOccurrences(of: "__SEARCH_SCRIPTS__", with: shipped)
