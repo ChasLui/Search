@@ -241,7 +241,7 @@ struct SearchApp: App {
                     .shortcut("view.zoomIn")
                 Button(language.text("ui.zoom_out", fallback: "Zoom Out")) { browser.zoom(by: 1 / 1.1) }
                     .shortcut("view.zoomOut")
-                Button(language.text("ui.actual_size", fallback: "Actual Size")) { browser.resetZoom() }
+                Button(browser.prefs.actualSizeTitle) { browser.resetZoom() }
                     .shortcut("view.actualSize")
                 Divider()
                 // The Web Inspector, on the keys Chrome and Arc use (see Inspector.swift).
