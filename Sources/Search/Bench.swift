@@ -1515,6 +1515,9 @@ final class Bench {
                 "canMoveWindow": hit?.mouseDownCanMoveWindow ?? false,
                 "windowMovable": window.isMovable,
                 "titleBar": y <= Double(window.frame.height - window.contentLayoutRect.height),
+                // Whether the window is movable with the pointer resting
+                // there, as window managers find it (idea 744).
+                "movableHovered": DragStrip.hover(window, at: point),
             ])
 
         case "field":
