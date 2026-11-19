@@ -13,6 +13,9 @@ in [ROADMAP.md](ROADMAP.md).
 
 ### Fixed
 
+- A window can be dragged by its strip on the first click when another app
+  is in front. The Mac's Move & Resize shortcuts with Control, Command or
+  Option also work while the pointer is over the tab area.
 - Installing or updating a Chrome Web Store extension uses less memory. Search downloads the package to disk and checks its signature without making extra copies of the ZIP. Verification, unpacking, and script preparation run off the main thread.
 - Search rejects truncated CRX3 metadata and can read a signed package with unfamiliar protobuf metadata before its proof.
 - Preparing an extension after installation or a shim update reads each JavaScript file once to collect its events and list its bundled scripts.

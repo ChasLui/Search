@@ -1178,7 +1178,7 @@ struct ContentView: View {
         // window stays movable, though — macOS's Window › Move & Resize, its
         // tiling and the tools that arrange windows ask for a movable one
         // (#286) — and is made unmovable only while the pointer is over the
-        // strip (see DragStrip).
+        // strip, except while a modified shortcut is handled (see DragStrip).
         window.isMovable = true
 
         // The traffic lights set in from the corner and centred in the strip's

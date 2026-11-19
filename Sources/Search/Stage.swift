@@ -736,12 +736,26 @@ struct DragStrip: NSViewRepresentable {
         /// How many strips the pointer is over, per window: the strips
         /// overlap (the corner's lies in the row's).
         private static var hovered: [ObjectIdentifier: Int] = [:]
+        /// Window shortcuts can be reassigned to Command or Option as well
+        /// as Control. Let AppKit handle them, then restore the tab drag guard.
+        private static let shortcuts = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
+            guard !event.modifierFlags.isDisjoint(with: [.command, .option, .control]), let window = event.window,
+                  hovered[ObjectIdentifier(window)] != nil else { return event }
+            window.isMovable = true
+            DispatchQueue.main.async { [weak window] in
+                guard let window else { return }
+                window.isMovable = hovered[ObjectIdentifier(window)] == nil
+            }
+            return event
+        }
 
         /// The strip moves the window and answers the double-click itself.
         /// Left to say yes, AppKit takes both on too in the title bar the
         /// strip sits in, and a double-click answered twice — by AppKit on
         /// the press, here on the release — ends where it started.
         override var mouseDownCanMoveWindow: Bool { false }
+        /// The first press on an inactive window can start a drag too.
+        override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
 
         override func hitTest(_ point: NSPoint) -> NSView? {
             let inside = convert(point, from: superview)
@@ -762,7 +776,10 @@ struct DragStrip: NSViewRepresentable {
             addTrackingArea(NSTrackingArea(rect: .zero, options: [.mouseEnteredAndExited, .activeAlways, .inVisibleRect], owner: self))
         }
 
-        override func mouseEntered(with event: NSEvent) { hover(true) }
+        override func mouseEntered(with event: NSEvent) {
+            _ = Strip.shortcuts
+            hover(true)
+        }
         override func mouseExited(with event: NSEvent) { hover(false) }
 
         override func viewWillMove(toWindow newWindow: NSWindow?) {
