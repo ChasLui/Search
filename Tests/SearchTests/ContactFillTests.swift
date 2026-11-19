@@ -414,14 +414,17 @@ final class ContactFillTests: XCTestCase {
         XCTAssertEqual(street.first?.fields["country"], "GB")
 
         let names = MeCard.offers(from: card, for: "name")
-        XCTAssertEqual(names.first?.title, "Ada Lovelace")
+        let localizedName = CNContactFormatter.string(from: card, style: .fullName) ?? "Ada Lovelace"
+        XCTAssertEqual(names.first?.title, localizedName)
         XCTAssertNil(names.first?.fields["organization"], "nothing empty is sent")
 
         XCTAssertTrue(MeCard.offers(from: CNMutableContact(), for: "email").isEmpty, "no email, no row")
 
         let phones = MeCard.offers(from: card, for: "tel")
         XCTAssertEqual(phones.map(\.title), ["+44 20 7946 0000"])
-        XCTAssertEqual(phones.first?.detail, "Ada Lovelace · Mobile")
+        let mobile = CNLabeledValue<NSString>.localizedString(forLabel: CNLabelPhoneNumberMobile)
+        let mobileLabel = mobile.prefix(1).uppercased() + mobile.dropFirst()
+        XCTAssertEqual(phones.first?.detail, "\(localizedName) · \(mobileLabel)")
         XCTAssertEqual(MeCard.offers(from: card, for: "tel-national").first?.title, "20 7946 0000", "without the country's code")
         XCTAssertEqual(MeCard.offers(from: card, for: "country").first?.title, "United Kingdom", "a country by its name")
         XCTAssertEqual(MeCard.offers(from: card, for: "street-address").first?.title, "12 St James's Square, Flat 3")

@@ -48,7 +48,8 @@ final class ExtensionPopupSizingTests: XCTestCase {
     }
 
     func testFlexibleDelayedAndOversizedContent() async throws {
-        let (web, window) = try await page("#content { display:flex; }", "<div id=content><div style='width:240px;flex:none;height:80px'>Loading</div></div>")
+        let (web, window) = try await page("html { overflow:hidden; } #content { display:flex; }",
+                                           "<div id=content><div style='width:240px;flex:none;height:80px'>Loading</div></div>")
         defer { window.close() }
         var size = try await measure(web)
         XCTAssertEqual(size, [240, 80])

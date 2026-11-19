@@ -13,6 +13,8 @@
 #                                build/appcast.json, signed with Developer ID
 #                                if there is one in the keychain
 #   ./build.sh release ship    + both notarised, the DMG stapled
+#   SEARCH_BETA=1 ./build.sh release dmg
+#                              append -beta.1 to VERSION for a beta build
 #
 #   SEARCH_ARCH=x86_64 ./build.sh release ship
 #                              the same for Intel Macs, into build/intel/
@@ -92,6 +94,10 @@ if [ "$DEV" = 1 ]; then
   esac
 fi
 VERSION="$(tr -d '[:space:]' < VERSION)"
+if [ -n "${SEARCH_BETA:-}" ]; then
+  [[ "$SEARCH_BETA" =~ ^[1-9][0-9]*$ ]] || { echo "SEARCH_BETA must be a positive integer" >&2; exit 1; }
+  VERSION="$VERSION-beta.$SEARCH_BETA"
+fi
 # A build number that only ever goes up, so the updater can tell newer from
 # older without parsing version strings.
 BUILD="$(date +%Y%m%d%H%M)"
@@ -283,7 +289,8 @@ fi
 # runtime Gatekeeper insists on for anything notarised; otherwise ad-hoc,
 # which is enough for the app to run on the machine that built it — and
 # which the updater refuses to swap anything in under.
-IDENTITY="${SEARCH_SIGN_IDENTITY:-$(security find-identity -v -p codesigning 2>/dev/null \
+# An explicitly empty SEARCH_SIGN_IDENTITY selects ad-hoc signing.
+IDENTITY="${SEARCH_SIGN_IDENTITY-$(security find-identity -v -p codesigning 2>/dev/null \
   | grep -o '"Developer ID Application: [^"]*"' | head -1 | tr -d '"' || true)}"
 # Passkeys need an entitlement Apple grants to browsers on request, and a
 # Developer ID provisioning profile that carries it. With the profile next to
