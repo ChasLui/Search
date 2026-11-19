@@ -39,6 +39,10 @@ Read [CONTRIBUTING.md](CONTRIBUTING.md) for project conventions and
 - When syncing or contributing extension changes upstream, use the
   [extension performance spec](docs/specs/extension-performance-upstream.md)
   to check CRX3 verification, shim generation, and external messaging.
+- When syncing or contributing upstream, or changing window, title bar, tab
+  dragging, or system window management, review the
+  [window drag and tiling spec](docs/specs/window-drag-tiling-upstream.md)
+  and preserve or revalidate its behavior.
 
 ## Where to work
 
