@@ -347,6 +347,43 @@ final class RowCarryTests: XCTestCase {
         XCTAssertNotEqual(browser.tabs.map(\.id), order, "moved")
     }
 
+    func testTheTopRowRevealsTheSelectedTab() async throws {
+        Session.write(now: true, Session.Shape(tabs: [], active: 0))
+        let browser = makeBrowser()
+        defer {
+            browser.closeAll()
+            Session.write(now: true, Session.Shape(tabs: [], active: 0))
+        }
+        browser.prefs.usesTabGroups = true
+        for number in 5..<45 {
+            browser.newTab()
+            browser.tabs.last?.restore(url: URL(string: "about:blank#scroll-\(number)")!, title: "\(number)")
+        }
+        let tabs = browser.tabs
+        let group = browser.addTabGroup(containing: tabs[0])
+        browser.move(tabs[1], toGroup: group)
+        browser.select(tabs[0])
+        let window = try makeTopRow(browser)
+        try await settle()
+
+        func scrollViews(in view: NSView) -> [NSScrollView] {
+            let here = (view as? NSScrollView).map { [$0] } ?? []
+            return here + view.subviews.flatMap { scrollViews(in: $0) }
+        }
+        let content = try XCTUnwrap(window.contentView)
+        let scroll = try XCTUnwrap(scrollViews(in: content).first {
+            ($0.documentView?.frame.width ?? 0) > $0.contentSize.width + 1
+        })
+        let start = scroll.contentView.bounds.minX
+        browser.select(tabs[tabs.count - 1])
+        try await Task.sleep(for: .seconds(1))
+        let end = scroll.contentView.bounds.minX
+        XCTAssertGreaterThan(end, start + 10)
+        browser.select(tabs[0])
+        try await Task.sleep(for: .seconds(1))
+        XCTAssertLessThan(scroll.contentView.bounds.minX, end - 10)
+    }
+
     private func shoot(_ view: NSView?, _ folder: String?, _ name: String) throws {
         guard let view, let folder, let rep = view.bitmapImageRepForCachingDisplay(in: view.bounds) else { return }
         view.cacheDisplay(in: view.bounds, to: rep)
