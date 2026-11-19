@@ -1705,6 +1705,10 @@ struct TabMenu: View {
                     }
                 } label: { Text("ui.move_to_window", bundle: Language.resources) }
             }
+            if browser.prefs.littleLinks {
+                Button("Open in Small Window") { browser.openInLittleWindow(tab) }
+                    .disabled(!browser.liftable(tab))
+            }
         }
         Divider()
         Button { browser.beginTabRename(tab) } label: { Text("ui.rename_d3f4cb", bundle: Language.resources) }
