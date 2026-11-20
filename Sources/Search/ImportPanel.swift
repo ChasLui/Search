@@ -382,9 +382,16 @@ struct ImportPanel: View {
                 Rule()
             }
             // A kind the browser has none of is said so, and can't be picked.
-            Line("ui.passwords_02c830", !source.importsPasswords ? language.format("import.not_supported", fallback: "Not supported for %1$@", source.name) : preview?.passwords == 0 ? language.format("import.none_in", fallback: "None in %1$@", source.name) : source.asksForKey
-                 ? language.format("import.keychain_key", fallback: "macOS asks once for %1$@'s keychain key", source.name)
-                 : language.format("import.own_files", fallback: "Read from %1$@'s own files, unless it has a primary password", source.name), localizedTitle: true) {
+            Line("ui.passwords_02c830",
+                 !source.importsPasswords
+                    ? (!source.passwordsInPasswordsApp
+                        ? language.format("import.not_supported", fallback: "Not supported for %1$@", source.name)
+                        : language.format("import.passwords_app", fallback: "%1$@ keeps them in the Passwords app: export them from there and bring in the CSV file", source.name))
+                    : preview?.passwords == 0
+                        ? language.format("import.none_in", fallback: "None in %1$@", source.name)
+                        : source.asksForKey
+                            ? language.format("import.keychain_key", fallback: "macOS asks once for %1$@'s keychain key", source.name)
+                            : language.format("import.own_files", fallback: "Read from %1$@'s own files, unless it has a primary password", source.name), localizedTitle: true) {
                 option($wantsPasswords, none: !source.importsPasswords || preview?.passwords == 0)
             }
             Rule()
@@ -408,9 +415,11 @@ struct ImportPanel: View {
                 option($wantsHistory, none: preview?.places == 0)
             }
             // Its open tabs and tab groups, asleep at the end of this space.
-            Rule()
-            Line("ui.open_tabs_tab_groups", tabsDetail(preview, source), localizedTitle: true) {
-                option($wantsTabs, none: !bringsTabs(source))
+            if source.readsOpenTabs {
+                Rule()
+                Line("ui.open_tabs_tab_groups", tabsDetail(preview, source), localizedTitle: true) {
+                    option($wantsTabs, none: !bringsTabs(source))
+                }
             }
             // Arc's own, or Zen's: its spaces, what is pinned in them, its
             // favourites or Essentials.
