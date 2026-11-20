@@ -1,0 +1,26 @@
+---
+isolation: none
+permissions:
+  on_request: escalate
+gates:
+  on_behalf: deny
+workspace:
+  archive: never
+  archive_with_run: false
+  archive_after: never
+role:
+  archive_agents: false
+agent_rules:
+  - >-
+    仅在本次分配的 worktree 内工作；先确认 git rev-parse --show-toplevel
+    和 git status，保留已有修改。
+  - >-
+    git mutation（包括 fetch、建分支和提交）、删除、清数据、终止进程，
+    以及对外发消息、评论、上传或发布，均须事先取得用户对具体操作的
+    明确许可；启动 run 不等于授权。
+  - >-
+    运行测试、构建或脚本前先检查其副作用和清理范围；尤其不要假定
+    SEARCH_PROBE、fresh.sh 或隐藏窗口测试没有删除或终止进程的副作用。
+  - >-
+    使用现有项目规则和相关规格，保留用户选择的模型；报告实际执行的
+    验证、结果和未验证项，不把静态检查当成真实 GUI 验收。
