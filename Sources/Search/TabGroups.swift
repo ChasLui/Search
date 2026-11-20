@@ -210,7 +210,8 @@ struct GroupHeading: View {
             .fill(dropping ? greys.wash : (hovering ? greys.hover : .clear)))
         .contentShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
         .onTapGesture { if !editing { browser.toggleTabGroup(group.id) } }
-        .modifier(GroupHeadingShared(browser: browser, group: group, dragSpace: dragSpace, dropping: $dropping))
+        .modifier(GroupHeadingShared(browser: browser, group: group, dragSpace: dragSpace, dropping: $dropping,
+                                     showsColour: !horizontal))
         .onHover { hovering = $0 }
         .onChange(of: editing) { _, now in
             if now {
@@ -239,6 +240,8 @@ private struct GroupHeadingShared: ViewModifier {
     let group: TabGroup
     let dragSpace: String?
     @Binding var dropping: Bool
+    var showsColour = true
+    @State private var choosingColour = false
 
     func body(content: Content) -> some View {
         content
@@ -268,6 +271,9 @@ private struct GroupHeadingShared: ViewModifier {
             .contextMenu {
                 Button { browser.editingGroupID = group.id } label: { Text("ui.rename_group", bundle: Language.resources) }
                 Button { browser.toggleTabGroup(group.id) } label: { Text(LocalizedStringKey(group.collapsed ? "Expand Group" : "Collapse Group"), bundle: Language.resources) }
+                if showsColour {
+                    Button { choosingColour = true } label: { Text("ui.colour", bundle: Language.resources) }
+                }
                 // The whole group into another space, still a group there: Arc's
                 // folders came in wherever Arc had them.
                 if browser.prefs.usesSpaces, browser.spaces.count > 1 {
@@ -284,6 +290,14 @@ private struct GroupHeadingShared: ViewModifier {
                 Divider()
                 Button { browser.removeTabGroup(group.id) } label: { Text("ui.ungroup_tabs", bundle: Language.resources) }
                 Button { browser.closeTabGroup(group.id) } label: { Text("ui.close_group", bundle: Language.resources) }
+            }
+            .popover(isPresented: $choosingColour,
+                     hangingFrom: browser.prefs.sidePosition == .right ? .leading : .trailing) {
+                let index = group.colour ?? 0
+                ColourSwatches(selected: Spaces.colours.indices.contains(index) ? index : 0) {
+                    browser.setTabGroupColour(group.id, to: $0)
+                }
+                .padding(16)
             }
     }
 }
