@@ -5,7 +5,9 @@ import re
 import subprocess
 import sys
 
-isolated_suites = ("DownloadLifecycleTests", "FloatUnseenTests", "PinStuckTests", "SidebarPressTests")
+# FaviconMemoryTests selects its own SEARCH_PROBE in class setup. Store.world
+# is fixed on first access, so that setup needs a fresh process to take effect.
+isolated_suites = ("DownloadLifecycleTests", "FaviconMemoryTests", "FloatUnseenTests", "PinStuckTests", "SidebarPressTests")
 suite_pattern = "|".join(isolated_suites)
 resources = subprocess.run([sys.executable, "Tests/check-localization.py"])
 # WebKit lifecycle journeys and AppKit gesture fixtures interfere when they
