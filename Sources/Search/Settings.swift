@@ -659,6 +659,11 @@ struct SettingsPanel: View {
                 set: { on in withAnimation(Motion.glide) { prefs.roomyTabs = on } }
             ))
         case "sidebar.player": Switch(on: $prefs.showsPlayer)
+        case "sidebar.doorsUp":
+            Switch(on: Binding(
+                get: { prefs.doorsUp },
+                set: { on in withAnimation(Motion.glide) { prefs.doorsUp = on } }
+            ))
         case "glyph": Segmented(options: Glyph.allCases.map { ($0, $0.title) }, selection: $prefs.glyph, localized: true)
         case "tabs.highContrast": Switch(on: $prefs.highContrastText)
         case "tabs.reading": Switch(on: $prefs.showsReading)
