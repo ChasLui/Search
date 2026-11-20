@@ -1,0 +1,38 @@
+---
+title: 独立审查
+description: 并行检查指定范围的正确性与验证覆盖，不修改工作区。
+inputs:
+  scope:
+    type: string
+    required: true
+    description: 审查范围及基线，例如当前未提交修改或指定提交范围
+outputs:
+  correctness:
+    type: string
+  validation:
+    type: string
+steps:
+  - id: correctness
+    title: 正确性与回归
+    role:
+      name: reviewer
+      prompt: |
+        审查范围：{{ inputs.scope }}
+        检查行为正确性、相关调用方、边界情况及隐私影响；
+        输出 correctness，按影响列出可核实的问题和限制。
+    inputs: [scope]
+    outputs:
+      correctness:
+        type: string
+  - id: validation
+    title: 验证与平台兼容
+    role:
+      name: reviewer
+      prompt: |
+        审查范围：{{ inputs.scope }}
+        检查测试覆盖和 macOS、WebKit、AppKit、本地化或视觉验收缺口。
+        仅报告与范围相关的问题；输出 validation，区分测试证据与缺口。
+    inputs: [scope]
+    outputs:
+      validation:
+        type: string

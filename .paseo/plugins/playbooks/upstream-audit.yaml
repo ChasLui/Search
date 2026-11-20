@@ -1,0 +1,46 @@
+---
+title: 上游同步预检
+description: 用已有 Git 引用评估镜像、逐提交移植状态和专项规格风险。
+inputs:
+  upstream_ref:
+    type: string
+    required: true
+    description: 已存在于本仓库的上游 main 引用或 commit SHA
+  mirror_ref:
+    type: string
+    default: origin/main
+    description: fork 的上游镜像引用
+  fork_ref:
+    type: string
+    default: origin/chaslui-dev
+    description: fork 的开发分支引用
+  pre_sync_ref:
+    type: string
+    default: none
+    description: 同步前镜像引用或 commit SHA；未知时使用 none
+outputs:
+  sync_report:
+    type: string
+steps:
+  - id: audit
+    title: 比较上游与 fork
+    role:
+      name: reviewer
+      prompt: |
+        上游引用：{{ inputs.upstream_ref }}
+        镜像引用：{{ inputs.mirror_ref }}
+        开发引用：{{ inputs.fork_ref }}
+        同步前镜像引用：{{ inputs.pre_sync_ref }}
+        只读取本地已有引用：先确认各引用存在，区分镜像与上游一致、
+        可快进、镜像领先或分叉；不执行 fetch、分支修改或同步。
+        同时核查镜像到上游的新增提交，以及开发分支历史中未包含的
+        上游提交；即使镜像已同步也要检查后者。若同步前镜像引用不是
+        none，还要核查从该引用到上游的新增提交。合并去重后逐项核查，
+        区分已移植、已有、待移植、暂缓和证据不足。提交不在历史中
+        不等于尚未移植：比较补丁和行为，关联专项规格及验证建议。
+        同步前引用为 none 时，说明无法精确还原本次同步范围；引用可能
+        过期，缺少必要引用时报告阻塞。输出 sync_report。
+    inputs: [upstream_ref, mirror_ref, fork_ref, pre_sync_ref]
+    outputs:
+      sync_report:
+        type: string
