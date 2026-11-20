@@ -39,6 +39,9 @@ Read [CONTRIBUTING.md](CONTRIBUTING.md) for project conventions and
 - When syncing or contributing extension changes upstream, use the
   [extension performance spec](docs/specs/extension-performance-upstream.md)
   to check CRX3 verification, shim generation, and external messaging.
+- When syncing or changing extension popup positioning, sizing, or motion,
+  review the [extension popup motion spec](docs/specs/extension-popup-motion-upstream.md)
+  and preserve or revalidate its behavior.
 - When syncing upstream, contributing WebKit resource-loading changes, or
   revisiting bundled CDN replacement, review the
   [local CDN spec](docs/specs/local-cdn-upstream.md) for the no-ship decision
