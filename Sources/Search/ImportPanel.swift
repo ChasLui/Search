@@ -50,6 +50,8 @@ struct ImportPanel: View {
     /// Whether that import left any bookmarks behind, which is what the
     /// offer to show the bar is for.
     @State private var marksLanded = false
+    /// The steps for exporting from Safari, shown when asked.
+    @State private var safariSteps = false
 
     enum Said: Hashable {
         case passwords(Int, skipped: Int, undecrypted: Int, source: String)
@@ -284,9 +286,16 @@ struct ImportPanel: View {
         if ImportSource.safari || !unreadable.isEmpty || folderError != nil {
             VStack(alignment: .leading, spacing: 4) {
                 if ImportSource.safari {
-                    Text("ui.safari_macos_keeps_its_data_from_other_apps_in_safari_f", bundle: Language.resources)
-                        .font(.system(size: 11.5))
-                        .foregroundStyle(Palette.faint)
+                    HStack(alignment: .firstTextBaseline, spacing: 8) {
+                        Text(language.text("import.safari.files", fallback: "Safari — macOS keeps its files from other apps, so it comes over from a file it exports."))
+                        Spacer(minLength: 4)
+                        Pill(safariSteps ? "ui.hide" : "ui.how") { withAnimation(Motion.settle) { safariSteps.toggle() } }
+                    }
+                    if safariSteps {
+                        Text(language.text("import.safari.steps", fallback: "In Safari, choose File › Export Browsing Data to File…, keep Bookmarks, History and Passwords, and save. Then press File… below and choose the ZIP it made."))
+                            .foregroundStyle(Palette.muted)
+                            .transition(.opacity)
+                    }
                 }
                 ForEach(unreadable.indices, id: \.self) { index in
                     let missing = unreadable[index]
