@@ -31,7 +31,7 @@ struct ImportPanel: View {
     @State private var wantsBookmarks = true
     @State private var wantsHistory = true
     @State private var wantsExtensions = false
-    /// A Chromium browser's open tabs and tab groups (see takeSession).
+    /// A browser's open tabs and tab groups (see takeSession).
     /// Off unless asked for.
     @State private var wantsTabs = false
     /// What came from this browser before goes, and its bookmarks come
@@ -265,10 +265,16 @@ struct ImportPanel: View {
         let tabs = session.found > session.tabs
             ? language.format("import.first_tabs", fallback: "The first %1$@ of %2$@ tabs", session.tabs.formatted(), session.found.formatted())
             : language.count("count.tabs", session.tabs)
+        var keepsSpaces = false
+        if case .mozilla(let mozilla) = source { keepsSpaces = mozilla.keepsSpaces }
         if session.groups.isEmpty {
-            return language.format("import.tabs_detail", fallback: "%1$@ — asleep at the end of this space, pinned tabs as pins", tabs)
+            return keepsSpaces
+                ? language.format("import.tabs_spaces_detail", fallback: "%1$@ — asleep at the end of this space; its pinned tabs come with its spaces", tabs)
+                : language.format("import.tabs_detail", fallback: "%1$@ — asleep at the end of this space, pinned tabs as pins", tabs)
         }
-        return language.format("import.tabs_groups_detail", fallback: "%1$@ in %2$@ — asleep at the end of this space, pinned tabs as pins", tabs, language.count("count.groups", session.groups.count))
+        return keepsSpaces
+            ? language.format("import.tabs_spaces_groups_detail", fallback: "%1$@ in %2$@ — asleep at the end of this space; its pinned tabs come with its spaces", tabs, language.count("count.groups", session.groups.count))
+            : language.format("import.tabs_groups_detail", fallback: "%1$@ in %2$@ — asleep at the end of this space, pinned tabs as pins", tabs, language.count("count.groups", session.groups.count))
     }
 
     /// Safari, and browsers on this Mac with nothing where their data should
@@ -402,11 +408,9 @@ struct ImportPanel: View {
                 option($wantsHistory, none: preview?.places == 0)
             }
             // Its open tabs and tab groups, asleep at the end of this space.
-            if case .chromium = source {
-                Rule()
-                Line("ui.open_tabs_tab_groups", tabsDetail(preview, source), localizedTitle: true) {
-                    option($wantsTabs, none: !bringsTabs(source))
-                }
+            Rule()
+            Line("ui.open_tabs_tab_groups", tabsDetail(preview, source), localizedTitle: true) {
+                option($wantsTabs, none: !bringsTabs(source))
             }
             // Arc's own, or Zen's: its spaces, what is pinned in them, its
             // favourites or Essentials.
