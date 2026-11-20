@@ -1,6 +1,7 @@
 import AppKit
 import Combine
 import Darwin
+import class SwiftUI.NSHostingView
 import WebKit
 import XCTest
 @testable import Search
@@ -264,5 +265,136 @@ private final class SlowServer: @unchecked Sendable {
 
     private static func failure(_ operation: String) -> NSError {
         NSError(domain: NSPOSIXErrorDomain, code: Int(errno), userInfo: [NSLocalizedDescriptionKey: "\(operation) failed"])
+    }
+}
+
+@MainActor
+final class NavigationSpeedTests: XCTestCase {
+    override class func setUp() {
+        if ProcessInfo.processInfo.environment["NAVIGATION_SPEED"] == "1" {
+            setenv("SEARCH_PROBE", "navigation-speed-\(getpid())", 1)
+            setenv("SEARCH_FEED", "about:blank", 1)
+        }
+        super.setUp()
+    }
+
+    func testNewTabAndNavigation() throws {
+        try XCTSkipIf(ProcessInfo.processInfo.environment["NAVIGATION_SPEED"] != "1", "NAVIGATION_SPEED not set")
+        try XCTSkipUnless(Store.world != nil && Store.world == ProcessInfo.processInfo.environment["SEARCH_PROBE"],
+                          "Run this test in a separate process to isolate its profile")
+        _ = NSApplication.shared
+        let activationPolicy = NSApp.activationPolicy()
+        NSApp.setActivationPolicy(.prohibited)
+        let browser = Browser(record: WindowRecord())
+        browser.welcoming = false
+        browser.newsShowing = false
+        browser.prefs.floatingNewTab = false
+        browser.prefs.sidebar = ProcessInfo.processInfo.environment["NAVIGATION_SIDEBAR"] == "1"
+        let initialTabs = max(1, Int(ProcessInfo.processInfo.environment["NAVIGATION_INITIAL_TABS"] ?? "1") ?? 1)
+        for index in 1..<initialTabs {
+            browser.active?.restore(url: URL(string: "https://background-\(index).example/")!, title: "Tab \(index)")
+            browser.newTab()
+        }
+        XCTAssertEqual(browser.tabs.count, initialTabs)
+        let window = NSWindow(contentRect: NSRect(x: -20_000, y: -20_000, width: 1000, height: 700),
+                              styleMask: [.titled, .closable, .resizable, .fullSizeContentView],
+                              backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        window.contentView = NSHostingView(rootView: ContentView(browser: browser))
+        browser.window = window
+        window.orderFrontRegardless()
+        let server = try SlowServer { path, _ in
+            .init(body: "<!doctype html><title>\(path)</title><p>Navigation fixture</p>")
+        }
+        defer {
+            server.stop()
+            ContentView.forget(browser)
+            window.contentView = nil
+            window.close()
+            browser.closeAll()
+            NSApp.setActivationPolicy(activationPolicy)
+        }
+
+        func wait(_ condition: () -> Bool) -> Bool {
+            let end = CACurrentMediaTime() + 10
+            repeat {
+                RunLoop.current.run(mode: .default, before: Date().addingTimeInterval(0.001))
+                if condition() { return true }
+            } while CACurrentMediaTime() < end
+            return false
+        }
+
+        func focusedField(in view: NSView) -> AddressField.Field? {
+            if let field = view as? AddressField.Field, let editor = field.currentEditor(), window.firstResponder === editor {
+                return field
+            }
+            return view.subviews.compactMap { focusedField(in: $0) }.first
+        }
+
+        func loaded(_ tab: Tab, path: String) -> Bool {
+            server.requests(path) > 0 && tab.built?.url?.path == path && tab.built?.title == path && tab.built?.isLoading == false
+        }
+
+        let first = try XCTUnwrap(browser.active)
+        first.go(to: server.url("/initial"))
+        XCTAssertTrue(wait { loaded(first, path: "/initial") })
+        var launchTimes: [Double] = []
+        var focusTimes: [Double] = []
+        var newSubmitTimes: [Double] = []
+        var newPageTimes: [Double] = []
+        var existingSubmitTimes: [Double] = []
+        var existingPageTimes: [Double] = []
+        for index in 0..<18 {
+            let start = CACurrentMediaTime()
+            let previousID = browser.activeID
+            let previousCount = browser.tabs.count
+            browser.launch()
+            let launch = (CACurrentMediaTime() - start) * 1000
+            XCTAssertNotEqual(browser.activeID, previousID)
+            XCTAssertEqual(browser.tabs.count, previousCount + 1)
+            guard wait({ window.contentView.flatMap { focusedField(in: $0) } != nil }) else {
+                return XCTFail("address field did not receive focus")
+            }
+            let focus = (CACurrentMediaTime() - start) * 1000
+            let field = try XCTUnwrap(window.contentView.flatMap { focusedField(in: $0) })
+            let editor = try XCTUnwrap(field.currentEditor() as? NSTextView)
+            editor.insertText("x", replacementRange: editor.selectedRange())
+            XCTAssertTrue(wait { browser.typed == "x" })
+            let tab = try XCTUnwrap(browser.active)
+            let newPath = "/new-\(index)"
+            browser.typed = server.url(newPath).absoluteString
+            let newStart = CACurrentMediaTime()
+            browser.submit()
+            let newSubmit = (CACurrentMediaTime() - newStart) * 1000
+            guard wait({ loaded(tab, path: newPath) }) else { return XCTFail("new tab did not load \(newPath)") }
+            let newPage = (CACurrentMediaTime() - newStart) * 1000
+
+            let existingPath = "/existing-\(index)"
+            browser.editing = true
+            browser.typed = server.url(existingPath).absoluteString
+            let existingStart = CACurrentMediaTime()
+            browser.submit()
+            let existingSubmit = (CACurrentMediaTime() - existingStart) * 1000
+            guard wait({ loaded(tab, path: existingPath) }) else { return XCTFail("existing tab did not load \(existingPath)") }
+            let existingPage = (CACurrentMediaTime() - existingStart) * 1000
+            if index >= 3 {
+                launchTimes.append(launch)
+                focusTimes.append(focus)
+                newSubmitTimes.append(newSubmit)
+                newPageTimes.append(newPage)
+                existingSubmitTimes.append(existingSubmit)
+                existingPageTimes.append(existingPage)
+            }
+        }
+        func p95(_ samples: [Double]) -> Double {
+            let sorted = samples.sorted()
+            return sorted[Int((Double(sorted.count - 1) * 0.95).rounded(.up))]
+        }
+        print("NAVIGATION_SPEED initial_tabs=\(initialTabs) launch_ms=\(launchTimes) focus_ms=\(focusTimes) new_submit_ms=\(newSubmitTimes) new_page_ms=\(newPageTimes) existing_submit_ms=\(existingSubmitTimes) existing_page_ms=\(existingPageTimes)")
+        if let limit = ProcessInfo.processInfo.environment["NAVIGATION_FOCUS_LIMIT_MS"].flatMap(Double.init) {
+            let median = focusTimes.sorted()[focusTimes.count / 2]
+            XCTAssertLessThan(median, limit, "new tab focus median exceeded \(limit) ms")
+        }
+        print("NAVIGATION_SPEED_P95 focus=\(p95(focusTimes)) new_page=\(p95(newPageTimes)) existing_page=\(p95(existingPageTimes))")
     }
 }

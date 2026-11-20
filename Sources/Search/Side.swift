@@ -857,7 +857,7 @@ struct SideBar: View {
             // among them would land.
             if !loose.isEmpty || ghost != nil {
                 let looseSteps = steps(loose)
-                VStack(spacing: SideBar.gap) {
+                LazyVStack(spacing: SideBar.gap) {
                     ForEach(Array(loose.enumerated()), id: \.element.id) { index, tab in
                         if ghost == index, let carried = crossingTab {
                             RowGhost(tab: carried, height: rowHeight, size: prefs.sideTitle)

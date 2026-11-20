@@ -348,6 +348,8 @@ final class RowCarryTests: XCTestCase {
     }
 
     func testTheTopRowRevealsTheSelectedTab() async throws {
+        try XCTSkipUnless(Store.world != nil && Store.world == ProcessInfo.processInfo.environment["SEARCH_PROBE"],
+                          "Run this test in a separate process to isolate its profile")
         Session.write(now: true, Session.Shape(tabs: [], active: 0))
         let browser = makeBrowser()
         defer {
@@ -379,9 +381,154 @@ final class RowCarryTests: XCTestCase {
         try await Task.sleep(for: .seconds(1))
         let end = scroll.contentView.bounds.minX
         XCTAssertGreaterThan(end, start + 10)
+        let document = try XCTUnwrap(scroll.documentView)
+        XCTAssertGreaterThanOrEqual(scroll.contentView.bounds.maxX, document.bounds.maxX - 5)
         browser.select(tabs[0])
         try await Task.sleep(for: .seconds(1))
         XCTAssertLessThan(scroll.contentView.bounds.minX, end - 10)
+
+        let left = tabs[tabs.count - 2], right = tabs[tabs.count - 1]
+        browser.pair(right, with: left, onLeft: false)
+        browser.select(tabs[0])
+        try await Task.sleep(for: .seconds(1))
+        let beforePair = scroll.contentView.bounds.minX
+        browser.select(right)
+        try await Task.sleep(for: .seconds(1))
+        XCTAssertEqual(browser.activeSplit?.left, left.id)
+        XCTAssertGreaterThan(scroll.contentView.bounds.minX, beforePair + 10)
+        let pairDocument = try XCTUnwrap(scroll.documentView)
+        XCTAssertGreaterThanOrEqual(scroll.contentView.bounds.maxX, pairDocument.bounds.maxX - 5)
+    }
+
+    func testTheTopRowFocusesAGroupCreatedFromAFarTab() async throws {
+        try XCTSkipUnless(Store.world != nil && Store.world == ProcessInfo.processInfo.environment["SEARCH_PROBE"],
+                          "Run this test in a separate process to isolate its profile")
+        Session.write(now: true, Session.Shape(tabs: [], active: 0))
+        let browser = makeBrowser()
+        defer {
+            browser.closeAll()
+            Session.write(now: true, Session.Shape(tabs: [], active: 0))
+        }
+        browser.prefs.usesTabGroups = true
+        for number in 5..<65 {
+            browser.newTab()
+            browser.tabs.last?.restore(url: URL(string: "about:blank#group-focus-\(number)")!, title: "\(number)")
+        }
+        let tabs = browser.tabs
+        browser.select(tabs[0])
+        let window = try makeTopRow(browser)
+        try await settle()
+
+        let first = browser.addTabGroup(containing: tabs[0])
+        try await settle()
+        let firstEditor = try XCTUnwrap(window.firstResponder as? NSTextView, "nearby group name receives focus")
+        XCTAssertEqual(firstEditor.string, browser.tabGroups.first { $0.id == first }?.name)
+        browser.editingGroupID = nil
+        browser.select(tabs[tabs.count - 1])
+        try await Task.sleep(for: .seconds(1))
+
+        let second = browser.addTabGroup(containing: tabs[tabs.count - 2])
+        try await Task.sleep(for: .seconds(1))
+        let secondEditor = try XCTUnwrap(window.firstResponder as? NSTextView, "new group name receives focus")
+        XCTAssertEqual(secondEditor.string, browser.tabGroups.first { $0.id == second }?.name)
+    }
+
+    func testTheTopRowEndsACarryWhenTheSourceScrollsAway() async throws {
+        try XCTSkipUnless(Store.world != nil && Store.world == ProcessInfo.processInfo.environment["SEARCH_PROBE"],
+                          "Run this test in a separate process to isolate its profile")
+        Session.write(now: true, Session.Shape(tabs: [], active: 0))
+        let browser = makeBrowser()
+        defer {
+            browser.closeAll()
+            Session.write(now: true, Session.Shape(tabs: [], active: 0))
+        }
+        browser.prefs.sidebar = false
+        for number in 5..<65 {
+            browser.newTab()
+            browser.tabs.last?.restore(url: URL(string: "about:blank#carry-scroll-\(number)")!, title: "\(number)")
+        }
+        browser.select(browser.tabs[0])
+        let window = try makeTopRow(browser)
+        try await settle()
+
+        func scrollViews(in view: NSView) -> [NSScrollView] {
+            let here = (view as? NSScrollView).map { [$0] } ?? []
+            return here + view.subviews.flatMap { scrollViews(in: $0) }
+        }
+        let content = try XCTUnwrap(window.contentView)
+        let scroll = try XCTUnwrap(scrollViews(in: content).first {
+            ($0.documentView?.frame.width ?? 0) > $0.contentSize.width + 1
+        })
+        let document = try XCTUnwrap(scroll.documentView)
+        let start = scroll.contentView.bounds.minX
+        TabDrag.testPointer = NSPoint(x: window.frame.midX, y: window.frame.midY)
+        defer { TabDrag.testPointer = nil }
+        let y = Metrics.strip / 2
+        try await send(.leftMouseDown, at: NSPoint(x: 350, y: y), in: window)
+        try await send(.leftMouseDragged, at: NSPoint(x: 360, y: y), in: window)
+        XCTAssertEqual(CarryGuard.count, 1, "carry started")
+        scroll.contentView.scroll(to: NSPoint(x: document.frame.width - scroll.contentSize.width, y: 0))
+        scroll.reflectScrolledClipView(scroll.contentView)
+        XCTAssertGreaterThan(scroll.contentView.bounds.minX, start + 100)
+        try await settle()
+        XCTAssertEqual(CarryGuard.count, 1, "carry remains active while scrolling")
+        try await send(.leftMouseUp, at: NSPoint(x: 360, y: y), in: window)
+        try await settle()
+        XCTAssertEqual(CarryGuard.count, 0, "carry ended")
+    }
+
+    func testTheColumnRevealsTheSelectedTab() async throws {
+        try XCTSkipUnless(Store.world != nil && Store.world == ProcessInfo.processInfo.environment["SEARCH_PROBE"],
+                          "Run this test in a separate process to isolate its profile")
+        Session.write(now: true, Session.Shape(tabs: [], active: 0))
+        let browser = makeBrowser()
+        defer {
+            browser.closeAll()
+            Session.write(now: true, Session.Shape(tabs: [], active: 0))
+        }
+        browser.prefs.usesTabGroups = true
+        for number in 5..<65 {
+            browser.newTab()
+            browser.tabs.last?.restore(url: URL(string: "about:blank#column-scroll-\(number)")!, title: "\(number)")
+        }
+        let tabs = browser.tabs
+        let group = browser.addTabGroup(containing: tabs[0])
+        browser.move(tabs[1], toGroup: group)
+        browser.select(tabs[0])
+        let window = makeWindow(browser)
+        try await settle()
+
+        func scrollViews(in view: NSView) -> [NSScrollView] {
+            let here = (view as? NSScrollView).map { [$0] } ?? []
+            return here + view.subviews.flatMap { scrollViews(in: $0) }
+        }
+        let content = try XCTUnwrap(window.contentView)
+        let scroll = try XCTUnwrap(scrollViews(in: content).first {
+            ($0.documentView?.frame.height ?? 0) > $0.contentSize.height + 1
+        })
+        let start = scroll.contentView.bounds.minY
+        browser.select(tabs[tabs.count - 1])
+        try await Task.sleep(for: .seconds(1))
+        let end = scroll.contentView.bounds.minY
+        XCTAssertGreaterThan(end, start + 10)
+        let document = try XCTUnwrap(scroll.documentView)
+        XCTAssertGreaterThanOrEqual(scroll.contentView.bounds.maxY, document.bounds.maxY - browser.prefs.sideRow - 10)
+        XCTAssertNotNil(Bench.hoverRows[tabs[tabs.count - 1].id])
+        browser.select(tabs[0])
+        try await Task.sleep(for: .seconds(1))
+        XCTAssertLessThan(scroll.contentView.bounds.minY, end - 10)
+
+        let left = tabs[tabs.count - 2], right = tabs[tabs.count - 1]
+        browser.pair(right, with: left, onLeft: false)
+        browser.select(tabs[0])
+        try await Task.sleep(for: .seconds(1))
+        let beforePair = scroll.contentView.bounds.minY
+        browser.select(right)
+        try await Task.sleep(for: .seconds(1))
+        XCTAssertEqual(browser.activeSplit?.left, left.id)
+        XCTAssertGreaterThan(scroll.contentView.bounds.minY, beforePair + 10)
+        let pairDocument = try XCTUnwrap(scroll.documentView)
+        XCTAssertGreaterThanOrEqual(scroll.contentView.bounds.maxY, pairDocument.bounds.maxY - browser.prefs.sideRow - 10)
     }
 
     private func shoot(_ view: NSView?, _ folder: String?, _ name: String) throws {

@@ -200,6 +200,78 @@ final class TabGroupDragOutTests: XCTestCase {
         XCTAssertEqual(browser.tabs.last?.id, t[0].id, "after the last tab in no group")
     }
 
+    func testCarriedOutDownTheColumnAfterScrollingBack() async throws {
+        try await carryOutAfterScrollingBack(vertical: true)
+    }
+
+    func testCarriedOutAlongTheTopAfterScrollingBack() async throws {
+        try await carryOutAfterScrollingBack(vertical: false)
+    }
+
+    private func carryOutAfterScrollingBack(vertical: Bool) async throws {
+        try XCTSkipUnless(Store.world != nil && Store.world == ProcessInfo.processInfo.environment["SEARCH_PROBE"],
+                          "Run this test in a separate process to isolate its profile")
+        Session.write(now: true, Session.Shape(tabs: [], active: 0))
+        let browser = makeBrowser()
+        defer {
+            browser.closeAll()
+            Session.write(now: true, Session.Shape(tabs: [], active: 0))
+        }
+        for number in 5..<65 {
+            browser.newTab()
+            browser.tabs.last?.restore(url: URL(string: "about:blank#group-scroll-\(number)")!, title: "\(number)")
+        }
+        let tabs = browser.tabs
+        let group = browser.addTabGroup(containing: tabs[0])
+        browser.move(tabs[1], toGroup: group)
+        browser.editingGroupID = nil
+        browser.select(tabs[4])
+        let window = try vertical ? makeWindow(browser) : makeTopRow(browser)
+        try await settle()
+
+        func scrollViews(in view: NSView) -> [NSScrollView] {
+            let here = (view as? NSScrollView).map { [$0] } ?? []
+            return here + view.subviews.flatMap { scrollViews(in: $0) }
+        }
+        let content = try XCTUnwrap(window.contentView)
+        let scroll = try XCTUnwrap(scrollViews(in: content).first {
+            guard let document = $0.documentView else { return false }
+            return vertical ? document.frame.height > $0.contentSize.height + 1
+                : document.frame.width > $0.contentSize.width + 1
+        })
+        let document = try XCTUnwrap(scroll.documentView)
+        let origin = scroll.contentView.bounds.origin
+        let far = vertical
+            ? NSPoint(x: origin.x, y: document.frame.height - scroll.contentSize.height)
+            : NSPoint(x: document.frame.width - scroll.contentSize.width, y: origin.y)
+        scroll.contentView.scroll(to: far)
+        scroll.reflectScrolledClipView(scroll.contentView)
+        XCTAssertGreaterThan(vertical ? scroll.contentView.bounds.minY - origin.y : scroll.contentView.bounds.minX - origin.x, 100)
+        try await settle()
+        scroll.contentView.scroll(to: origin)
+        scroll.reflectScrolledClipView(scroll.contentView)
+        try await settle()
+        TabDrag.testPointer = NSPoint(x: window.frame.midX, y: window.frame.midY)
+
+        if vertical {
+            try await carry(from: 44, to: 125, in: window)
+        } else {
+            let heading = try XCTUnwrap(browser.tabGroups.first { $0.id == group })
+            let first = GroupHeading.width(for: heading.name) + Metrics.tabGap
+            let grab = scroll.contentView.convert(NSPoint(x: first + Metrics.tabMinWidth / 2, y: 0), to: nil).x
+            let end = scroll.contentView.convert(NSPoint(x: first + 3 * (Metrics.tabMinWidth + Metrics.tabGap) + 8, y: 0), to: nil).x
+            let y = Metrics.strip / 2
+            try await send(.leftMouseDown, at: NSPoint(x: grab, y: y), in: window)
+            for x in stride(from: grab + 2, through: end, by: 2) {
+                try await send(.leftMouseDragged, at: NSPoint(x: x, y: y), in: window)
+            }
+            try await send(.leftMouseUp, at: NSPoint(x: end, y: y), in: window)
+            try await settle()
+        }
+        XCTAssertNil(browser.group(of: tabs[0]), "out of its group")
+        XCTAssertEqual(Array(browser.tabs.prefix(4)).map(\.id), [tabs[1], tabs[2], tabs[0], tabs[3]].map(\.id))
+    }
+
     // MARK: - helpers
 
     private func makeBrowser() -> Browser {

@@ -13,6 +13,8 @@ in [ROADMAP.md](ROADMAP.md).
 
 ### Fixed
 
+- Opening tabs and navigating with many tabs takes less work in the top tab
+  bar and the sidebar's ungrouped rows.
 - An extension's popup opened from the sidebar no longer grows and shrinks
   as its initial scrollbars settle, or repeatedly changes size on static pages
   with overflow.
