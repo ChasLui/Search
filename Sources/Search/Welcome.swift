@@ -104,10 +104,17 @@ struct WelcomePanel: View {
                             .font(.system(size: 13))
                             .foregroundStyle(Palette.muted)
                     }
+                    // What can come from it at all; spaces and open tabs
+                    // are in the full sheet (File › Bring Things Over…).
+                    Text(Language.shared.format("welcome.can_bring", fallback: "%1$@ can bring: %2$@", (source ?? sources[0]).name, (source ?? sources[0]).canBringLine.lowercased()))
+                        .font(.system(size: 12))
+                        .foregroundStyle(Palette.faint)
                     if importsPasswords {
                         Choice("welcome.passwords", "welcome.passwords.detail", on: $wantsPasswords)
                     } else {
-                        Text(Language.shared.format("welcome.passwords.unsupported", fallback: "Passwords from %1$@ aren't supported yet.", (source ?? sources[0]).name))
+                        Text((source ?? sources[0]).passwordsInPasswordsApp
+                             ? Language.shared.format("welcome.passwords.in_passwords_app", fallback: "%1$@ keeps passwords in the Passwords app: export them there, then bring in the file below.", (source ?? sources[0]).name)
+                             : Language.shared.format("welcome.passwords.unsupported", fallback: "Passwords from %1$@ aren't supported yet.", (source ?? sources[0]).name))
                             .font(.system(size: 13)).foregroundStyle(Palette.muted)
                     }
                     Choice("welcome.bookmarks", "welcome.bookmarks.detail", on: $wantsBookmarks)
