@@ -576,6 +576,7 @@ struct SettingsPanel: View {
         case "sync":
             // On asks for the folder first; cancelled, it stays off.
             Switch(on: Binding(get: { sync.on }, set: { $0 ? sync.choose() : sync.turnOff() }))
+        case "handoff": Switch(on: $prefs.handoff)
         case "quit.confirm": Switch(on: $prefs.confirmsQuit)
         case "downloads.folder": Pill("ui.change") { chooseFolder() }
         case "downloads.ask": Switch(on: $prefs.asksWhereToSave)
