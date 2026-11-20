@@ -87,7 +87,7 @@ struct TabBar: View {
                                     // asking one after another a redraw of the strip
                                     // took over a second.
                                     let each = row.each
-                                    HStack(spacing: Metrics.tabGap) {
+                                    LazyHStack(spacing: Metrics.tabGap) {
                                         if let grouped {
                                             let pinSteps = steps(pins, each: each, splits: splits)
                                             ForEach(Array(pins.enumerated()), id: \.element.id) { index, tab in
@@ -98,6 +98,7 @@ struct TabBar: View {
                                             ForEach(grouped.groups) { group in
                                                 GroupHeading(browser: browser, group: group.group,
                                                              horizontal: true, dragSpace: "strip")
+                                                    .id("group-\(group.id)")
                                                 let members = group.tabs
                                                 let memberSteps = steps(members, each: each, splits: splits)
                                                 ForEach(Array(members.enumerated()), id: \.element.id) { index, tab in
@@ -140,6 +141,10 @@ struct TabBar: View {
                                 .onAppear { reveal(reader, overflowing: row.overflowing) }
                                 .onChange(of: row.overflowing) { _, _ in reveal(reader, overflowing: row.overflowing) }
                                 .onChange(of: browser.activeID) { _, _ in reveal(reader, overflowing: row.overflowing, gliding: true) }
+                                .onChange(of: browser.editingGroupID) { _, id in
+                                    guard let id else { return }
+                                    DispatchQueue.main.async { reader.scrollTo("group-\(id)") }
+                                }
                             }
                                 .modifier(SwipeShift(offset: browser.spaceSwipeOffset))
                         }

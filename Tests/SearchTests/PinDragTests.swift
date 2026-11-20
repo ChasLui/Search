@@ -170,11 +170,31 @@ final class PinDragTests: XCTestCase {
 
     func testDropsWhileTheRowsScroll() async throws {
         // More rows than the window holds: they scroll, under the grid.
+        try XCTSkipUnless(Store.world != nil && Store.world == ProcessInfo.processInfo.environment["SEARCH_PROBE"],
+                          "Run this test in a separate process to isolate its profile")
+        Session.write(now: true, Session.Shape(tabs: [], active: 0))
         let browser = makeBrowser(count: 20)
         let t = browser.tabs
+        XCTAssertEqual(t.count, 20)
         browser.pin(t[0]); browser.pin(t[1])
         try await browser.selectLoadedPinForDrag(t[0])
         let window = makeWindow(browser)
+        try await settle()
+        func scrollViews(in view: NSView) -> [NSScrollView] {
+            let here = (view as? NSScrollView).map { [$0] } ?? []
+            return here + view.subviews.flatMap { scrollViews(in: $0) }
+        }
+        let content = try XCTUnwrap(window.contentView)
+        let scroll = try XCTUnwrap(scrollViews(in: content).first {
+            ($0.documentView?.frame.height ?? 0) > $0.contentSize.height + 1
+        })
+        let start = scroll.contentView.bounds.origin
+        let bottom = try XCTUnwrap(scroll.documentView).frame.height - scroll.contentSize.height
+        scroll.contentView.scroll(to: NSPoint(x: start.x, y: bottom))
+        scroll.reflectScrolledClipView(scroll.contentView)
+        XCTAssertGreaterThan(scroll.contentView.bounds.minY, start.y + 10)
+        scroll.contentView.scroll(to: start)
+        scroll.reflectScrolledClipView(scroll.contentView)
         try await settle()
         let room = browser.prefs.sideWidth - 20
         try await drag(from: point(x: 10 + room / 6, y: Metrics.strip + 17, in: window), through: [
@@ -295,7 +315,9 @@ final class PinDragTests: XCTestCase {
         browser.prefs.listsPins = rows
         browser.prefs.roomyTabs = false
         browser.prefs.sharesPins = false
-        for word in ["one", "two", "three", "four", "five", "six"].prefix(count) {
+        let names = ["one", "two", "three", "four", "five", "six"]
+        for index in 0..<count {
+            let word = index < names.count ? names[index] : "tab-\(index)"
             if browser.tabs.last?.isBlank == false { browser.newTab() }
             browser.tabs.last?.restore(url: URL(string: "about:blank#\(word)")!, title: word)
         }
