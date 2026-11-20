@@ -1,0 +1,27 @@
+{
+  "scripts": {
+    "build": {
+      "command": "sh -c 'swift build; result=$?; printf \"\\033]633;D;%s\\007\" \"$result\"; exit \"$result\"'"
+    },
+    "check-localization": {
+      "command": "sh -c 'python3 Tests/check-localization.py; result=$?; printf \"\\033]633;D;%s\\007\" \"$result\"; exit \"$result\"'"
+    },
+    "test-extension-popup": {
+      "command": "sh -c 'SEARCH_PROBE=\"paseo-popup-$$\" SEARCH_FEED=file:///dev/null/no-appcast swift test --filter \"ExtensionPopup(Sizing|Motion)Tests\"; result=$?; printf \"\\033]633;D;%s\\007\" \"$result\"; exit \"$result\"'"
+    }
+  },
+  "metadataGeneration": {
+    "title": {
+      "instructions": "使用简体中文生成简短、准确的任务标题，保留能区分任务的 issue 或 PR 编号、组件名称和技术标识。"
+    },
+    "branchName": {
+      "instructions": "Use a short lowercase English kebab-case branch name. Start with feat-, fix-, perf-, docs-, test-, or chore- when appropriate, and preserve meaningful issue or PR numbers."
+    },
+    "commitMessage": {
+      "instructions": "遵循 Conventional Commits，使用 type(scope): 中文说明 的格式，scope 可省略。简洁、具体地描述改动，保留必要的技术标识，不加句末标点。"
+    },
+    "pullRequest": {
+      "instructions": "使用简体中文撰写简洁的标题和正文，说明问题、最终改动及其原因，并列出实际执行的验证和结果；未执行的检查应明确标注。保留必要的技术标识。"
+    }
+  }
+}

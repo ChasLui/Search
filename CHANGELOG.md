@@ -13,6 +13,9 @@ in [ROADMAP.md](ROADMAP.md).
 
 ### Fixed
 
+- An extension's popup opened from the sidebar no longer grows and shrinks
+  as its initial scrollbars settle, or repeatedly changes size on static pages
+  with overflow.
 - A window can be dragged by its strip on the first click when another app
   is in front. The Mac's Move & Resize shortcuts with Control, Command or
   Option also work while the pointer is over the tab area.

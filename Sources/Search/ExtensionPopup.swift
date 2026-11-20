@@ -134,18 +134,20 @@ final class ExtensionPopup: NSObject, WKUIDelegate, WKNavigationDelegate, NSPopo
         }
         DispatchQueue.main.asyncAfter(deadline: .now() + 5) { [weak self, weak popover] in
             guard let self, let popover, popover === self.popover else { return }
-            self.reveal()
+            if let size = self.firstSize { self.apply(size) } else { self.reveal() }
         }
     }
 
     /// Each extension's popup size, so the next opening starts there.
     private static var lastSize: [String: NSSize] = [:]
     private var shown = false
+    private var firstSize: NSSize?
 
     /// The page, at the popover's size, in view.
     private func reveal() {
         guard !shown, let web, let stage = popover?.contentViewController?.view else { return }
         shown = true
+        firstSize = nil
         web.frame = NSRect(origin: .zero, size: popover?.contentSize ?? stage.bounds.size)
         web.autoresizingMask = [.width, .height]
         NSAnimationContext.runAnimationGroup { context in
@@ -179,6 +181,7 @@ final class ExtensionPopup: NSObject, WKUIDelegate, WKNavigationDelegate, NSPopo
         page = nil
         popover = nil
         web = nil
+        firstSize = nil
         extensionID = nil
         button = nil
     }
@@ -226,6 +229,7 @@ final class ExtensionPopup: NSObject, WKUIDelegate, WKNavigationDelegate, NSPopo
         w = narrowest >= 100 ? narrowest : Math.max(narrowest, d.scrollWidth);
       }
       const gutter = innerWidth - v.clientWidth;
+      if (gutter > 0) m.gutterW = gutter;
       w = Math.min(800, Math.max(25, Math.ceil(w + gutter)));
       d.style.setProperty("width", (w - gutter) + "px", "important");
       let h = d.getBoundingClientRect().height;
@@ -236,8 +240,22 @@ final class ExtensionPopup: NSObject, WKUIDelegate, WKNavigationDelegate, NSPopo
         d.style.setProperty("min-height", "0", "important");
         h = d.getBoundingClientRect().height;
       }
+      const heightGutter = innerHeight - v.clientHeight;
+      if (heightGutter > 0) m.gutterH = heightGutter;
+      const b = document.body, bodyBox = b && b.getBoundingClientRect(), rootBox = d.getBoundingClientRect();
+      const rootStyle = getComputedStyle(d), bodyStyle = b && getComputedStyle(b);
+      const scrollbarVisible = getComputedStyle(d, "::-webkit-scrollbar").display !== "none";
+      const extent = (axis, start, size, scroll) => {
+        const root = rootStyle[axis], body = bodyStyle[axis];
+        if (["hidden", "clip"].includes(root) || (root === "visible" && ["hidden", "clip"].includes(body))) return 0;
+        return start + Math.max(size, root === "visible" || body === "visible" ? scroll : 0);
+      };
+      const extraW = !gutter && scrollbarVisible && b &&
+        extent("overflowY", bodyBox.top - rootBox.top, bodyBox.height, b.scrollHeight) > h + 1 ? (m.gutterW || 0) : 0;
+      const extraH = !heightGutter && scrollbarVisible && b &&
+        extent("overflowX", bodyBox.left - rootBox.left, bodyBox.width, b.scrollWidth) > w - gutter + 1 ? (m.gutterH || 0) : 0;
       back();
-      return [w, Math.min(600, Math.max(25, Math.ceil(h + innerHeight - v.clientHeight)))];
+      return [Math.min(800, w + extraW), Math.min(600, Math.max(25, Math.ceil(h + heightGutter + extraH)))];
     }
     """
 
@@ -260,7 +278,19 @@ final class ExtensionPopup: NSObject, WKUIDelegate, WKNavigationDelegate, NSPopo
             MainActor.assumeIsolated {
                 guard let self, web === self.web, !self.shown else { return }
                 guard let pair = value as? [Double], pair.count == 2 else { return }
-                self.apply(NSSize(width: pair[0], height: pair[1]))
+                let size = NSSize(width: pair[0], height: pair[1])
+                self.firstSize = size
+                web.setFrameSize(size)
+                web.evaluateJavaScript("(\(ExtensionPopup.preferred))()") { [weak self] value, _ in
+                    MainActor.assumeIsolated {
+                        guard let self, web === self.web, !self.shown else { return }
+                        if let pair = value as? [Double], pair.count == 2 {
+                            self.apply(NSSize(width: pair[0], height: pair[1]))
+                        } else {
+                            self.apply(size)
+                        }
+                    }
+                }
             }
         }
     }
@@ -311,7 +341,8 @@ final class ExtensionPopup: NSObject, WKUIDelegate, WKNavigationDelegate, NSPopo
         if ticks <= 8 {
             web.evaluateJavaScript("(\(ExtensionPopup.preferred))()") { [weak self] value, _ in
                 MainActor.assumeIsolated {
-                    guard let self, let pair = value as? [Double], pair.count == 2 else { return }
+                    guard let self, web === self.web, popover === self.popover,
+                          let pair = value as? [Double], pair.count == 2 else { return }
                     let wanted = NSSize(width: pair[0], height: pair[1])
                     let now = popover.contentSize
                     if abs(wanted.width - now.width) > 2 || abs(wanted.height - now.height) > 2 { self.apply(wanted) }
@@ -323,11 +354,21 @@ final class ExtensionPopup: NSObject, WKUIDelegate, WKNavigationDelegate, NSPopo
         if ticks > 24, ticks % 4 != 0 { return }
         // a width the page names for itself, remembered as the first measure does, is followed both ways:
         // Bitwarden's narrow setting shrinks it.
-        web.evaluateJavaScript("[\(ExtensionPopup.reach)('width'), (() => { const d = document.documentElement; return d && d.scrollHeight > d.clientHeight ? d.scrollHeight : 0; })(), (() => { const m = window.__searchSizing || (window.__searchSizing = {}), d = document.documentElement, v = document.compatMode === 'BackCompat' ? document.body : d, w = d.getBoundingClientRect().width, gutter = innerWidth - v.clientWidth; if (Math.abs(w - v.clientWidth) > 1) return (m.w = w) + gutter; return m.w && Math.abs(m.w - v.clientWidth) <= 1 ? m.w + gutter : 0; })()]") { value, _ in
+        web.evaluateJavaScript("""
+            (() => {
+              const d = document.documentElement, v = document.compatMode === 'BackCompat' ? document.body : d;
+              const m = window.__searchSizing || (window.__searchSizing = {}), own = d.getBoundingClientRect().width;
+              const named = Math.abs(own - v.clientWidth) > 1 || (m.w && Math.abs(m.w - v.clientWidth) <= 1);
+              const preferred = named ? (\(ExtensionPopup.preferred))() : null;
+              const width = preferred ? preferred[0] : \(ExtensionPopup.reach)('width');
+              return [width, d.scrollHeight > d.clientHeight ? d.scrollHeight : 0, preferred ? 1 : 0];
+            })()
+            """) { value, _ in
             MainActor.assumeIsolated {
-                guard let pair = value as? [Double], pair.count == 3 else { return }
+                guard web === self.web, popover === self.popover,
+                      let pair = value as? [Double], pair.count == 3 else { return }
                 let now = popover.contentSize
-                let width = pair[2] > 0 ? max(25, pair[2].rounded(.up)) : max(now.width, pair[0])
+                let width = pair[2] > 0 ? max(25, pair[0].rounded(.up)) : max(now.width, pair[0])
                 let wanted = NSSize(width: min(800, width), height: min(600, max(now.height, pair[1])))
                 if wanted != now { self.apply(wanted) }
             }

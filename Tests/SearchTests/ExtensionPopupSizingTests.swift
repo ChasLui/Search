@@ -11,6 +11,62 @@ final class ExtensionPopupSizingTests: XCTestCase {
         super.setUp()
     }
 
+    func testScrollbarHiddenAfterViewportExpansionDoesNotKeepGutters() async throws {
+        let (web, window) = try await page("""
+            html { width: 500px; height: 300px; }
+            body { width: 510px; height: 310px; }
+            ::-webkit-scrollbar { width: 15px; height: 15px; }
+            @media (min-width: 400px) { ::-webkit-scrollbar { display: none; } }
+            """, "Popup")
+        defer { window.close() }
+        _ = try await measure(web)
+        let display = try await web.evaluateJavaScript("getComputedStyle(document.documentElement, '::-webkit-scrollbar').display") as? String
+        XCTAssertEqual(display, "none")
+        let size = try await measure(web)
+        XCTAssertEqual(size, [500, 300])
+    }
+
+    func testBodyMarginDoesNotCauseScrollbarOscillation() async throws {
+        let (web, window) = try await page("""
+            html { width: 500px; height: 300px; }
+            body { margin: 8px; width: 500px; height: 300px; }
+            ::-webkit-scrollbar { width: 15px; height: 15px; }
+            """, "Popup")
+        defer { window.close() }
+        let first = try await measure(web)
+        let second = try await measure(web)
+        let third = try await measure(web)
+        XCTAssertEqual(first, [515, 315])
+        XCTAssertEqual(second, first)
+        XCTAssertEqual(third, first)
+    }
+
+    func testContainedOverflowDoesNotAddOuterGutters() async throws {
+        let (web, window) = try await page("""
+            html, body { width: 500px; height: 300px; overflow: auto; }
+            div { width: 510px; height: 310px; } ::-webkit-scrollbar { width: 15px; height: 15px; }
+            """, "<div>Popup</div>")
+        defer { window.close() }
+        _ = try await measure(web)
+        let second = try await measure(web)
+        let third = try await measure(web)
+        XCTAssertEqual(second, [500, 300])
+        XCTAssertEqual(third, [500, 300])
+    }
+
+    func testClippedOverflowDoesNotKeepScrollbarGutters() async throws {
+        let (web, window) = try await page("""
+            html, body { width: 500px; height: 300px; } body { overflow: hidden; }
+            div { width: 510px; height: 310px; } ::-webkit-scrollbar { width: 15px; height: 15px; }
+            """, "<div>Popup</div>")
+        defer { window.close() }
+        _ = try await measure(web)
+        let second = try await measure(web)
+        let third = try await measure(web)
+        XCTAssertEqual(second, [500, 300])
+        XCTAssertEqual(third, [500, 300])
+    }
+
     func testScrollbarDoesNotBecomeThePopupsExplicitWidth() async throws {
         let (web, window) = try await page("""
             html { overflow-y: scroll; } ::-webkit-scrollbar { width: 15px; }
