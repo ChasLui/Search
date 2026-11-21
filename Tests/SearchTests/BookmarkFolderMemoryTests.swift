@@ -82,6 +82,9 @@ final class BookmarkFolderMemoryTests: XCTestCase {
         XCTAssertEqual(a.lastFolder, work.id)
         XCTAssertNil(b.lastFolder)
         b.lastFolder = home.id
+        // Saves go to a disk queue one after another (see Disk): the next
+        // launch below reads the folder once this test's writes have landed.
+        Disk.drain()
         XCTAssertEqual(Bookmarks(file: "bookmarks-a-\(tag).json").lastFolder, work.id, "kept across launches")
         XCTAssertEqual(b.lastFolder, home.id)
         // A folder of another profile's is no folder here.
