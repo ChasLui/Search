@@ -1470,9 +1470,13 @@ enum ImportSource: Identifiable, Hashable {
         return out
     }
 
-    /// The same, as a line: "Bookmarks, history, passwords and open tabs".
+    /// The same, as an English line: "Bookmarks, history, passwords and open
+    /// tabs". The interface shows localizedCanBringLine; this stays the same
+    /// whatever Mac it is read on.
     var canBringLine: String {
-        let line = ListFormatter.localizedString(byJoining: canBring)
+        let list = ListFormatter()
+        list.locale = Locale(identifier: "en")
+        let line = list.string(from: canBring) ?? canBring.joined(separator: ", ")
         return line.prefix(1).uppercased() + line.dropFirst()
     }
 
