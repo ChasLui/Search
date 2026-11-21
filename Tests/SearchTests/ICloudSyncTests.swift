@@ -561,6 +561,10 @@ final class ICloudSyncTests: XCTestCase {
     }
 
     func testABuildWithoutICloudCantTurnItOn() {
+        let language = Language.shared
+        let previousLanguage = language.selection
+        language.select(.english)
+        defer { language.select(previousLanguage) }
         let sync = make(FakeMac(), FakeEngine(), available: false)
         sync.turnOn()
         XCTAssertFalse(sync.on)
@@ -582,6 +586,10 @@ final class ICloudSyncTests: XCTestCase {
     }
 
     func testADeletedZoneTurnsSyncOffAndSaysWhy() async {
+        let language = Language.shared
+        let previousLanguage = language.selection
+        language.select(.english)
+        defer { language.select(previousLanguage) }
         let mac = FakeMac(), engine = FakeEngine()
         mac.tabs = [DeviceTabs.Page(url: "https://a.example/", title: "A")]
         engine.cloud = [("device.PHONE", json(DeviceTabs(name: "iPhone", platform: "ios", at: Date(),
