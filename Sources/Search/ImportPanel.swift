@@ -131,7 +131,7 @@ struct ImportPanel: View {
                 Card {
                     ForEach(Array(sources.enumerated()), id: \.element.id) { index, source in
                         if index > 0 { Rule() }
-                        Row(name: source.name, detail: detail(of: source), can: source.canBringLine, chosen: pick == source) {
+                        Row(name: source.name, detail: detail(of: source), can: source.localizedCanBringLine, chosen: pick == source) {
                             guard !bringing else { return }
                             pick = source
                             replaceBookmarks = false

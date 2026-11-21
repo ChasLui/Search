@@ -169,7 +169,7 @@ struct ExtensionsPage: View {
                                 .textSelection(.enabled)
                         }
                         // Running, but without what it is for (#1208).
-                        if let limit = context.flatMap({ Extensions.cantDo($0.webExtension.manifest) }) {
+                        if let limit = context.flatMap({ Extensions.localizedCantDo($0.webExtension.manifest) }) {
                             Text(limit)
                                 .font(.system(size: 11.5))
                                 .foregroundStyle(Palette.unsafe)

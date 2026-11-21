@@ -36,18 +36,18 @@ struct ShortcutsPage: View {
         let words = hunt.trimmingCharacters(in: .whitespaces)
         guard !words.isEmpty else { return true }
         let key = words.replacingOccurrences(of: " ", with: "")
-        return "Tab 1 to 9".localizedCaseInsensitiveContains(words) || "numbers".localizedCaseInsensitiveContains(words)
+        return language.text("shortcuts.tab_numbers", fallback: "Tab 1 to 9").localizedCaseInsensitiveContains(words) || "numbers".localizedCaseInsensitiveContains(words)
             || KeyCombo.tabNumbers.localizedCaseInsensitiveContains(key)
             || (1...9).contains { KeyCombo.tabNumber($0).display.localizedCaseInsensitiveContains(key) }
     }
 
     private var numbersNote: String {
         if prefs.usesSpaces && prefs.spacesOnCommand {
-            return "The ninth is the last. ⌘1–⌘9 switch spaces: Settings › Spaces & Pins"
+            return language.text("shortcuts.tab_numbers_command", fallback: "The ninth is the last. ⌘1–⌘9 switch spaces: Settings › Spaces & Pins")
         }
         return prefs.usesSpaces
-            ? "The ninth is the last. To switch spaces with them instead: Settings › Spaces & Pins"
-            : "The ninth is the last. With spaces on, they can switch spaces instead"
+            ? language.text("shortcuts.tab_numbers_spaces", fallback: "The ninth is the last. To switch spaces with them instead: Settings › Spaces & Pins")
+            : language.text("shortcuts.tab_numbers_alone", fallback: "The ninth is the last. With spaces on, they can switch spaces instead")
     }
 
     var body: some View {
@@ -77,7 +77,7 @@ struct ShortcutsPage: View {
                         }
                         if numbered {
                             if !commands.isEmpty { Rule() }
-                            Line("Tab 1 to 9", numbersNote) {
+                            Line(language.text("shortcuts.tab_numbers", fallback: "Tab 1 to 9"), numbersNote) {
                                 FixedKey(text: KeyCombo.tabNumbers)
                             }
                         }
@@ -131,6 +131,7 @@ extension ShortcutsPage {
 
 /// Keys that are listed but not moved here, drawn as a KeyBox at rest.
 private struct FixedKey: View {
+    @ObservedObject private var language = Language.shared
     let text: String
 
     var body: some View {
@@ -144,7 +145,7 @@ private struct FixedKey: View {
                 RoundedRectangle(cornerRadius: 7, style: .continuous)
                     .strokeBorder(Palette.hairline, lineWidth: 1)
             )
-            .help("Set in Settings › Spaces & Pins")
+            .help(language.text("shortcuts.set_in_settings", fallback: "Set in Settings › Spaces & Pins"))
     }
 }
 

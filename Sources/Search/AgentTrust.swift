@@ -56,6 +56,9 @@ struct AgentLauncher: Equatable {
     var signed = false
     /// Why it can't be remembered, or nil when it can (AgentLauncher.refusal).
     var unrememberable: String?
+    /// The same reason, structured, so the banner can say it in the
+    /// interface's language (Refusal.localized).
+    var refusal: Refusal?
 
     var name: String { (path as NSString).lastPathComponent }
 
@@ -93,14 +96,64 @@ struct AgentLauncher: Equatable {
 
     /// Why a launcher can't be remembered, or nil when it can.
     static func refusal(signed: Bool, adhoc: Bool, team: String, identifier: String, path: String) -> String? {
+        refusalKind(signed: signed, adhoc: adhoc, team: team, identifier: identifier, path: path)?.english
+    }
+
+    /// The same reason, for the banner to say in the interface's language.
+    static func refusalKind(signed: Bool, adhoc: Bool, team: String, identifier: String, path: String) -> Refusal? {
         let name = (path as NSString).lastPathComponent
-        let called = name.isEmpty ? "the program that started it" : name
-        guard signed else { return "\(called), which started it, isn't signed" }
-        guard !adhoc, !team.isEmpty else { return "\(called), which started it, isn't signed by a named developer" }
+        guard signed else { return .unsigned(name: name) }
+        guard !adhoc, !team.isEmpty else { return .unnamedDeveloper(name: name) }
         guard let expected = allowed[identifier], expected == team else {
-            return "it was started by \(called), which isn't an agent's own program Search knows"
+            return .notAgentsProgram(name: name)
         }
         return nil
+    }
+}
+
+/// Why a launcher can't be remembered, kept as what was the matter rather
+/// than as a sentence: the same reason is said in the interface's language.
+enum Refusal: Equatable {
+    case unsigned(name: String)
+    case unnamedDeveloper(name: String)
+    case notAgentsProgram(name: String)
+    case wrongSignature(name: String, identifier: String)
+
+    private var name: String {
+        switch self {
+        case .unsigned(let name), .unnamedDeveloper(let name), .notAgentsProgram(let name),
+             .wrongSignature(let name, _):
+            return name
+        }
+    }
+
+    /// As the bench and the tests say it.
+    var english: String {
+        let called = name.isEmpty ? "the program that started it" : name
+        switch self {
+        case .unsigned: return "\(called), which started it, isn't signed"
+        case .unnamedDeveloper: return "\(called), which started it, isn't signed by a named developer"
+        case .notAgentsProgram: return "it was started by \(called), which isn't an agent's own program Search knows"
+        case .wrongSignature(_, let identifier):
+            return "\(name), which started it, isn't signed as \(identifier) must be"
+        }
+    }
+
+    @MainActor var localized: String {
+        let language = Language.shared
+        let called = name.isEmpty
+            ? language.text("agent.refusal.the_program", fallback: "the program that started it")
+            : name
+        switch self {
+        case .unsigned:
+            return language.format("agent.refusal.unsigned", fallback: "%1$@, which started it, isn't signed", called)
+        case .unnamedDeveloper:
+            return language.format("agent.refusal.unnamed_developer", fallback: "%1$@, which started it, isn't signed by a named developer", called)
+        case .notAgentsProgram:
+            return language.format("agent.refusal.not_agents_program", fallback: "it was started by %1$@, which isn't an agent's own program Search knows", called)
+        case .wrongSignature(_, let identifier):
+            return language.format("agent.refusal.wrong_signature", fallback: "%1$@, which started it, isn't signed as %2$@ must be", name, identifier)
+        }
     }
 }
 
@@ -182,12 +235,14 @@ enum AgentIdentity {
             }
         }
         if out.requirement.isEmpty { out.signed = false }
-        out.unrememberable = AgentLauncher.refusal(signed: out.signed, adhoc: out.adhoc, team: out.team,
-                                                   identifier: out.identifier, path: out.path)
+        out.refusal = AgentLauncher.refusalKind(signed: out.signed, adhoc: out.adhoc, team: out.team,
+                                                identifier: out.identifier, path: out.path)
+        out.unrememberable = out.refusal?.english
         // What it says it is, checked against what Search says that is.
         if out.unrememberable == nil,
            !(AgentLauncher.requirements[out.identifier].map { passes(code, $0) } ?? false) {
-            out.unrememberable = "\(out.name), which started it, isn't signed as \(out.identifier) must be"
+            out.refusal = .wrongSignature(name: out.name, identifier: out.identifier)
+            out.unrememberable = out.refusal?.english
         }
         return out
     }

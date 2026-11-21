@@ -259,7 +259,7 @@ struct StylePanel: View {
                 size = Self.first
                 Self.keep(size)
             }
-            .help("Drag to resize")
+            .help(Text("site_style.drag_resize", bundle: Language.resources))
             .accessibilityHidden(true)
     }
 

@@ -1784,7 +1784,7 @@ struct TabMenu: View {
                 } label: { Text("ui.move_to_window", bundle: Language.resources) }
             }
             if browser.prefs.littleLinks {
-                Button("Open in Small Window") { browser.openInLittleWindow(tab) }
+                Button { browser.openInLittleWindow(tab) } label: { Text("ui.open_in_small_window", bundle: Language.resources) }
                     .disabled(!browser.liftable(tab))
             }
         }

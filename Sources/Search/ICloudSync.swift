@@ -581,7 +581,7 @@ final class ICloudSync: ObservableObject {
         defer { joining = false }
         account = (try? await ICloudSync.outside { await engine.account() }) ?? .unknown
         guard account == .signedIn else {
-            problem = account == .restricted ? "iCloud is restricted on this Mac" : nil
+            problem = account == .restricted ? Language.shared.text("icloud.summary.restricted", fallback: "iCloud is restricted on this Mac") : nil
             return
         }
         do {
@@ -857,7 +857,11 @@ final class ICloudSync: ObservableObject {
     }
 
     static func title(_ device: DeviceTabs) -> String {
-        device.name.isEmpty ? (device.platform == "ios" ? "iPhone" : "Mac") : device.name
+        device.name.isEmpty
+            ? (device.platform == "ios"
+               ? Language.shared.text("icloud.title.iphone", fallback: "iPhone")
+               : Language.shared.text("icloud.title.mac", fallback: "Mac"))
+            : device.name
     }
 
     /// Tabs open on the other devices that match what was typed, for the
@@ -869,7 +873,7 @@ final class ICloudSync: ObservableObject {
         for (_, device) in devices {
             for page in device.tabs where page.title.lowercased().contains(words) || page.url.lowercased().contains(words) {
                 guard let url = URL(string: page.url) else { continue }
-                out.append(Suggestion(key: Address.editable(url), title: "On \(ICloudSync.title(device))", url: url, kind: .elsewhere))
+                out.append(Suggestion(key: Address.editable(url), title: Language.shared.format("icloud.suggestion", fallback: "On %1$@", ICloudSync.title(device)), url: url, kind: .elsewhere))
                 if out.count == limit { return out }
             }
         }
@@ -878,32 +882,42 @@ final class ICloudSync: ObservableObject {
 
     /// The line under the switch.
     func summary(folderSyncOn: Bool, otherwise: String) -> String {
+        let language = Language.shared
         guard available else {
             // A signed build in a test run is a build that could: it says so.
-            return Store.testing && ICloudSync.entitled ? "Off in a test run" : "Needs a build of Search signed for iCloud"
+            return Store.testing && ICloudSync.entitled
+                ? language.text("icloud.summary.test_run", fallback: "Off in a test run")
+                : language.text("icloud.summary.unsigned", fallback: "Needs a build of Search signed for iCloud")
         }
-        if folderSyncOn && !on { return "Turn off Sync with your other Macs first" }
-        guard on else { return offReason ?? otherwise }
+        if folderSyncOn && !on { return language.text("icloud.summary.folder_sync_on", fallback: "Turn off Sync with your other Macs first") }
+        guard on else {
+            guard let offReason else { return otherwise }
+            return offReason == ICloudSync.deletedElsewhere
+                ? language.text("icloud.off.deleted_elsewhere", fallback: ICloudSync.deletedElsewhere)
+                : offReason
+        }
         switch account {
-        case .signedOut: return "Not signed in to iCloud: System Settings › Apple Account"
-        case .restricted: return "iCloud is restricted on this Mac"
-        case .unknown: return problem ?? "Checking iCloud…"
+        case .signedOut: return language.text("icloud.summary.signed_out", fallback: "Not signed in to iCloud: System Settings › Apple Account")
+        case .restricted: return language.text("icloud.summary.restricted", fallback: "iCloud is restricted on this Mac")
+        case .unknown: return problem ?? language.text("icloud.summary.checking", fallback: "Checking iCloud…")
         case .signedIn:
-            if let problem { return "Signed in to iCloud · \(problem)" }
-            guard let lastSynced else { return "Signed in to iCloud · syncing…" }
+            if let problem { return language.format("icloud.summary.problem", fallback: "Signed in to iCloud · %1$@", problem) }
+            guard let lastSynced else { return language.text("icloud.summary.syncing", fallback: "Signed in to iCloud · syncing…") }
             let when = RelativeDateTimeFormatter().localizedString(for: lastSynced, relativeTo: Date())
             let count = devices.count
-            let with = count == 0 ? "" : count == 1 ? " · 1 other device" : " · \(count) other devices"
-            return "Signed in to iCloud · synced \(when)\(with)"
+            let with = count == 0 ? "" : count == 1
+                ? language.text("icloud.other_devices.one", fallback: " · 1 other device")
+                : language.format("icloud.other_devices.many", fallback: " · %1$@ other devices", count)
+            return language.format("icloud.summary.synced", fallback: "Signed in to iCloud · synced %1$@%2$@", when, with)
         }
     }
 
     static func say(_ error: Error) -> String {
         guard let error = error as? CKError else { return error.localizedDescription }
         switch error.code {
-        case .notAuthenticated: return "Sign in to iCloud in System Settings to sync"
-        case .quotaExceeded: return "Your iCloud is full"
-        case .networkFailure, .networkUnavailable: return "Offline. Sync carries on when you're back"
+        case .notAuthenticated: return Language.shared.text("icloud.say.not_authenticated", fallback: "Sign in to iCloud in System Settings to sync")
+        case .quotaExceeded: return Language.shared.text("icloud.say.quota", fallback: "Your iCloud is full")
+        case .networkFailure, .networkUnavailable: return Language.shared.text("icloud.say.offline", fallback: "Offline. Sync carries on when you're back")
         default: return error.localizedDescription
         }
     }

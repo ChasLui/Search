@@ -735,21 +735,39 @@ final class Extensions: NSObject, ObservableObject {
     /// that way, so not one request is blocked (#1208). Said in Settings and
     /// at install rather than leaving a row that looked like any other.
     static func cantDo(_ manifest: [String: Any]) -> String? {
+        guard asksToBlockRequests(manifest) else { return nil }
+        let lite = suggestsLite(manifest) ? " uBlock Origin Lite, from the Chrome Web Store, blocks them here." : ""
+        return "Can’t block requests: Safari’s engine doesn’t let extensions block them with webRequestBlocking. What it does inside pages still works." + lite
+    }
+
+    /// The same, in the interface's language.
+    @MainActor
+    static func localizedCantDo(_ manifest: [String: Any]) -> String? {
+        guard asksToBlockRequests(manifest) else { return nil }
+        let lite = suggestsLite(manifest)
+            ? " " + Language.shared.text("extension.cant_block_lite", fallback: "uBlock Origin Lite, from the Chrome Web Store, blocks them here.")
+            : ""
+        return Language.shared.text("extension.cant_block", fallback: "Can’t block requests: Safari’s engine doesn’t let extensions block them with webRequestBlocking. What it does inside pages still works.") + lite
+    }
+
+    private static func asksToBlockRequests(_ manifest: [String: Any]) -> Bool {
         let asked = (manifest["permissions"] as? [Any] ?? []).compactMap { $0 as? String }
         // One that also has request rules blocks with those.
-        guard asked.contains("webRequestBlocking"), !asked.contains(where: { $0.hasPrefix("declarativeNetRequest") }) else { return nil }
-        let lite = (manifest["name"] as? String)?.hasPrefix("uBlock Origin") == true
-            ? " uBlock Origin Lite, from the Chrome Web Store, blocks them here." : ""
-        return "Can’t block requests: Safari’s engine doesn’t let extensions block them with webRequestBlocking. What it does inside pages still works." + lite
+        return asked.contains("webRequestBlocking") && !asked.contains(where: { $0.hasPrefix("declarativeNetRequest") })
+    }
+
+    private static func suggestsLite(_ manifest: [String: Any]) -> Bool {
+        (manifest["name"] as? String)?.hasPrefix("uBlock Origin") == true
     }
 
     /// WebKit's error in a line: the manifest problem it names, where it
     /// names one, rather than its general "couldn't be loaded".
+    @MainActor
     static func reason(_ error: Error) -> String {
         let error = error as NSError
         let under = (error.userInfo[NSUnderlyingErrorKey] as? NSError)?.localizedDescription
         let text = [error.localizedDescription, under].compactMap { $0 }.filter { !$0.isEmpty }
-        return text.isEmpty ? "unknown error" : text.joined(separator: " ")
+        return text.isEmpty ? Language.shared.text("extension.unknown_error", fallback: "unknown error") : text.joined(separator: " ")
     }
 
     @discardableResult
@@ -1151,7 +1169,7 @@ final class Extensions: NSObject, ObservableObject {
         guard installed.contains(where: { $0.id == id }) else { return }
         installing.insert(id)
         if await load(item) {
-            let limit = contexts[id].flatMap { Extensions.cantDo($0.webExtension.manifest) }
+            let limit = contexts[id].flatMap { Extensions.localizedCantDo($0.webExtension.manifest) }
             if let limit {
                 browser?.announce("\(name) is installed, but \(limit.prefix(1).lowercased() + limit.dropFirst())",
                                   localizedKey: "announcement.extension_installed_limit", arguments: [name, limit])

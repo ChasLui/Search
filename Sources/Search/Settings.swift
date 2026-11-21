@@ -455,7 +455,7 @@ struct SettingsPanel: View {
         switch item.id {
         case "updates.version": return versionTitle
         // ⌃ while it picks the tabs (Settings › Spaces & Pins).
-        case "tabs.shortcuts" where prefs.usesSpaces && prefs.spacesOnCommand: return "Show tab numbers while ⌃ is held"
+        case "tabs.shortcuts" where prefs.usesSpaces && prefs.spacesOnCommand: return language.text("settings.tabs.shortcuts_held", fallback: "Show tab numbers while ⌃ is held")
         default: return item.title
         }
     }
@@ -465,11 +465,11 @@ struct SettingsPanel: View {
         case "general.default":
             return isDefault ? language.text("Search is the default browser on this Mac", fallback: "Search is the default browser on this Mac") : item.detail
         case "mail.default":
-            if mailDefault { return "Email links from other apps open here" }
-            return mailHandler.map { "Email links from other apps go to \($0) now" } ?? item.detail
+            if mailDefault { return language.text("settings.mail.open_here", fallback: "Email links from other apps open here") }
+            return mailHandler.map { language.format("settings.mail.go_to", fallback: "Email links from other apps go to %1$@ now", $0) } ?? item.detail
         case "downloads.folder":
             return prefs.downloads.path.replacingOccurrences(of: NSHomeDirectory(), with: "~")
-        case "sync": return icloud.on ? "Off while Sync with iCloud is on" : sync.on ? sync.summary : item.detail
+        case "sync": return icloud.on ? language.text("settings.sync.off_icloud", fallback: "Off while Sync with iCloud is on") : sync.on ? sync.summary : item.detail
         case "icloud": return icloud.summary(folderSyncOn: sync.on, otherwise: item.detail)
         case "search.engine": return searchDetail
         case "search.shift": return shiftDetail
@@ -540,7 +540,7 @@ struct SettingsPanel: View {
         case "mail.webmail":
             Picker("", selection: $prefs.webmail) {
                 ForEach(Webmail.allCases) { mail in
-                    Text(mail.title).tag(mail)
+                    Text(language.text("webmail.\(mail.rawValue)", fallback: mail.title)).tag(mail)
                     if mail == .none { Divider() }
                 }
             }
@@ -555,11 +555,15 @@ struct SettingsPanel: View {
                     .frame(width: 24)
             } else {
                 // Only ever from this click: macOS asks to confirm.
-                Pill("Make default", filled: true) {
+                Pill("ui.make_default", filled: true) {
                     Mail.becomeDefault { worked in
                         mailDefault = Mail.isDefault
                         mailHandler = Mail.handlerName
-                        browser.announce(worked && mailDefault ? "Email links now open here" : "macOS didn't change it")
+                        if worked && mailDefault {
+                            browser.announce("Email links now open here", localizedKey: "announcement.mail_open_here")
+                        } else {
+                            browser.announce("macOS didn't change it", localizedKey: "announcement.mail_unchanged")
+                        }
                     }
                 }
             }
@@ -590,12 +594,12 @@ struct SettingsPanel: View {
                 .disabled(locked)
                 .opacity(locked ? 0.4 : 1)
         case "icloud.erase":
-            Pill("Delete…") {
+            Pill("ui.delete") {
                 let alert = NSAlert()
-                alert.messageText = "Delete Search's data from iCloud?"
-                alert.informativeText = "Open tabs, pins, spaces, bookmarks and settings leave iCloud for every device. What is on each device stays. Sync with iCloud turns off here and on your other devices."
-                alert.addButton(withTitle: "Delete")
-                alert.addButton(withTitle: "Cancel")
+                alert.messageText = language.text("settings.icloud.erase.confirm", fallback: "Delete Search's data from iCloud?")
+                alert.informativeText = language.text("settings.icloud.erase.message", fallback: "Open tabs, pins, spaces, bookmarks and settings leave iCloud for every device. What is on each device stays. Sync with iCloud turns off here and on your other devices.")
+                alert.addButton(withTitle: language.text("ui.delete", fallback: "Delete"))
+                alert.addButton(withTitle: language.text("ui.cancel", fallback: "Cancel"))
                 if alert.runModal() == .alertFirstButtonReturn { icloud.erase() }
             }
         case "quit.confirm": Switch(on: $prefs.confirmsQuit)
@@ -1704,15 +1708,20 @@ private struct NotificationSites: View {
 /// Forget. Under "Let coding agents use Search".
 private struct RememberedAgents: View {
     @ObservedObject private var trust = AgentTrust.shared
+    @ObservedObject private var language = Language.shared
 
     var body: some View {
         ForEach(trust.remembered) { entry in
             Rule()
-            SettingRow(icon: "checkmark.shield", title: entry.client,
-                       detail: (entry.suspended == true ? "Asked again since you stopped it" : "Allowed without asking")
-                           + " · signed by \(entry.signer) · last used \(Self.when(entry.used)) · until \(Self.day(entry.expires))",
-                       more: entry.path.isEmpty ? nil : "Started by \((entry.path as NSString).lastPathComponent) (\(entry.identifier), team \(entry.team)), last seen at \(entry.path). Let in only while that program still passes its code signature and it calls itself “\(entry.client)”.") {
-                Pill("Forget") { trust.forget(entry.id) }
+            let detail = (entry.suspended == true
+                          ? language.text("settings.trust.stopped", fallback: "Asked again since you stopped it")
+                          : language.text("settings.trust.allowed", fallback: "Allowed without asking"))
+                       + language.format("settings.trust.detail", fallback: " · signed by %1$@ · last used %2$@ · until %3$@",
+                                         entry.signer, Self.when(entry.used), Self.day(entry.expires))
+            let more = entry.path.isEmpty ? nil : language.format("settings.trust.more", fallback: "Started by %1$@ (%2$@, team %3$@), last seen at %4$@. Let in only while that program still passes its code signature and it calls itself “%5$@”.",
+                                                                  (entry.path as NSString).lastPathComponent, entry.identifier, entry.team, entry.path, entry.client)
+            SettingRow(icon: "checkmark.shield", title: entry.client, detail: detail, more: more) {
+                Pill("ui.forget") { trust.forget(entry.id) }
             }
         }
     }

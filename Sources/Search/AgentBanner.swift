@@ -77,7 +77,7 @@ private struct AgentStatusFace: View {
                         .background(ClickSpot { AgentControl.shared.stopButton = $0 })
                 }
                 .buttonStyle(.plain)
-                .help("\(AgentWords.short(session)). Click to stop it.")
+                .help(Language.shared.format("agent.click_to_stop", fallback: "%1$@. Click to stop it.", AgentWords.short(session)))
             case .row, .door:
                 VStack(alignment: .leading, spacing: 1) {
                     HStack(spacing: 6) {
@@ -93,14 +93,14 @@ private struct AgentStatusFace: View {
                     }
                     // Let in without asking: always said, under it.
                     if session.auto, style == .row {
-                        Text("Allowed automatically")
+                        Text(Language.shared.text("agent.allowed_automatically", fallback: "Allowed automatically"))
                             .font(.system(size: 10))
                             .foregroundStyle(Palette.muted.opacity(0.8))
                             .lineLimit(1)
                     }
                 }
                 .padding(.horizontal, style == .row ? 10 : 4)
-                .help(AgentWords.short(session) + ". Stop disconnects it; its tabs stay.")
+                .help(Language.shared.format("agent.banner_help", fallback: "%1$@. Stop disconnects it; its tabs stay.", AgentWords.short(session)))
                 .fixedSize(horizontal: style == .door, vertical: true)
             }
         }
@@ -111,7 +111,7 @@ private struct AgentStop: View {
     @State private var hovering = false
     var body: some View {
         Button { AgentControl.shared.stopSession() } label: {
-            Text("Stop")
+            Text("Stop", bundle: Language.resources)
                 .font(.system(size: 11, weight: .medium))
                 .foregroundStyle(hovering ? Palette.ink : Palette.ink.opacity(0.75))
                 .contentShape(Rectangle())
@@ -119,7 +119,7 @@ private struct AgentStop: View {
         }
         .buttonStyle(.plain)
         .onHover { hovering = $0 }
-        .help("Disconnect it. Its tabs stay where they are.")
+        .help(Text("Disconnect it. Its tabs stay where they are.", bundle: Language.resources))
     }
 }
 
@@ -140,7 +140,7 @@ struct AgentMark: View {
                 .background(Circle().fill(Palette.ground))
                 .offset(x: 3, y: 3)
                 .allowsHitTesting(false)
-                .help("A coding agent is working in this tab")
+                .help(Language.shared.text("agent.working_here", fallback: "A coding agent is working in this tab"))
                 .transition(.opacity)
         } else if tab.agent {
             Circle()
@@ -150,7 +150,7 @@ struct AgentMark: View {
                 .background(Circle().fill(Palette.ground))
                 .offset(x: 3, y: 3)
                 .allowsHitTesting(false)
-                .help("Opened by a coding agent")
+                .help(Language.shared.text("Opened by a coding agent", fallback: "Opened by a coding agent"))
         }
     }
 }
@@ -159,7 +159,7 @@ struct AgentMark: View {
 struct AgentRowStop: View {
     var body: some View {
         Button { AgentControl.shared.stopSession() } label: {
-            Text("Stop")
+            Text("ui.stop", bundle: Language.resources)
                 .font(.system(size: 11, weight: .medium))
                 .foregroundStyle(Palette.ink)
                 .padding(.horizontal, 7)
@@ -169,7 +169,7 @@ struct AgentRowStop: View {
                 .contentShape(Capsule())
         }
         .buttonStyle(.plain)
-        .help("Stop the coding agent. Its tabs stay where they are.")
+        .help(Text("agent.stop_help", bundle: Language.resources))
     }
 }
 
@@ -190,19 +190,23 @@ struct StopAgentMenuItem: View {
 enum AgentWords {
     @MainActor
     static func line(_ session: AgentSession) -> String {
-        session.busy ? "\(session.client) is using Search" : "\(session.client), idle"
+        session.busy
+            ? Language.shared.format("agent.is_using", fallback: "%@ is using Search", session.client)
+            : Language.shared.format("agent.idle", fallback: "%@, idle", session.client)
     }
 
     /// Said for a few seconds once let in without asking.
     @MainActor
     static func admitted(_ session: AgentSession) -> String {
-        "\(session.client) let in automatically"
+        Language.shared.format("agent.let_in", fallback: "%@ let in automatically", session.client)
     }
 
     /// In the strip, where there is room for one short line.
     @MainActor
     static func short(_ session: AgentSession) -> String {
-        session.auto ? "\(session.client) · Allowed automatically" : line(session)
+        session.auto
+            ? Language.shared.format("agent.short_auto", fallback: "%@ · Allowed automatically", session.client)
+            : line(session)
     }
 }
 
@@ -240,15 +244,17 @@ private struct AgentQuestion: View {
             // Offered only for a program its signature names (AgentTrust);
             // otherwise, why not.
             if let why = session.noAlways {
-                Text("Can't be remembered: \(why).")
+                Text(Language.shared.format("agent.cant_remember", fallback: "Can't be remembered: %1$@.", why))
                     .font(.system(size: 10.5))
                     .foregroundStyle(Palette.muted)
                     .fixedSize(horizontal: false, vertical: true)
                     .padding(.leading, 23)
             } else {
-                Toggle("Always allow \(session.client)", isOn: Binding(
+                Toggle(isOn: Binding(
                     get: { session.wantsAlways },
-                    set: { _ in AgentControl.shared.toggleAlways(event: NSApp.currentEvent) }))
+                    set: { _ in AgentControl.shared.toggleAlways(event: NSApp.currentEvent) })) {
+                    Text(Language.shared.format("agent.always_allow", fallback: "Always allow %@", session.client))
+                }
                     .toggleStyle(.checkbox)
                     .background(ClickSpot { AgentControl.shared.alwaysBox = $0 })
                     .font(.system(size: 12))

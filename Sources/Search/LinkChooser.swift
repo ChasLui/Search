@@ -93,6 +93,13 @@ enum LinkChooser {
         sender.map { "Open a link from \($0)" } ?? "Open a link"
     }
 
+    /// The same title, in the interface's language.
+    @MainActor
+    static func localizedTitle(sender: String?) -> String {
+        sender.map { Language.shared.format("link_chooser.from", fallback: "Open a link from %1$@", $0) }
+            ?? Language.shared.text("link_chooser.open", fallback: "Open a link")
+    }
+
     // MARK: - waiting links
 
     /// Links that arrive while the panel is open, asked about one at a time

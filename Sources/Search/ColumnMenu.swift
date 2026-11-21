@@ -23,21 +23,21 @@ enum ColumnMenu {
             item.representedObject = does
             menu.addItem(item)
         }
-        add("New Tab") { [weak browser] in browser?.launch() }
+        add(Language.shared.text("ui.new_tab", fallback: "New Tab")) { [weak browser] in browser?.launch() }
         if browser.prefs.showsPinFolders, !browser.websitePopup {
-            add("New Folder") { [weak browser] in _ = browser?.newPinFolder() }
-            add("New Live Folder…") { [weak browser] in
+            add(Language.shared.text("ui.new_pin_folder", fallback: "New Folder")) { [weak browser] in _ = browser?.newPinFolder() }
+            add(Language.shared.text("ui.new_live_folder", fallback: "New Live Folder…")) { [weak browser] in
                 guard let browser else { return }
                 LiveFolders.ask(for: browser, in: nil)
             }
         }
         if let url = pasted(for: browser) {
             menu.addItem(.separator())
-            add("Paste and Go") { [weak browser] in browser?.open(url, foreground: true) }
+            add(Language.shared.text("ui.paste_and_go", fallback: "Paste and Go")) { [weak browser] in browser?.open(url, foreground: true) }
         }
         menu.addItem(.separator())
-        add("Hide Sidebar") { [weak browser] in browser?.toggleFold() }
-        add("Sidebar Settings…") { [weak browser] in
+        add(Language.shared.text("ui.hide_sidebar", fallback: "Hide Sidebar")) { [weak browser] in browser?.toggleFold() }
+        add(Language.shared.text("ui.sidebar_settings", fallback: "Sidebar Settings…")) { [weak browser] in
             browser?.settingsPage = .tabs
             browser?.tuning = true
         }

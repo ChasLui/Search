@@ -121,7 +121,7 @@ final class LinkChooserPanel: ObservableObject {
         let prefs = Shared.prefs
         let pruned = LinkChooser.pruned(prefs.linkChoices, known: Set(Spaces.known.keys))
         if pruned != prefs.linkChoices { prefs.linkChoices = pruned }
-        title = LinkChooser.title(sender: current.sender)
+        title = LinkChooser.localizedTitle(sender: current.sender)
         address = Address.pretty(current.url)
         site = SpaceRoutes.site(of: current.url)
         alwaysShown = prefs.sendsLinksToSpaces && site != nil
@@ -318,7 +318,7 @@ private struct LinkChooserView: View {
                 .lineLimit(1)
                 .truncationMode(.middle)
             if chooser.gone {
-                Text("That space is gone. Choose another.")
+                Text(Language.shared.text("link_chooser.space_gone", fallback: "That space is gone. Choose another."))
                     .font(.system(size: 12))
                     .foregroundStyle(Color.red.opacity(0.8))
             }
@@ -361,14 +361,16 @@ private struct LinkChooserView: View {
             if chooser.alwaysShown, let site = chooser.site {
                 HStack(spacing: 8) {
                     Switch(on: $chooser.always)
-                    Text("Always open \(site) links here")
+                    Text(Language.shared.format("link_chooser.always_open", fallback: "Always open %1$@ links here", site))
                         .font(.system(size: 12))
                         .foregroundStyle(Palette.ink)
                         .lineLimit(1)
                         .truncationMode(.middle)
                 }
             }
-            Text(chooser.alwaysShown ? "1–0 or Return opens · Space: Always · Esc cancels" : "1–0 or Return opens · Esc cancels")
+            Text(chooser.alwaysShown
+                 ? Language.shared.text("link_chooser.keys_always", fallback: "1–0 or Return opens · Space: Always · Esc cancels")
+                 : Language.shared.text("link_chooser.keys", fallback: "1–0 or Return opens · Esc cancels"))
                 .font(.system(size: 10.5))
                 .foregroundStyle(Palette.muted)
         }

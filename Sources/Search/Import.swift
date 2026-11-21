@@ -1476,6 +1476,23 @@ enum ImportSource: Identifiable, Hashable {
         return line.prefix(1).uppercased() + line.dropFirst()
     }
 
+    /// The same line in the interface's language, for the sheet and the Welcome.
+    @MainActor var localizedCanBringLine: String {
+        let words = canBring.map { item -> String in
+            switch item {
+            case "passwords": return Language.shared.text("import.can_bring.passwords", fallback: item)
+            case "spaces & pins": return Language.shared.text("import.can_bring.spaces_pins", fallback: item)
+            case "open tabs": return Language.shared.text("import.can_bring.open_tabs", fallback: item)
+            case "history": return Language.shared.text("import.can_bring.history", fallback: item)
+            default: return Language.shared.text("import.can_bring.bookmarks", fallback: item)
+            }
+        }
+        let list = ListFormatter()
+        list.locale = Language.shared.locale
+        let line = list.string(from: words) ?? words.joined(separator: ", ")
+        return line.prefix(1).uppercased() + line.dropFirst()
+    }
+
     /// A WebKit browser's passwords are the Mac's own, in the Passwords app.
     var passwordsInPasswordsApp: Bool {
         if case .webkit = self { return true }

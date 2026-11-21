@@ -106,7 +106,7 @@ struct WelcomePanel: View {
                     }
                     // What can come from it at all; spaces and open tabs
                     // are in the full sheet (File › Bring Things Over…).
-                    Text(Language.shared.format("welcome.can_bring", fallback: "%1$@ can bring: %2$@", (source ?? sources[0]).name, (source ?? sources[0]).canBringLine.lowercased()))
+                    Text(Language.shared.format("welcome.can_bring", fallback: "%1$@ can bring: %2$@", (source ?? sources[0]).name, (source ?? sources[0]).localizedCanBringLine.lowercased()))
                         .font(.system(size: 12))
                         .foregroundStyle(Palette.faint)
                     if importsPasswords {

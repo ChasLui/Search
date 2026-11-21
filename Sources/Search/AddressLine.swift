@@ -51,6 +51,7 @@ struct AddressLine: View {
     }
 
     private struct Shown: View {
+        @ObservedObject private var language = Language.shared
         @ObservedObject var browser: Browser
         @ObservedObject var tab: Tab
         let height: CGFloat
@@ -68,14 +69,14 @@ struct AddressLine: View {
                 if browser.editingInline {
                     AddressField(browser: browser, size: 12)
                 } else {
-                    Text(address.isEmpty ? "Search or enter address" : address)
+                    Text(address.isEmpty ? language.text("address_line.placeholder", fallback: "Search or enter address") : address)
                         .foregroundStyle(address.isEmpty ? Palette.faint : Palette.muted)
                         .lineLimit(1)
                         .truncationMode(.middle)
                     Spacer(minLength: 0)
                     // The site card (#1240), for a page on the web.
                     if tab.isWeb {
-                        button("slider.horizontal.3", help: "Site Settings") {
+                        button("slider.horizontal.3", help: language.text("address_line.site_settings", fallback: "Site Settings")) {
                             guard let under = line.view, let from = options.view else { return }
                             SiteCardPanel.toggle(for: tab, in: browser, under: under, button: from)
                         }
@@ -92,7 +93,7 @@ struct AddressLine: View {
             .background(ViewAnchor(box: line))
             .contentShape(Rectangle())
             .onTapGesture { if !browser.editing { browser.edit(); browser.inlineEdit = true } }
-            .help("Type an address or a search")
+            .help(language.text("address_line.help", fallback: "Type an address or a search"))
             // ⌘L's suggestions, hanging under the line at its width.
             .overlay(alignment: .topLeading) {
                 if browser.editingInline {
