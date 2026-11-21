@@ -45,9 +45,12 @@ Search 将标签放在隐藏标题栏附近。窗口一直设为不可移动时�
 | [SidebarPressTests.swift](../../Tests/SearchTests/SidebarPressTests.swift)、[ShortcutTests.swift](../../Tests/SearchTests/ShortcutTests.swift) | 标签拖动和输入时方向键行为的回归检查。 |
 
 当前 `DragStrip` 用 `reserved`、`trailing`、`below` 为标签和控件让出命中区域；
-使用 `.mouseEnteredAndExited`、`.activeAlways`、`.inVisibleRect` 跟踪悬停，并按
-窗口计数，视图移离窗口时释放计数。悬停时暂时让该窗口不可移动，保护顶部标签
-拖动；离开后恢复可移动。不要把命中测试的保留范围误当成独立的悬停计数。
+使用 `.mouseEnteredAndExited`、`.mouseMoved`、`.activeAlways`、`.inVisibleRect`
+跟踪悬停，并按窗口计数，视图移离窗口时释放计数。同步 `2c37a80`（#1257）后，
+是否锁住窗口由 `DragStrip.holdsWindow(at:in:)` 按指针位置判断：指针位于标题带内
+的标签、按钮等实际控件上时，窗口不可移动，保护顶部标签拖动；空白 strip、红黄
+绿窗口按钮和标题栏以下的区域保持可移动，让系统「移动与调整大小」、平铺和窗口
+管理器可用（idea 744）。不要把命中测试的保留范围误当成独立的悬停计数。
 
 拖拽达到 3 pt 门槛时，当前实现临时允许移动，并把原始 mouse-down 事件传给
 `window.performDrag(with:)`；返回后按悬停计数恢复状态。处理带 Command、Option
@@ -108,6 +111,17 @@ SEARCH_PROBE=window-drag-check ./fresh.sh again
 如环境不允许物理输入、某版本 macOS 或第三方窗口管理器实测，应明确记为未验收。
 `bench hit` 和合成事件可协助定位命中及 AppKit 状态，不能代替真实鼠标经过
 WindowServer 的拖拽，也不能证明系统吸附正常。
+
+## 2026-11-21 上游同步记录
+
+同步 `dbb8345` 的 103 个提交时，上游 `2c37a80`（#1257）已经用更精确的
+`aim`/`hold` 取代了 fork 的“进入 strip 即锁窗口”：现在只有指针位于标题带内
+的标签/按钮上才锁住窗口。该实现覆盖了 fork PR #6 的目标行为，因此采用上游
+实现，保留 fork 的 `_ = Strip.shortcuts` 与 Command/Option/Control 快捷键放行
+监控。`WindowDragTests` 原先在窗口左下角进入 strip 并断言锁窗，现改为在标题带
+内的点进入，并使用 `fullSizeContentView` 窗口；4 项通过。真实物理鼠标、系统
+平铺和第三方窗口管理器仍未在本次同步中实测，见
+`docs/specs/upstream-sync-2026-11-21.md` 的未验收项。
 
 ## 2026-11-19 修复记录与边界
 
