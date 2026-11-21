@@ -190,7 +190,10 @@ final class ExtensionSiteAccessTests: XCTestCase {
 
         Extensions.apply(SiteAccess(), to: context)
         XCTAssertTrue(context.hasAccess(to: URL(string: "https://anything.test/")!))
-        XCTAssertTrue(granted(context).contains("<all_urls>"))
+        // Every website is held as *://*/*: <all_urls> would carry data:
+        // URLs now that the scheme is known (ExtensionDataFrameTests).
+        XCTAssertFalse(granted(context).contains("<all_urls>"), "\(granted(context))")
+        XCTAssertTrue(granted(context).contains("*://*/*"), "\(granted(context))")
         XCTAssertTrue(granted(context).contains(own.string))
         // Extension pages and files stay refused whatever "Runs on" says.
         XCTAssertFalse(context.hasAccess(to: URL(string: "file:///tmp/x")!))

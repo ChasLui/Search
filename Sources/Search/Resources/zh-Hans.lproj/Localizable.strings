@@ -1419,6 +1419,9 @@
 "Close All" = "全部关闭";
 "Close Both" = "全部关闭";
 "Pin to Toolbar" = "固定到工具栏";
+"extension.menu.web_store" = "Chrome 应用商店…";
+"extension.menu.load_unpacked" = "加载已解压的扩展…";
+"extension.menu.manage" = "管理扩展…";
 "extension.remove.menu" = "移除“%1$@”…";
 "extension.always_on" = "始终在 %1$@ 上运行";
 "extension.remove.title" = "移除“%1$@”？";
