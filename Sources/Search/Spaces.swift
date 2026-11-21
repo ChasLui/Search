@@ -1117,10 +1117,20 @@ enum SpaceMenu {
             // Once the menu has gone: a popover shown while it tracks closes with it.
             DispatchQueue.main.async { SpaceLookPopover.show(for: browser) }
         })
-        // The order is the swipe's, and ⌃1–⌃9's.
+        // The order is the swipe's, and ⌃1–⌃9's. With profiles in one
+        // window, past its profile's first or last space the move takes the
+        // whole profile past the one beside it, so any profile can come first.
         if let at = browser.spaces.firstIndex(where: { $0.id == here.id }) {
-            if at > 0 { menu.addItem(localizedItem("space.move_left", "Move Left") { browser.moveSpace(here.id, to: at - 1) }) }
-            if at < browser.spaces.count - 1 { menu.addItem(localizedItem("space.move_right", "Move Right") { browser.moveSpace(here.id, to: at + 1) }) }
+            if at > 0 {
+                menu.addItem(localizedItem("space.move_left", "Move Left") { browser.moveSpace(here.id, to: at - 1) })
+            } else if browser.profileBeyond(-1) != nil {
+                menu.addItem(localizedItem("space.move_left", "Move Left") { Profiles.shared.move(browser.profileID, by: -1) })
+            }
+            if at < browser.spaces.count - 1 {
+                menu.addItem(localizedItem("space.move_right", "Move Right") { browser.moveSpace(here.id, to: at + 1) })
+            } else if browser.profileBeyond(1) != nil {
+                menu.addItem(localizedItem("space.move_right", "Move Right") { Profiles.shared.move(browser.profileID, by: 1) })
+            }
         }
         // Every group of this space, folded or opened at once, as in Arc.
         if browser.prefs.usesTabGroups, !browser.tabGroups.isEmpty {
