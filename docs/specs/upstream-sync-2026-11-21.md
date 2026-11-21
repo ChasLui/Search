@@ -128,6 +128,7 @@
 - **ImportPanel**：采用上游新增的 `%3$@`（收藏项）与 `%1$@`（来源名）参数及 Safari 导出步骤，重套 fork 的 `import.*` 语义键。
 - **Settings**：多轮冲突合并后保留 `title`/`detail` 变量与 `relabel` 结构；新增 `mail.default`、`spaces.commandNumbers`、`tabs.highContrast`、`sidebar.doorsUp` 等条目；`language` 与 `icloud` 两个观察对象并存。`settings.icloud.erase.title` 在设置行与确认框里被上游复用于不同文案（有/无问号），fork 为确认框另立 `settings.icloud.erase.confirm`，避免同一键两种英文。
 - **测试**：`PinDragTests` 改用上游的 `wake(_:then:in:)` helper，保留 fork 的 `selectLoadedPinForDrag` 供 `PinStuckTests` 使用；`FollowFileTests`、`SidebarPressTests` 的清理逻辑按上游更新。
+- **Shield 与 FloatUnseenTests**：上游 #1248 让浏览器首个页面在 Shield 规则表就绪前最多等一秒。`FloatUnseenTests` 在 `benchOpen` 后立刻用 `loadHTMLString` 放进测试页，首载一秒后落地会把测试页替换成 about:blank，`evaluateJavaScript` 因而抛 `InvalidTransition`。测试改为先等首载落地再放测试页。
 - **构建修正**：`DownloadsFloat.swift` 在合并 `LanguageRoot` 包裹时多了一个右括号，`e1b1688` 修正。
 
 ## 本地化收尾
@@ -166,11 +167,13 @@
   - `BrowserDiscoveryTests/testMoreBrowsersAreFoundOnceEach`：`canBringLine` 用系统 locale 连接英语词条，中文 Mac 上不再以 “Bookmarks, history” 开头。改为固定 `en` locale；界面本就用 `localizedCanBringLine`。
   - `ICloudSyncTests` 两项：summary 已本地化，测试仍与英文比较。两项改为临时 `language.select(.english)` 并在 `defer` 恢复，沿用仓库既有测试写法。
   - `WindowDragTests/testBrowserHandsWindowShortcutToAppKit`：只在同进程全量运行时失败，固定 x=20 可能落在红黄绿按钮而非标签上。测试改为沿标题带试探，直到指针落在会锁窗的位置。
-  - `FloatUnseenTests` 四个隔离用例：WebKit 在 `canvas.captureStream` 视频上抛 `InvalidTransition { phase: idle, targetPhase: failed(deinit) }`。本次同步没有任何提交触及 Float/媒体/播放器代码，先在单测进程复现，判断为这台 Mac 上 WebKit 媒体管线的环境问题，未计入同步回归；仍列为未验收。
+  - `FloatUnseenTests` 四个隔离用例：抛 `InvalidTransition { phase: idle, targetPhase: failed(deinit) }`。当时判为这台 Mac 上 WebKit 媒体管线的环境问题；后续对照实验推翻了这一判断（见下）。
 - 第二次完整 `python3 Tests/run-ci-tests.py`（2026-11-21 16:05–16:26）：主套件 1230 项、27 项跳过、1 项失败；43 个隔离用例中 4 项失败。退出码 1。
-  - 主套件唯一失败为 `BookmarkFolderMemoryTests/testEachProfileRemembersItsOwn`（“kept across launches”），该用例单独运行时 2 项全过；第一次完整运行时也通过。判为共享 `Store.world` 下的偶发失败，未改动相关代码。
-  - 隔离用例仍为前述 `FloatUnseenTests` 四项，原因不变。
+  - 主套件唯一失败为 `BookmarkFolderMemoryTests/testEachProfileRemembersItsOwn`（“kept across launches”），该用例单独运行时通过；第二次与第三次完整运行复现，根因是测试自身在 `Bookmarks.save()` 的异步磁盘队列落地前就新建实例读取，读取前补 `Disk.drain()` 后稳定。
+  - 隔离用例仍为前述 `FloatUnseenTests` 四项；根因随后查明为上方“Shield 与 FloatUnseenTests”一条，已修复。
   - 第一轮的四类失败中，`BrowserDiscoveryTests`、`ICloudSyncTests`、`WindowDragTests` 已在第二轮通过。
+- 对照实验：同步前 `ae5b13a` 上 `testVideoPausedByHandStaysInItsTab` 10/10 通过；同步后 HEAD 10/10 失败（均为 `InvalidTransition`），确认回归由 #1248 的首载等待与测试写法交互引入，而非 WebKit 环境。修复后四个 `FloatUnseenTests` 用例在同一进程 4/4 通过，逐项独立进程各 2 次共 8/8 通过。
+- 第四次完整 `python3 Tests/run-ci-tests.py`（2026-11-21 19:02–19:24）：本地化检查通过（2525 strings / 35 plurals）；主套件 1230 项、27 项跳过、0 失败；43 个隔离用例全部通过。退出码 0。
 
 ## 未验收项
 
