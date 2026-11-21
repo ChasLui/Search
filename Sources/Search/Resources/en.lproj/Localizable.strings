@@ -2522,3 +2522,4 @@
 "whatsnew.notes.1.0.15.fixed.2" = "Claude's side panel once signed in.";
 "whatsnew.notes.1.0.15.fixed.3" = "Extensions reopening their welcome tab at every launch.";
 "agent.banner_help" = "%1$@. Stop disconnects it; its tabs stay.";
+"history.other_devices" = "Tabs on Your Other Devices";

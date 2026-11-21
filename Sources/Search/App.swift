@@ -401,7 +401,7 @@ struct SearchApp: App {
                 // As Safari's iCloud Tabs: what is open on your iPhone and
                 // other Macs, a menu each, opened here only when picked.
                 if icloud.on, !icloud.devices.isEmpty {
-                    Section("Tabs on Your Other Devices") {
+                    Section {
                         ForEach(icloud.devices, id: \.id) { device in
                             Menu(ICloudSync.title(device.tabs)) {
                                 ForEach(device.tabs.tabs, id: \.self) { page in
@@ -415,6 +415,8 @@ struct SearchApp: App {
                                 }
                             }
                         }
+                    } header: {
+                        Text("history.other_devices", bundle: Language.resources)
                     }
                 }
                 Divider()

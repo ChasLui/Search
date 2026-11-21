@@ -2324,7 +2324,7 @@
 "settings.mail.default.more" = "macOS 会请求你确认。撤销方法：在“邮件 › 设置 › 通用 › 默认邮件阅读器”中选择其他 App。";
 "settings.handoff.title" = "接力到 iPhone 和 iPad";
 "settings.handoff.detail" = "当前网页会像 Safari 一样出现在它们的 App 切换器中";
-"settings.handoff.more" = "也会出现在你其他 Mac 的 Dock 一端。macOS 会把网址传给登录同一 Apple 账户并开启“接力”的设备（Mac 上在“系统设置 › 通用 › 隔空投送与接力”中开启）。无痕标签页和已退出其他空间的独立空间不会传出。Search 为默认浏览器时，从 iPhone 接力来的网页会在这里打开。";
+"settings.handoff.more" = "也会出现在你其他 Mac 的 Dock 一端。macOS 会把网址传给登录同一 Apple 账户并开启“接力”的设备（Mac 上在“系统设置 › 通用 › 隔空投送与接力”中开启）。无痕标签页，以及已退出其他空间登录状态的空间，都不会传出。Search 为默认浏览器时，从 iPhone 接力来的网页会在这里打开。";
 "settings.icloud.title" = "与 iCloud 同步";
 "settings.icloud.detail" = "在 iPhone 之间同步打开的标签页、固定项、空间、书签和部分设置";
 "settings.icloud.more" = "通过你自己的 iCloud，端到端加密：iPhone 和其他 Mac 上的 Search 能看到这台 Mac 打开的标签页（在历史记录和地址栏中，显示为“其他设备上的标签页”），并共享固定项、空间、书签、搜索引擎和外观。无痕标签页、历史记录、密码、Cookie 和登录状态不会传出。在你开启前，任何数据都不会离开这台 Mac。不能与“与其他 Mac 同步”同时开启。";
@@ -2522,3 +2522,4 @@
 "whatsnew.notes.1.0.15.fixed.2" = "修复 Claude 登录后的侧边栏。";
 "whatsnew.notes.1.0.15.fixed.3" = "修复扩展每次启动都重新打开欢迎标签页。";
 "agent.banner_help" = "%1$@。“停止”会断开连接，标签页保留。";
+"history.other_devices" = "其他设备上的标签页";
