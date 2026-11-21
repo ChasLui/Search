@@ -140,6 +140,11 @@ struct SearchApp: App {
                         get: { browser.prefs.autocorrect },
                         set: { browser.prefs.autocorrect = $0 }
                     )) { Text("ui.correct_spelling_automatically", bundle: Language.resources) }
+                    // Off unless switched on here, whatever the Mac says.
+                    Toggle(isOn: Binding(
+                        get: { browser.prefs.inlinePredictions },
+                        set: { browser.prefs.inlinePredictions = $0 }
+                    )) { Text("ui.show_inline_predictions", bundle: Language.resources) }
                 }
             }
             CommandGroup(replacing: .toolbar) {
