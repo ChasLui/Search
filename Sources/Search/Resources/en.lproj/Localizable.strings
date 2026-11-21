@@ -1419,6 +1419,9 @@
 "Close All" = "Close All";
 "Close Both" = "Close Both";
 "Pin to Toolbar" = "Pin to Toolbar";
+"extension.menu.web_store" = "Chrome Web Store…";
+"extension.menu.load_unpacked" = "Load Unpacked…";
+"extension.menu.manage" = "Manage Extensions…";
 "extension.remove.menu" = "Remove “%1$@”…";
 "extension.always_on" = "Always on %1$@";
 "extension.remove.title" = "Remove “%1$@”?";

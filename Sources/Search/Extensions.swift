@@ -177,6 +177,15 @@ final class Extensions: NSObject, ObservableObject {
 
     private override init() {
         WKWebExtension.MatchPattern.registerCustomURLScheme(Extensions.scheme)
+        // A data: frame is a document with no site to ask about: WebKit lets
+        // an extension's content script in when the frame that made it is a
+        // site it may reach, and reads the extension's own files for it —
+        // but only once data: is a scheme its patterns know. Until it was
+        // registered, a content script importing its own module in such a
+        // frame failed ("Importing a module script failed"), which is where
+        // Immersive Translate lost pages that embed one. It is no site an
+        // extension is given: see `fence`.
+        WKWebExtension.MatchPattern.registerCustomURLScheme("data")
         // A test run keeps its extensions' storage apart, as it does its
         // cookies and passwords.
         let configuration: WKWebExtensionController.Configuration = Store.testing && !Store.ownContainer
@@ -1363,9 +1372,18 @@ final class Extensions: NSObject, ObservableObject {
         pattern.scheme?.lowercased() == "file"
     }
 
-    /// What no extension is given or asked about: extension pages and files.
+    /// A data: URL is a page's own document, not an address to reach: Chrome
+    /// grants no extension one, and WebKit knows the scheme only so a data:
+    /// frame can read the extension's files (see init). A manifest naming it
+    /// is granted nothing.
+    nonisolated static func reachesData(_ pattern: WKWebExtension.MatchPattern) -> Bool {
+        pattern.scheme?.lowercased() == "data"
+    }
+
+    /// What no extension is given or asked about: extension pages, files,
+    /// and data: URLs.
     nonisolated static func withheld(_ pattern: WKWebExtension.MatchPattern) -> Bool {
-        reachesExtensions(pattern) || reachesFiles(pattern)
+        reachesExtensions(pattern) || reachesFiles(pattern) || reachesData(pattern)
     }
 
     /// The sites its manifest names, granted as it loads: never one for
@@ -1398,6 +1416,16 @@ final class Extensions: NSObject, ObservableObject {
         // the extension (Figma's) waits forever. What <all_urls> means for
         // websites is kept as *://*/*, which the refusals don't touch.
         let everything = context.grantedPermissionMatchPatterns.keys.contains { $0.matchesAllURLs }
+        // A data: frame is reached by the site that made it (see init), but
+        // <all_urls> would cover data: URLs themselves now that WebKit knows
+        // the scheme: a page's whole document as a site no one named, which
+        // Chrome grants no extension either. It goes from the granted list
+        // rather than being granted beside *://*/* — permissions.getAll()
+        // still answers <all_urls>, so the extension is told no more.
+        if everything {
+            context.grantedPermissionMatchPatterns = context.grantedPermissionMatchPatterns
+                .filter { !$0.key.matchesAllURLs }
+        }
         defer {
             if everything, let web = try? WKWebExtension.MatchPattern(string: "*://*/*") {
                 context.setPermissionStatus(.grantedExplicitly, for: web)
@@ -2414,7 +2442,7 @@ private struct ExtensionActions: View {
 @available(macOS 15.4, *)
 @MainActor
 func extensionMenuPicture() -> NSBitmapImageRep? {
-    let host = NSHostingView(rootView: ExtensionMenu(extensions: .shared))
+    let host = NSHostingView(rootView: LanguageRoot(content: ExtensionMenu(extensions: .shared)))
     host.frame = NSRect(origin: .zero, size: host.fittingSize)
     let window = NSWindow(contentRect: host.frame, styleMask: .borderless, backing: .buffered, defer: false)
     window.appearance = NSApp.effectiveAppearance
@@ -2454,15 +2482,15 @@ private struct ExtensionMenu: View {
             }
             Divider().overlay(Palette.hairline)
             VStack(spacing: 1) {
-                Foot("storefront", "Chrome Web Store…") {
+                Foot("storefront", "extension.menu.web_store") {
                     extensions.menuOpen = false
                     (browser ?? extensions.browser)?.open(Browser.webStore, foreground: true)
                 }
-                Foot("folder", "Load Unpacked…") {
+                Foot("folder", "extension.menu.load_unpacked") {
                     extensions.menuOpen = false
                     DispatchQueue.main.async { extensions.installFolder() }
                 }
-                Foot("gearshape", "Manage Extensions…") {
+                Foot("gearshape", "extension.menu.manage") {
                     extensions.menuOpen = false
                     Store.settings.set("extensions", forKey: "settings.page")
                     (browser ?? extensions.browser)?.tuning = true
@@ -2553,7 +2581,7 @@ private struct ExtensionMenu: View {
         var body: some View {
             HStack(spacing: 8) {
                 Image(systemName: symbol).font(.system(size: 11)).foregroundStyle(Palette.muted).frame(width: 14)
-                Text(title).font(.system(size: 12.5)).foregroundStyle(Palette.ink)
+                Text(LocalizedStringKey(title), bundle: Language.resources).font(.system(size: 12.5)).foregroundStyle(Palette.ink)
                 Spacer(minLength: 0)
             }
             .padding(.horizontal, 10)

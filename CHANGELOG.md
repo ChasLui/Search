@@ -13,6 +13,11 @@ in [ROADMAP.md](ROADMAP.md).
 
 ### Fixed
 
+- The extensions menu now shows its actions in the selected interface language.
+- An extension's content script now runs inside a page's embedded data:
+  document, as in Chrome: importing a module from the extension's own folder
+  failed there, which left Immersive Translate unable to translate pages that
+  embed one. The data: URL itself is still not a site an extension is given.
 - Opening tabs and navigating with many tabs takes less work in the top tab
   bar and the sidebar's ungrouped rows.
 - An extension's popup opened from the sidebar no longer grows and shrinks
