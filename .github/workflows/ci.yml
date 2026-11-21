@@ -35,7 +35,7 @@ jobs:
       - name: Build beta DMG
         id: dmg
         env:
-          SEARCH_BETA: '3'
+          SEARCH_BETA: '4'
           SEARCH_SIGN_IDENTITY: ''
         run: |
           ./build.sh release dmg
