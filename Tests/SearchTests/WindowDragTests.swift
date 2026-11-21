@@ -30,7 +30,7 @@ final class WindowDragTests: XCTestCase {
 
     func testDragLetsTheSystemMoveTheWindowThenRestoresTheHoverGuard() async throws {
         let (window, strip) = try await makeWindow()
-        strip.mouseEntered(with: try crossing(.mouseEntered, window: window))
+        strip.mouseEntered(with: try crossing(.mouseEntered, at: titlePoint(of: window), window: window))
         XCTAssertFalse(window.isMovable)
 
         let down = try mouse(.leftMouseDown, at: NSPoint(x: 20, y: 20), window: window)
@@ -47,8 +47,8 @@ final class WindowDragTests: XCTestCase {
     func testModifiedShortcutsCanMoveTheHoveredWindow() async throws {
         let (window, strip) = try await makeWindow()
         let (other, otherStrip) = try await makeWindow()
-        strip.mouseEntered(with: try crossing(.mouseEntered, window: window))
-        otherStrip.mouseEntered(with: try crossing(.mouseEntered, window: other))
+        strip.mouseEntered(with: try crossing(.mouseEntered, at: titlePoint(of: window), window: window))
+        otherStrip.mouseEntered(with: try crossing(.mouseEntered, at: titlePoint(of: other), window: other))
         XCTAssertFalse(window.isMovable)
         XCTAssertFalse(other.isMovable)
         let moveLeft = NSMenuItem(title: "", action: NSSelectorFromString("_zoomLeft:"), keyEquivalent: "")
@@ -122,7 +122,7 @@ final class WindowDragTests: XCTestCase {
             try await Task.sleep(for: .milliseconds(20))
         }
         let strip = try XCTUnwrap(findStrip(host))
-        strip.mouseEntered(with: try crossing(.mouseEntered, window: window))
+        strip.mouseEntered(with: try crossing(.mouseEntered, at: titlePoint(of: window), window: window))
         XCTAssertFalse(window.isMovable)
         let key = try XCTUnwrap(NSEvent.keyEvent(with: .keyDown, location: .zero,
                                                  modifierFlags: [.command, .option],
@@ -144,7 +144,7 @@ final class WindowDragTests: XCTestCase {
         if activationPolicy == nil { activationPolicy = NSApp.activationPolicy() }
         NSApp.setActivationPolicy(.prohibited)
         let window = DragWindow(contentRect: NSRect(x: -20_000, y: -20_000, width: 300, height: 60),
-                                styleMask: .titled, backing: .buffered, defer: false)
+                                styleMask: [.titled, .fullSizeContentView], backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
         let host = NSHostingView(rootView: DragStrip())
         window.contentView = host
@@ -159,8 +159,16 @@ final class WindowDragTests: XCTestCase {
         return view.subviews.lazy.compactMap(findStrip).first
     }
 
-    private func crossing(_ type: NSEvent.EventType, window: NSWindow) throws -> NSEvent {
-        try XCTUnwrap(NSEvent.enterExitEvent(with: type, location: .zero, modifierFlags: [],
+    /// A point in the window's title band, where the strip's tabs and
+    /// buttons are drawn: the window is guarded only over those, the rest of
+    /// the strip moving the window again (#1257).
+    private func titlePoint(of window: NSWindow) -> NSPoint {
+        NSPoint(x: 20, y: window.frame.height - 5)
+    }
+
+    private func crossing(_ type: NSEvent.EventType, at point: NSPoint = .zero,
+                          window: NSWindow) throws -> NSEvent {
+        try XCTUnwrap(NSEvent.enterExitEvent(with: type, location: point, modifierFlags: [],
                                              timestamp: ProcessInfo.processInfo.systemUptime,
                                              windowNumber: window.windowNumber, context: nil,
                                              eventNumber: 1, trackingNumber: 1, userData: nil))
