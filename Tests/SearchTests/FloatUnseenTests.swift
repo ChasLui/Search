@@ -111,6 +111,10 @@ final class FloatUnseenTests: XCTestCase {
         browser.window = owner
         defer { owner.close() }
         let tab = browser.benchOpen(try XCTUnwrap(URL(string: "about:blank")))
+        // A browser's first load at launch waits for Shield's list, a second
+        // at most (see Shield.whenReady); the page below must land after that
+        // load, or about:blank replaces it a moment later.
+        try await waitFor { tab.web.url != nil }
         defer {
             browser.land(covering: false)
             browser.unpicture()
