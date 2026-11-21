@@ -37,7 +37,7 @@ enum DownloadsFloat {
         self.edge = edge
 
         let presence = Presence()
-        let host = FirstClick(rootView: AnyView(LanguageRoot(content: content(browser, edge: edge, presence: presence)))))
+        let host = FirstClick(rootView: AnyView(LanguageRoot(content: content(browser, edge: edge, presence: presence))))
         let panel = Panel(contentRect: .zero, styleMask: [.borderless, .nonactivatingPanel],
                           backing: .buffered, defer: false)
         panel.contentView = host
