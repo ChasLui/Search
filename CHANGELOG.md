@@ -50,6 +50,7 @@ in [ROADMAP.md](ROADMAP.md).
 - Split View no longer draws a frame round the page the keys go to, as a card or edge to edge: it read as a stray border on one page of two.
 - The line under the pins, with Clear at its end, waits for a tab with a page under it: over nothing but the empty tab a window starts with, it was a line with nothing to keep apart. New Live Folder… is in a square pin's menu too.
 - Typing in a page no longer offers the grey rest of a word at the caret ("would you m" → "ind") with Correct Spelling Automatically off. That was macOS's inline predictive text, not autocorrect: WebKit shows it in every page whenever System Settings › Keyboard › Text Input › Show inline predictive text is on, as it is unless turned off, while Chrome and Arc never do. It now has its own switch, Edit › Spelling and Grammar › Show Inline Predictions, off unless turned on, and counting over the Mac's setting in every page and after a relaunch. `python3 Tests/autocorrect.py`
+- YouTube videos start at once on a return visit with Shield on. From the second visit YouTube schedules an ad before the video, and once Shield had taken it out the player held the video at 0:00 with its spinner for 5 to 30 seconds; Search now starts that first video again through YouTube's own player, which plays it in about two seconds, ads still blocked. `python3 Tests/youtube_hold.py` loads videos again and again in a hidden window. (idea 852)
 
 ### Held back
 
