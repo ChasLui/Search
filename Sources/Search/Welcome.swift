@@ -209,6 +209,7 @@ struct WelcomePanel: View {
                 Key("⌘O", "welcome.key.links")
                 Key("⌘L", "welcome.key.suggestions")
                 Key("⌘", "welcome.key.numbers")
+                Key("⌘,", "welcome.key.theme")
                 Key("⌘1", "welcome.key.pin")
                 Key("⇧⌘P", "welcome.key.video")
                 Key("⌃-click", "welcome.key.side_panel")
