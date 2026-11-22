@@ -733,7 +733,21 @@ final class Extensions: NSObject, ObservableObject {
     /// work, but WebKit gives extensions no way to stop or change a request
     /// that way, so not one request is blocked (#1208). Said in Settings and
     /// at install rather than leaving a row that looked like any other.
-    static func cantDo(_ manifest: [String: Any]) -> String? {
+    ///
+    /// And on macOS 15, WebAssembly in a Manifest V3 extension's own pages:
+    /// WebKit there refuses to make a WebAssembly instance in them whatever
+    /// their policy says, 'wasm-unsafe-eval' included (a module compiles,
+    /// an instance is refused), where a page with the same policy, or a
+    /// Manifest V2 extension, runs it. Bitwarden's popup then says
+    /// WebAssembly isn't supported (#1383, #716). On macOS 26 it runs. It is
+    /// WebKit's to allow; said here so the extension isn't taken for broken.
+    static func cantDo(_ manifest: [String: Any],
+                       macOS: Int = ProcessInfo.processInfo.operatingSystemVersion.majorVersion) -> String? {
+        let limits = [blocking(manifest), wasm(manifest, macOS: macOS)].compactMap { $0 }
+        return limits.isEmpty ? nil : limits.joined(separator: " ")
+    }
+
+    private static func blocking(_ manifest: [String: Any]) -> String? {
         guard asksToBlockRequests(manifest) else { return nil }
         let lite = suggestsLite(manifest) ? " uBlock Origin Lite, from the Chrome Web Store, blocks them here." : ""
         return "Can’t block requests: Safari’s engine doesn’t let extensions block them with webRequestBlocking. What it does inside pages still works." + lite
@@ -741,12 +755,17 @@ final class Extensions: NSObject, ObservableObject {
 
     /// The same, in the interface's language.
     @MainActor
-    static func localizedCantDo(_ manifest: [String: Any]) -> String? {
-        guard asksToBlockRequests(manifest) else { return nil }
-        let lite = suggestsLite(manifest)
-            ? " " + Language.shared.text("extension.cant_block_lite", fallback: "uBlock Origin Lite, from the Chrome Web Store, blocks them here.")
-            : ""
-        return Language.shared.text("extension.cant_block", fallback: "Can’t block requests: Safari’s engine doesn’t let extensions block them with webRequestBlocking. What it does inside pages still works.") + lite
+    static func localizedCantDo(_ manifest: [String: Any],
+                                macOS: Int = ProcessInfo.processInfo.operatingSystemVersion.majorVersion) -> String? {
+        var limits: [String] = []
+        if asksToBlockRequests(manifest) {
+            let lite = suggestsLite(manifest)
+                ? " " + Language.shared.text("extension.cant_block_lite", fallback: "uBlock Origin Lite, from the Chrome Web Store, blocks them here.")
+                : ""
+            limits.append(Language.shared.text("extension.cant_block", fallback: "Can’t block requests: Safari’s engine doesn’t let extensions block them with webRequestBlocking. What it does inside pages still works.") + lite)
+        }
+        if let wasm = localizedWasm(manifest, macOS: macOS) { limits.append(wasm) }
+        return limits.isEmpty ? nil : limits.joined(separator: " ")
     }
 
     private static func asksToBlockRequests(_ manifest: [String: Any]) -> Bool {
@@ -757,6 +776,25 @@ final class Extensions: NSObject, ObservableObject {
 
     private static func suggestsLite(_ manifest: [String: Any]) -> Bool {
         (manifest["name"] as? String)?.hasPrefix("uBlock Origin") == true
+    }
+
+    /// See cantDo: an MV3 extension whose pages' policy asks for WebAssembly.
+    private static func wasm(_ manifest: [String: Any], macOS: Int) -> String? {
+        guard macOS < 26, (manifest["manifest_version"] as? Int) == 3 else { return nil }
+        let policy = manifest["content_security_policy"]
+        let pages = (policy as? [String: Any])?["extension_pages"] as? String ?? policy as? String ?? ""
+        guard pages.contains("wasm-unsafe-eval") else { return nil }
+        return "WebAssembly doesn’t run in its own pages on macOS 15: Safari’s engine there refuses it to these extensions whatever they ask, so parts that need it, like Bitwarden’s popup, won’t open. On macOS 26 they do."
+    }
+
+    /// The same, in the interface's language.
+    @MainActor
+    private static func localizedWasm(_ manifest: [String: Any], macOS: Int) -> String? {
+        guard macOS < 26, (manifest["manifest_version"] as? Int) == 3 else { return nil }
+        let policy = manifest["content_security_policy"]
+        let pages = (policy as? [String: Any])?["extension_pages"] as? String ?? policy as? String ?? ""
+        guard pages.contains("wasm-unsafe-eval") else { return nil }
+        return Language.shared.text("extension.cant_wasm", fallback: "WebAssembly doesn’t run in its own pages on macOS 15: Safari’s engine there refuses it to these extensions whatever they ask, so parts that need it, like Bitwarden’s popup, won’t open. On macOS 26 they do.")
     }
 
     /// WebKit's error in a line: the manifest problem it names, where it
