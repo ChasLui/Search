@@ -124,14 +124,24 @@ struct TabBar: View {
                                             }
                                             if pinLine { PinLine() }
                                             ForEach(grouped.groups) { group in
+                                                let members = group.tabs
+                                                // An open group's band, its name
+                                                // to its last tab (GroupBand); a
+                                                // folded one is drawn as before.
+                                                let banded = !group.group.collapsed
                                                 GroupHeading(browser: browser, group: group.group,
                                                              horizontal: true, dragSpace: "strip")
                                                     .id("group-\(group.id)")
-                                                let members = group.tabs
+                                                    .background {
+                                                        if banded {
+                                                            GroupBand(group: group.group, piece: group.group.id, first: true, last: members.isEmpty)
+                                                        }
+                                                    }
                                                 let memberSteps = steps(members, each: each, splits: splits)
                                                 ForEach(Array(members.enumerated()), id: \.element.id) { index, tab in
                                                     topTab(tab, index: index, steps: memberSteps,
-                                                           group: group.id, strip: geo.size.width, each: each, splits: splits)
+                                                           group: group.id, strip: geo.size.width, each: each, splits: splits,
+                                                           band: banded ? group.group : nil, last: index == members.count - 1)
                                                 }
                                             }
                                             let ungrouped = grouped.ungrouped
@@ -395,11 +405,20 @@ struct TabBar: View {
                     }
                     if line { PinLine() }
                     ForEach(groupsShown) { drawn in
+                        // The same band as the row on screen (GroupBand).
+                        let members = drawn.tabs.filter { fit.contains($0.id) }
+                        let banded = !drawn.group.collapsed
                         GroupHeading(browser: browser, group: drawn.group, horizontal: true)
-                        ForEach(drawn.tabs.filter { fit.contains($0.id) }) { tab in
+                            .background {
+                                if banded { GroupBand(group: drawn.group, piece: drawn.group.id, first: true, last: members.isEmpty) }
+                            }
+                        ForEach(members) { tab in
                             rowItem(tab, splits: splits, activeID: row.active,
                                     width: each, room: strip - lights - 12,
                                     height: Metrics.strip, interactive: false, pill: pill)
+                                .background {
+                                    if banded { GroupBand(group: drawn.group, piece: tab.id, last: tab.id == members.last?.id) }
+                                }
                         }
                     }
                     ForEach(looseShown) { tab in
@@ -445,8 +464,10 @@ struct TabBar: View {
     /// for the run.
     /// `steps`: every place in the run the tab is carried along (see
     /// `steps(_:each:splits:)`), worked out once for the run as `each` is.
+    /// `band`: the open group it is drawn in, whose band it carries a piece
+    /// of (GroupBand); `last`, the piece that ends it.
     private func topTab(_ tab: Tab, index: Int, steps: [CGFloat], group: UUID?, strip: CGFloat,
-                        each: CGFloat, splits: SplitItems) -> some View {
+                        each: CGFloat, splits: SplitItems, band: TabGroup? = nil, last: Bool = false) -> some View {
         let isPairRepresentative = splits.pairs[tab.id] != nil
         return rowItem(tab, splits: splits, activeID: browser.activeID,
                        width: each, room: strip - lights - leading - 12,
@@ -468,6 +489,11 @@ struct TabBar: View {
                     browser.moveDisplayedTab(tab, to: $0)
                 }
             })
+            // After Carried: its piece stays where the tab's place is while
+            // the tab itself goes with the hand.
+            .background {
+                if let band { GroupBand(group: band, piece: tab.id, last: last) }
+            }
             .id(tab.id)
     }
 
@@ -597,6 +623,8 @@ struct TabBar: View {
     /// The run's tabs as last laid out, and the run they are shown in, for
     /// the bench.
     static var laidOut: CGFloat = 0
+    /// Each group band piece of a row drawn for the bench (GroupBand).
+    static var drawnBands: [UUID: GroupBand.Drawn] = [:]
     static var runShown: CGFloat = 0
     static var scrolls = false
 
