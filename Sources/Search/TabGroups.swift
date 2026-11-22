@@ -278,6 +278,9 @@ private struct GroupHeadingShared: ViewModifier {
             }
             .onDrag { NSItemProvider(object: "search-group:\(group.id.uuidString)" as NSString) }
             .contextMenu {
+                // First, as Chrome has it: a tab at the group's end, in front.
+                Button { browser.newTab(inGroup: group.id) } label: { Text("ui.new_tab_in_group", bundle: Language.resources) }
+                Divider()
                 Button { browser.editingGroupID = group.id } label: { Text("ui.rename_group", bundle: Language.resources) }
                 Button { browser.toggleTabGroup(group.id) } label: { Text(LocalizedStringKey(group.collapsed ? "Expand Group" : "Collapse Group"), bundle: Language.resources) }
                 Button { choosingColour = true } label: { Text("ui.colour", bundle: Language.resources) }
