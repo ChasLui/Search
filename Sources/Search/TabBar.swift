@@ -2011,7 +2011,7 @@ struct TabMenu: View {
         // The card a click on the tab you are on shows under its address.
         Button {
             if browser.activeID != tab.id { browser.select(tab) }
-            browser.beginTabEdit(tab)
+            browser.beginTabEdit(tab, card: true)
         } label: { Text("ui.site_information", bundle: Language.resources) }
         .disabled(tab.isBlank || tab.address == nil || tab.pin != nil)
         Button {
