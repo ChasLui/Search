@@ -4232,7 +4232,8 @@ final class Bench {
             // (GroupBand): the heading or tab under it and the piece itself,
             // [minX, maxX] in the row, by group. And every title drawn: what
             // it says, how wide it was laid out, and what of it is left once
-            // cut as SwiftUI cuts it ("visible"), by tab and line.
+            // cut as SwiftUI cuts it ("visible"), by tab and line. And where
+            // each tab of the run was laid out, [minX, maxX] ("items").
             guard let path = request["path"] as? String else { answer(["error": "strip needs a path"]); return }
             let width = request["width"] as? Double ?? 1100
             let host = NSHostingView(rootView: TabBar(browser: browser).frame(width: width, height: Metrics.strip).background(Palette.ground)
@@ -4246,6 +4247,7 @@ final class Bench {
             }
             TabBar.drawnBands = [:]
             TabBar.drawnTitles = [:]
+            TabBar.drawnItems = [:]
             window.contentView = host
             host.layoutSubtreeIfNeeded()
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
@@ -4269,9 +4271,13 @@ final class Bench {
                                                 medium: drawn.medium, middle: drawn.middle)]
                 }
                 TabBar.drawnTitles = [:]
+                let items = Dictionary(TabBar.drawnItems.map { id, rect in
+                    (String(id.uuidString.prefix(8)).lowercased(), [Double(rect.minX), Double(rect.maxX)])
+                }, uniquingKeysWith: { first, _ in first })
+                TabBar.drawnItems = [:]
                 do {
                     try picture.representation(using: .png, properties: [:])?.write(to: URL(fileURLWithPath: path))
-                    answer(["saved": path, "bands": bands, "titles": titles])
+                    answer(["saved": path, "bands": bands, "titles": titles, "items": items])
                 } catch { answer(["error": error.localizedDescription]) }
                 window.contentView = nil
             }
