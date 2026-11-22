@@ -419,10 +419,16 @@ struct SettingsPanel: View {
 
     @ViewBuilder
     private var results: some View {
-        let found = hits
-        if found.isEmpty {
+        let all = hits
+        if all.isEmpty {
             Card { Nothing("ui.no_setting_called_that_try_other_words_like_dark_tabs_o") }
         }
+        }
+        // What is always there and has nothing to set comes apart, after
+        // the settings: among them its row with no switch read as a setting
+        // gone missing (idea 483).
+        let found = all.filter { $0.kind != .note }
+        let always = all.filter { $0.kind == .note }
         let byGroup = Dictionary(grouping: found, by: \.group)
         ForEach(SettingsIndex.groups.filter { byGroup[$0.id] != nil }) { group in
             VStack(alignment: .leading, spacing: 8) {
@@ -447,6 +453,19 @@ struct SettingsPanel: View {
                 .buttonStyle(.plain)
                 .help("\(group.page.localizedTitle) › \(group.localizedTitle)")
                 Card { rows(byGroup[group.id] ?? [], searched: true) }
+            }
+        }
+        if !always.isEmpty {
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(spacing: 6) {
+                    Image(systemName: "checkmark.circle").font(.system(size: 10.5, weight: .medium))
+                    Text(language.text("ui.always_on_nothing_to_set", fallback: "Always on, nothing to set").uppercased())
+                        .font(.system(size: 10.5, weight: .semibold))
+                        .tracking(0.4)
+                }
+                .foregroundStyle(Palette.muted)
+                .padding(.leading, 2)
+                Card { rows(always, searched: true) }
             }
         }
     }
