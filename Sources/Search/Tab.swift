@@ -3054,6 +3054,18 @@ final class PageView: WKWebView {
     /// begun within a moment of that is the same scrolling going on (the
     /// page repeats itself at most ten times a second, see Swipe.watch).
     private var lastTaken: Date?
+    /// When the page last scrolled up or down under the fingers or in the
+    /// glide after them. A gesture begun within a moment of that is the same
+    /// scrolling going on: a fast flick down that drifts sideways at its
+    /// start went back a page (#1389). Safari reads it as scrolling too.
+    private var scrolledDown: Date?
+    /// This gesture began while the page was still scrolling (scrolledDown):
+    /// only a plainly sideways one is a swipe, and never a mere flick.
+    private var afterScroll = false
+    /// The furthest the fingers have been this gesture. Letting go counts
+    /// only near it: drawn back `giveBack` from there, the swipe is off, so
+    /// taking it back is a shorter move than making it (#1389).
+    private var peak: CGFloat = 0
     private var armedNow = false
     private var showing = false
     private var going = false
@@ -3089,6 +3101,13 @@ final class PageView: WKWebView {
     /// this far, within `flickTime` of setting off.
     private static let flick: CGFloat = 30
     private static let flickTime: TimeInterval = 0.25
+    /// Drawn back this far from the furthest point, letting go goes nowhere.
+    private static let giveBack: CGFloat = 20
+    /// How long after the page last scrolled up or down a new gesture still
+    /// counts as that scrolling, and how much more sideways than up or down
+    /// it then has to set off to be a swipe.
+    private static let scrollingOn: TimeInterval = 0.4
+    private static let plainlySideways: CGFloat = 3
     /// Less than this and there is nothing to show yet — or nothing left to.
     private static let show: CGFloat = 6
 
@@ -3179,6 +3198,10 @@ final class PageView: WKWebView {
             Swipe.calm(self)
         }
         if went, event.momentumPhase != [] { return }
+        // Up or down, by hand or in the glide after it (see scrolledDown).
+        if axis == .down, event.phase == .changed || event.phase == .ended || event.momentumPhase != [] {
+            scrolledDown = Date()
+        }
         // The page gets every event first and scrolls as it always did. The
         // swipe is only read, never taken — except while its list is open,
         // when up and down are picking a page, not scrolling this one. The
@@ -3202,6 +3225,8 @@ final class PageView: WKWebView {
             asked = nil
             spent = false
             refused = lastTaken.map { Date().timeIntervalSince($0) < 0.15 } ?? false
+            afterScroll = scrolledDown.map { Date().timeIntervalSince($0) < PageView.scrollingOn } ?? false
+            peak = 0
             armedNow = false
             showing = false
             holding?.cancel()
@@ -3225,7 +3250,8 @@ final class PageView: WKWebView {
                 gatheredY += abs(event.scrollingDeltaY)
                 sideways += event.scrollingDeltaX
                 guard gatheredX + gatheredY > 6 else { return }
-                axis = gatheredX > gatheredY * 1.3 ? .across : .down
+                axis = gatheredX > gatheredY * (afterScroll ? PageView.plainlySideways : 1.3) ? .across : .down
+                if axis == .down { scrolledDown = Date() }
                 if axis == .down {
                     spent = true
                     return
@@ -3295,6 +3321,7 @@ final class PageView: WKWebView {
         guard free == true else { return }
 
         let travel = travel
+        peak = max(peak, travel)
         // Drawn all the way back, the disc goes; drawn out again, it returns.
         // Nothing is decided until the fingers lift.
         guard travel >= PageView.show else {
@@ -3302,7 +3329,9 @@ final class PageView: WKWebView {
             return
         }
 
-        let armed = travel >= PageView.arm
+        // Armed only near the furthest the fingers went: drawn back a little
+        // from there, it lets go of the page (the lighter tap says so).
+        let armed = travel >= PageView.arm && travel > peak - PageView.giveBack
         if PageView.holdsHistory, stops == nil, armed != armedNow {
             holding?.cancel()
             holding = nil
@@ -3369,7 +3398,7 @@ final class PageView: WKWebView {
         // Let go before the list came: it doesn't come now.
         holding?.cancel()
         holding = nil
-        let flicked = !spent && free == true && travel >= PageView.flick
+        let flicked = !spent && free == true && !afterScroll && travel >= PageView.flick && travel > peak - PageView.giveBack
             && (asked.map { Date().timeIntervalSince($0) <= PageView.flickTime } ?? false)
         guard !spent, free == true, armedNow || flicked || stops != nil else {
             settle(nil)
