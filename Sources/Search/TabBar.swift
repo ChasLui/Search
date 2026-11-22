@@ -11,6 +11,11 @@ struct TabBar: View {
     @ObservedObject var browser: Browser
 
     @Namespace private var pill
+    /// The live tab's glass, when it is glass (LiquidTab.swift).
+    @StateObject private var lens = LensMotion()
+    /// The height the tabs and the bar's buttons take, centred in the bar:
+    /// above and below it the bar is title bar (see DragStrip.band).
+    static let band: CGFloat = 30
     /// The neighbouring spaces' own grey, apart from this one's.
     @Namespace private var above
     @Namespace private var below
@@ -25,9 +30,15 @@ struct TabBar: View {
     @State private var nearby = false
     @State private var plussed = false
     /// The helm's width when it stands before the tabs rather than after them.
-    private var leading: CGFloat { browser.prefs.navigationLeft ? Metrics.helm - 8 + Metrics.tabGap : 0 }
+    private var leading: CGFloat {
+        (browser.prefs.navigationLeft ? Metrics.helm - 8 + Metrics.tabGap : 0)
+            + (browser.prefs.addressLine ? browser.prefs.addressWidth.width + AddressLine.after + Metrics.tabGap : 0)
+    }
     /// How wide the doors at the far end are, extension buttons included.
     @State private var doors: CGFloat = 0
+    /// The space whose run was last brought to its tab: another one is a
+    /// space coming in, not a tab picked (see reveal).
+    @State private var revealedSpace: UUID?
 
     var body: some View {
         // A GeometryReader is only here to measure the width. Its content is
@@ -47,8 +58,11 @@ struct TabBar: View {
             let pinLine = row.pinLine
             ZStack(alignment: .leading) {
                 // The empty half of the strip is what you grab to move the
-                // window; the tabs keep the run they sit on.
-                DragStrip(reserved: lights + dot + leading + (making ? min(540, row.room) : row.run) + Metrics.tabGap + Metrics.plusWidth, trailing: doors + 12, onDoubleClick: browser.newTab)
+                // window; the tabs keep the run they sit on, and the buttons
+                // theirs, only as tall as they are: above and below them is
+                // title bar too.
+                DragStrip(reserved: lights + dot + leading + (making ? min(540, row.room) : row.run) + Metrics.tabGap + Metrics.plusWidth, trailing: doors + 12,
+                          band: making ? nil : TabBar.band, onDoubleClick: browser.newTab)
                 // And the corner the lights sit in, which is title bar too —
                 // the one stretch left to take hold of when tabs fill the row.
                 DragStrip()
@@ -62,6 +76,13 @@ struct TabBar: View {
                     // after a switch.
                     // The profile, once there is more than one (see Profiles.swift).
                     if Profiles.shared.several { ProfileBadge(browser: browser) }
+                    // The page's address, when it is to be in sight: before the tabs.
+                    if browser.prefs.addressLine {
+                        AddressLine(browser: browser)
+                            .frame(width: browser.prefs.addressWidth.width)
+                            .padding(.trailing, AddressLine.after)
+                            .zIndex(2)
+                    }
                     if browser.prefs.usesSpaces { SpaceDot(browser: browser).zIndex(1) }
 
                     // The tabs, in a run of their own. While they fit, it is
@@ -127,7 +148,7 @@ struct TabBar: View {
                                             }
                                         }
                                     }
-                                    .frame(height: Metrics.strip)
+                                    .frame(height: TabBar.band)
                                     .environment(\.rowCarrying, carrying)
                                     .onPreferenceChange(GroupDropFrames.self) { groupFrames = $0 }
                                 }
@@ -138,9 +159,26 @@ struct TabBar: View {
                                 // would show over the lights and the doors.
                                 .scrollClipDisabled(carrying && !row.overflowing)
                                 .frame(width: row.run)
-                                .onAppear { reveal(reader, overflowing: row.overflowing) }
+                                // Only as tall as the tabs: a scroll view is
+                                // AppKit's, over the strip that moves the
+                                // window, and as tall as the bar it took every
+                                // press above and below them too.
+                                .frame(height: TabBar.band)
+                                // The live tab as a pane of Liquid Glass, held
+                                // to the run (LiquidTab.swift).
+                                .liveLens(browser, motion: lens)
+                                .onAppear {
+                                    revealedSpace = browser.spaceID
+                                    reveal(reader, overflowing: row.overflowing)
+                                }
                                 .onChange(of: row.overflowing) { _, _ in reveal(reader, overflowing: row.overflowing) }
-                                .onChange(of: browser.activeID) { _, _ in reveal(reader, overflowing: row.overflowing, gliding: true) }
+                                // Another space's run comes in on its tab,
+                                // not gliding there from where the last was.
+                                .onChange(of: browser.activeID) { _, _ in
+                                    let arrived = revealedSpace != browser.spaceID
+                                    revealedSpace = browser.spaceID
+                                    reveal(reader, overflowing: row.overflowing, gliding: !arrived)
+                                }
                                 .onChange(of: browser.editingGroupID) { _, id in
                                     guard let id else { return }
                                     DispatchQueue.main.async { reader.scrollTo("group-\(id)") }
@@ -148,13 +186,29 @@ struct TabBar: View {
                             }
                                 .modifier(SwipeShift(offset: browser.spaceSwipeOffset))
                         }
-                        if browser.spaceSwipeSide > 0, spaceAt > 0 {
-                            page(spaceAt - 1, in: geo.size.width, pill: above)
-                                .modifier(SwipeShift(offset: browser.spaceSwipeOffset, by: -Metrics.strip))
+                        // Always there, out of sight above and below, the swipe
+                        // only moving them: put there as it set off, the bar
+                        // was made over, and the window worked out again where
+                        // it can be dragged by, past every tab — up to a tenth
+                        // of a second before the row moved. Drawn again only
+                        // for the space a slide brings from further along
+                        // (beside, Browser.mapDrawn).
+                        SwipeSided(side: browser.mapDrawn) { _ in
+                            if spaceAt > 0 {
+                                page(beside(spaceAt - 1, -1), in: geo.size.width, pill: above)
+                                    .modifier(SwipeShift(offset: browser.spaceSwipeOffset, by: -Metrics.strip))
+                                    .accessibilityHidden(true)
+                            }
+                            if spaceAt + 1 < browser.spaces.count {
+                                page(beside(spaceAt + 1, 1), in: geo.size.width, pill: below)
+                                    .modifier(SwipeShift(offset: browser.spaceSwipeOffset, by: Metrics.strip))
+                                    .accessibilityHidden(true)
+                            }
                         }
-                        if browser.spaceSwipeSide < 0, browser.drawsPage(after: spaceAt) {
-                            page(spaceAt + 1, in: geo.size.width, pill: below)
-                                .modifier(SwipeShift(offset: browser.spaceSwipeOffset, by: Metrics.strip))
+                        // The card for a new space, with its field, only while
+                        // the fingers bring it.
+                        if spaceAt + 1 >= browser.spaces.count, browser.drawsPage(after: spaceAt) {
+                            SwipeCard(side: browser.swipeSide, browser: browser, inline: true)
                         }
                     }
                     .frame(width: making ? min(540, row.room) : row.run, height: Metrics.strip, alignment: .leading)
@@ -189,6 +243,9 @@ struct TabBar: View {
                     // Back, forward, reload, and the bookmarks, at the far end
                     // of the row. The dropdown hangs from the last one.
                     HStack(spacing: Metrics.tabGap) {
+                        // A coding agent allowed in this window: its pill and
+                        // Stop, here rather than over the page (AgentBanner).
+                        AgentStatus(browser: browser, style: .door)
                         // Only while a download is running, and a moment after.
                         FetchDoor(browser: browser, fetches: browser.fetches)
                         ExtensionSlot(browser: browser)
@@ -226,12 +283,17 @@ struct TabBar: View {
                 landing ? Palette.hover : Color.clear
                 // The space's colour, if it has one, over whatever ground the
                 // row lies on: the window's, or the one it brings along when
-                // it comes down over the page.
-                SpaceWash(look: browser.wash)
+                // it comes down over the page. On glass the glass wears it.
+                if !browser.glassUnder { SpaceWash(look: browser.wash) }
                 if browser.prefs.splitView {
                     SplitDropZone(browser: browser, tab: nil, kind: .strip)
                 }
             }
+        }
+        // Another space's run comes in at once, not tab by tab (see SideBar).
+        .transaction(value: browser.spaceID) {
+            $0.animation = nil
+            $0.disablesAnimations = true
         }
         .animation(Motion.quick, value: landing)
         .animation(Motion.glide, value: browser.activeID)
@@ -245,6 +307,15 @@ struct TabBar: View {
     // MARK: - the spaces, one above the other
 
     private var making: Bool { browser.prefs.usesSpaces && browser.makingSpace }
+
+    /// The space drawn beside this one while it moves: the one lying
+    /// there, or while one slides in from further along, that one
+    /// (SideBar.beside).
+    private func beside(_ index: Int, _ side: Int) -> Int {
+        guard side == browser.spaceStep, let other = browser.spaceComing,
+              let at = browser.spaces.firstIndex(where: { $0.id == other }) else { return index }
+        return at
+    }
 
     /// Where the space on screen sits among them: one past the last while
     /// the row for a new one is up.
@@ -276,29 +347,37 @@ struct TabBar: View {
             let line = TabBar.showsPinLine(shown, groups: groups.count)
             let firstLoose = shown.firstIndex { $0.pin == nil }
             let splits = SplitItems(tabs: row.tabs, splits: row.splits, enabled: browser.prefs.splitView)
+            // Only the tabs there is room for, and a couple more: the rest
+            // run on past the window's edge. All of a long space's made,
+            // each swipe's start held the row still for up to a fifth of a
+            // second.
+            let fit = Set(shown.prefix(Int((strip / max(each + Metrics.tabGap, 1)).rounded(.up)) + 2).map(\.id))
+            let pinsShown = pins.filter { fit.contains($0.id) }
+            let groupsShown = groups.filter { $0.tabs.contains { fit.contains($0.id) } }
+            let looseShown = loose.filter { fit.contains($0.id) }
             HStack(spacing: Metrics.tabGap) {
                 if groupsOn {
-                    ForEach(pins) { tab in
+                    ForEach(pinsShown) { tab in
                         rowItem(tab, splits: splits, activeID: row.active,
                                 width: each, room: strip - lights - 12,
                                 height: Metrics.strip, interactive: false, pill: pill)
                     }
                     if line { PinLine() }
-                    ForEach(groups) { drawn in
+                    ForEach(groupsShown) { drawn in
                         GroupHeading(browser: browser, group: drawn.group, horizontal: true)
-                        ForEach(drawn.tabs) { tab in
+                        ForEach(drawn.tabs.filter { fit.contains($0.id) }) { tab in
                             rowItem(tab, splits: splits, activeID: row.active,
                                     width: each, room: strip - lights - 12,
                                     height: Metrics.strip, interactive: false, pill: pill)
                         }
                     }
-                    ForEach(loose) { tab in
+                    ForEach(looseShown) { tab in
                         rowItem(tab, splits: splits, activeID: row.active,
                                 width: each, room: strip - lights - 12,
                                 height: Metrics.strip, interactive: false, pill: pill)
                     }
                 } else {
-                    ForEach(Array(shown.enumerated()), id: \.element.id) { index, tab in
+                    ForEach(Array(shown.enumerated()).filter { fit.contains($0.element.id) }, id: \.element.id) { index, tab in
                         if line, index == firstLoose { PinLine() }
                         rowItem(tab, splits: splits, activeID: row.active,
                                 width: each, room: strip - lights - 12,
@@ -673,6 +752,10 @@ enum Rewind {
 private struct TabPill: View, Equatable {
     @ObservedObject private var language = Language.shared
     @Environment(\.tabShortcutNumbers) private var shortcutNumbers
+    /// Black or white with alpha, so on a space's colour the pills take its
+    /// tint rather than sit on it as grey patches (see Greys).
+    @Environment(\.liquidTabs) private var liquid
+    @Environment(\.greys) private var greys
     @Environment(\.rowCarrying) private var rowCarrying
     let browser: Browser
     @ObservedObject var prefs: Preferences
@@ -731,6 +814,7 @@ private struct TabPill: View, Equatable {
     /// the address on the tab you're on).
     private var rest: AtRest? { live && !editing ? AtRest.said(tab.restAddress, always: prefs.showsAddress) : nil }
     private var atRest: Bool { rest != nil }
+    private var dim: Bool { prefs.dimsSleepingTabs && tab.asleep && !live && !hovering }
 
     /// A pinned tab is a square, an edited one is a field, everything else is
     /// its share of what is left.
@@ -752,7 +836,8 @@ private struct TabPill: View, Equatable {
                         // letter or icon comes back once it is there.
                         Ring(size: 11)
                     } else if prefs.glyph == .icons, let icon = tab.icon {
-                        Mark(icon: icon, letter: tab.pin ?? "", size: 16, dim: tab.asleep)
+                        Mark(icon: icon, letter: tab.pin ?? "", size: 16, dim: tab.asleep,
+                             contrast: prefs.highContrastText)
                     } else {
                         Text(tab.pin ?? "")
                             .font(.system(size: 12, weight: .medium))
@@ -813,6 +898,7 @@ private struct TabPill: View, Equatable {
         .animation(nil, value: hovering)
         .animation(Motion.glide, value: editing)
         .animation(Motion.glide, value: tab.pin)
+        .animation(Motion.quick, value: dim)
         .onChange(of: refusals) { _, _ in
             guard editing else { return }
             shake = 0
@@ -838,7 +924,9 @@ private struct TabPill: View, Equatable {
                 } else if tab.loading {
                     Ring()
                 } else {
-                    Mark(icon: prefs.glyph == .icons ? tab.icon : nil, letter: tab.monogram, size: 15, dim: tab.asleep)
+                    Mark(icon: prefs.glyph == .icons ? tab.icon : nil, letter: tab.monogram, size: 15, dim: tab.asleep,
+                         contrast: prefs.highContrastText)
+                        .overlay(alignment: .bottomTrailing) { AgentMark(tab: tab) }
                 }
             }
             .frame(width: 16, height: 16)
@@ -863,14 +951,16 @@ private struct TabPill: View, Equatable {
                     .frame(height: 16)
             } else {
                 if !tab.isBlank {
-                    Mark(icon: prefs.glyph == .icons ? tab.icon : nil, letter: tab.monogram, size: 15)
+                    Mark(icon: prefs.glyph == .icons ? tab.icon : nil, letter: tab.monogram, size: 15, dim: dim,
+                         contrast: prefs.highContrastText)
+                        .overlay(alignment: .bottomTrailing) { AgentMark(tab: tab) }
                 }
-                if tab.bench {
-                    // A script's tab, or a coding agent's, not yours.
-                    Image(systemName: tab.agent ? "cursorarrow.rays" : "flask")
+                if tab.bench, !tab.agent {
+                    // A script's tab, not yours.
+                    Image(systemName: "flask")
                         .font(.system(size: 9))
                         .foregroundStyle(colour.opacity(0.7))
-                        .help(Text(LocalizedStringKey(tab.agent ? "Opened by a coding agent" : "Opened by a script"), bundle: Language.resources))
+                        .help(Text("Opened by a script", bundle: Language.resources))
                 }
                 if tab.shy {
                     // Quiet, and only on the tabs that keep nothing.
@@ -890,7 +980,7 @@ private struct TabPill: View, Equatable {
                 // The page is translated (Translate.swift).
                 TranslateSign(tab: tab, colour: colour)
                 TitleAtRest(label: tab.displayLabel, rest: rest, shown: atRest, hovering: hovering,
-                            size: 12.5, colour: colour, roomy: false)
+                            size: 12.5, colour: colour, roomy: false, dim: dim)
             }
 
             Spacer(minLength: 2)
@@ -960,8 +1050,9 @@ private struct TabPill: View, Equatable {
             // it says it without adding anything to the window.
             ZStack(alignment: .leading) {
                 // A pinned square among the faint grey of the others: the
-                // darker grey the column's live pin wears too.
-                Rectangle().fill(pinned ? Palette.pinLive : Palette.wash)
+                // darker grey the column's live pin wears too. Under a pane
+                // of Liquid Glass, the glass is a tab's ground.
+                Rectangle().fill(pinned ? greys.pinLive : (liquid ? Color.clear : greys.wash))
                 // Not on a pinned square, nor a tab down to its mark. Thirty
                 // points of grey filling from the left behind a single letter
                 // says nothing about anything — it needs the width of a title
@@ -971,13 +1062,13 @@ private struct TabPill: View, Equatable {
                 }
             }
             .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
-            .matchedGeometryEffect(id: "live", in: pill)
+            .modifier(LiveMatch(id: "live", in: pill, tab: pinned ? nil : tab.id))
         } else if selected {
             RoundedRectangle(cornerRadius: 9, style: .continuous)
-                .fill(Palette.wash)
+                .fill(greys.wash)
         } else if hovering {
             RoundedRectangle(cornerRadius: 9, style: .continuous)
-                .fill(Palette.hover)
+                .fill(greys.hover)
         } else if pinned || compact || rowCarrying {
             // A letter with nothing behind it reads as debris. A pinned tab
             // keeps a faint ground of its own so the block of them reads as
@@ -992,13 +1083,13 @@ private struct TabPill: View, Equatable {
             // its left under it too, and the half left showing was nothing,
             // so it seemed gone until the hand moved on (#898).
             RoundedRectangle(cornerRadius: 9, style: .continuous)
-                .fill(Palette.wash.opacity(0.55))
+                .fill(greys.tile)
         }
     }
 
     private var colour: Color {
-        if live { return Palette.ink }
-        return hovering ? Palette.ink.opacity(0.7) : Palette.muted
+        if live || prefs.highContrastText { return Palette.ink }
+        return hovering ? Palette.ink.opacity(0.7) : greys.muted
     }
 }
 
@@ -1364,7 +1455,8 @@ struct TabAddressField: NSViewRepresentable {
     func makeCoordinator() -> Coordinator { Coordinator(browser: browser) }
 
     func makeNSView(context: Context) -> NSTextField {
-        let field = NSTextField()
+        // The caret kept clear of the field's end (RoomyField).
+        let field = RoomyField()
         field.delegate = context.coordinator
         field.isBordered = false
         field.drawsBackground = false
@@ -1690,6 +1782,10 @@ struct TabMenu: View {
                         Button(other.windowName) { browser.moveToWindow(tab, other) }
                     }
                 } label: { Text("ui.move_to_window", bundle: Language.resources) }
+            }
+            if browser.prefs.littleLinks {
+                Button { browser.openInLittleWindow(tab) } label: { Text("ui.open_in_small_window", bundle: Language.resources) }
+                    .disabled(!browser.liftable(tab))
             }
         }
         Divider()

@@ -128,6 +128,14 @@ enum SettingsIndex {
         .init(id: "general.default", group: "browser", icon: "link.badge.plus",
               title: "Open links from other apps", detail: "Make Search the browser Mail, Slack and the rest send links to",
               words: ["default browser"]),
+        .init(id: "mail.webmail", group: "browser", icon: "envelope",
+              title: "Email links open in", detail: "Write in Gmail or another webmail, in a tab, instead of your mail app",
+              more: "Email (mailto:) links clicked in a page open the webmail's new message in a tab beside it, with the address, subject and text filled in. From a private tab too, in an ordinary tab, where you're signed in. Links from other apps, and Send Feedback, go there once Search opens email links.",
+              keys: ["mail.webmail"], words: ["email", "mailto", "gmail", "mail", "outlook", "fastmail", "proton", "webmail", "compose"]),
+        .init(id: "mail.default", group: "browser", icon: "envelope.badge",
+              title: "Make Search open email links", detail: "So links from other apps open your webmail too",
+              more: "macOS asks you to confirm. Pick another app in Mail › Settings › General › Default email reader to undo it.",
+              words: ["email", "mailto", "gmail", "mail", "default email", "handler"], parent: "mail.webmail"),
         .init(id: "general.import", group: "browser", icon: "square.and.arrow.down.on.square",
               title: "Bring things over", detail: "Bookmarks, history, passwords and extensions from another browser",
               more: "From another browser on this Mac, or from a file it exported. Nothing leaves your Mac.",
@@ -139,6 +147,17 @@ enum SettingsIndex {
               title: "Sync with your other Macs", detail: "Spaces, pins, bookmarks and settings, through a folder you choose",
               more: "Choose a folder your Macs share, in iCloud Drive or Dropbox for example, and turn this on with the same folder in Search on each Mac. Each profile syncs on its own. Never your history, passwords, cookies, sign-ins or open tabs. No account and no server: only small files in that folder.",
               keys: ["sync.folder"], words: ["sync", "icloud", "dropbox", "other mac", "devices", "mac"]),
+        .init(id: "handoff", group: "browser", icon: "iphone.and.arrow.forward",
+              title: "Handoff to your iPhone and iPad", detail: "The page in front comes up in their app switcher, as Safari's does",
+              more: "And at the end of the Dock on your other Macs. macOS carries the address to devices signed in to your Apple Account with Handoff on, in System Settings › General › AirDrop & Handoff on a Mac. Never a private tab or a space signed out of the others. Pages handed off from your iPhone open here when Search is your default browser.",
+              keys: ["handoff"], words: ["handoff", "continuity", "iphone", "ipad", "devices", "app switcher", "multitasking"]),
+        .init(id: "icloud", group: "browser", icon: "icloud",
+              title: "Sync with iCloud", detail: "Open tabs, pins, spaces, bookmarks and a few settings, with your iPhone",
+              more: "Through your own iCloud, end to end encrypted: Search on your iPhone and your other Macs see this Mac's open tabs (under History and in the address field, as Tabs on Your Other Devices) and share its pins, spaces, bookmarks, search engine and look. Private tabs never go, nor your history, passwords, cookies or sign-ins. Nothing leaves this Mac until you turn it on. Not together with Sync with your other Macs.",
+              keys: ["icloud.sync"], words: ["sync", "icloud", "iphone", "ios", "cloudkit", "other devices", "devices", "icloud tabs", "tabs on other devices", "handoff"]),
+        .init(id: "icloud.erase", group: "browser", icon: "trash",
+              title: "Delete Search's data from iCloud", detail: "For every device. What is on each one stays, and sync turns off here",
+              words: ["icloud", "delete", "erase", "remove", "sync"], parent: "icloud"),
         .init(id: "quit.confirm", group: "browser", icon: "power",
               title: "Confirm before quitting", detail: "Ask before ⌘Q or Quit Search closes the browser",
               keys: ["quit.confirm"], words: ["quit", "cmd q"]),
@@ -181,6 +200,10 @@ enum SettingsIndex {
         .init(id: "sidebar.hides", group: "window", icon: "sidebar.squares.left",
               title: "Hide the column until the pointer reaches the edge", detail: "The page takes the whole window; ⌘S keeps the tabs out",
               keys: ["sidebar.hides"], words: ["auto hide", "sidebar"], parent: "tabs.layout"),
+        .init(id: "sidebar.slides", group: "window", icon: "rectangle.lefthalf.inset.filled.arrow.left",
+              title: "Slide the column in and out", detail: "A gentler slide when ⌘S or the window's edge brings the column out or puts it away",
+              more: "With Reduce Motion on in System Settings › Accessibility › Display, the column fades in and out instead. With Reduce animations on, it comes and goes at once.",
+              keys: [Motion.slidesKey], words: ["animation", "animate", "smooth", "slide", "sidebar", "arc"], parent: "tabs.layout"),
         .init(id: "sidebar.foldIcons", group: "window", icon: "arrow.down.right.and.arrow.up.left",
               title: "⌘S makes the column icons only", detail: "The tabs stay in sight as a narrow column of icons; ⌘S again brings the titles back",
               more: "Off, ⌘S hides the column and the page takes the whole window.",
@@ -201,9 +224,35 @@ enum SettingsIndex {
               title: "Shorter tab bar", detail: "Only a few points above and below the tabs, for more of the page",
               keys: ["tabs.compact"], words: ["compact", "slim", "thin", "height", "padding", "tab bar", "toolbar"],
               parent: "tabs.layout"),
+        .init(id: "address.shown", group: "window", icon: "link",
+              title: "Always show the address bar", detail: "The page's full address, to type in",
+              keys: ["address.shown"], words: ["address bar", "url", "location", "url bar", "omnibox", "full address"]),
+        .init(id: "address.width", group: "window", icon: "arrow.left.and.right",
+              title: "Address width", detail: "Before the tabs across the top",
+              keys: ["address.width"], words: ["address bar", "url", "width", "wide"], parent: "address.shown"),
+        .init(id: "window.glass", group: "window", icon: "square.on.square.intersection.dashed",
+              title: "Glass", detail: "What is behind the window shows through the tabs and the frame, blurred",
+              more: "As in Arc and Zen. The glass takes the space's colour; how see-through it is, and its grain, are in the space's menu › Colour…. Not in full screen.",
+              keys: ["window.glass"], words: ["glass", "translucent", "transparent", "blur", "frosted", "vibrancy", "see through", "arc", "zen"]),
+        .init(id: "window.glass.style", group: "window", icon: "drop",
+              title: "Glass style", detail: "Frosted, or the Mac's Liquid Glass",
+              keys: ["window.glass.style"], words: ["liquid glass", "liquid", "frosted", "glass", "tahoe"], parent: "window.glass"),
+        .init(id: "window.glass.clear", group: "window", icon: "circle.lefthalf.filled",
+              title: "Transparency", detail: "From the space's colour on the glass to clear glass",
+              keys: ["window.glass.clear"], words: ["transparency", "tint", "opacity", "glass"], parent: "window.glass"),
+        .init(id: "window.glass.grain", group: "window", icon: "circle.dotted",
+              title: "Grain", detail: "A still noise over the glass",
+              keys: ["window.glass.grain"], words: ["grain", "noise", "texture", "glass"], parent: "window.glass"),
+        .init(id: "tabs.liquid", group: "tablook", icon: "drop.halffull",
+              title: "Liquid Glass tab", detail: "The tab you're on under a pane of Liquid Glass that glides, stretches and settles",
+              more: "It bends the tabs it passes over. Pinned tabs and split pages keep their grey. Under Reduce Motion it goes straight to the tab you pick.",
+              keys: ["tabs.liquid"], words: ["liquid glass", "liquid", "glass", "active tab", "selected tab", "animation", "wobble"]),
         .init(id: "sidebar.roomy", group: "tablook", icon: "textformat.size.larger",
               title: "Roomier tabs", detail: "Taller rows and larger titles in the column",
               keys: ["sidebar.roomy"], words: ["bigger", "larger", "text size", "accessibility"], parent: "tabs.layout"),
+        .init(id: "sidebar.doorsUp", group: "tablook", icon: "rectangle.topthird.inset.filled",
+              title: "Buttons at the top", detail: "Bookmarks, extensions and downloads beside back, forward and reload, when they fit",
+              keys: ["sidebar.doorsUp"], words: ["minimal", "toolbar", "footer", "bottom", "icons", "clean"], parent: "tabs.layout"),
         .init(id: "sidebar.player", group: "tablook", icon: "play.circle",
               title: "What's playing in other tabs", detail: "At the foot of the sidebar, to pause it, play it again or go to it",
               more: "A tab playing sound while you're on another one shows above the sidebar's foot.",
@@ -211,6 +260,9 @@ enum SettingsIndex {
         .init(id: "glyph", group: "tablook", icon: "app",
               title: "Tabs show", detail: "Beside the title, and on a pinned square",
               keys: ["glyph"], words: ["favicon", "icons", "letters"]),
+        .init(id: "tabs.highContrast", group: "tablook", icon: "bold",
+              title: "High contrast text", detail: "Tab titles in black or white, instead of soft grey",
+              keys: ["tabs.highContrast"], words: ["contrast", "accessibility", "bold", "readable", "black", "white"]),
         .init(id: "tabs.reading", group: "tablook", icon: "text.line.first.and.arrowtriangle.forward",
               title: "Show how far you've read", detail: "The tab you're on fills with grey as you scroll down",
               keys: ["tabs.reading"], words: ["progress", "scroll"]),
@@ -269,6 +321,9 @@ enum SettingsIndex {
               title: "Sleep tabs you aren't using", detail: "A resting tab lets its page go and comes back where you left it",
               more: "Pinned tabs, sound, calls and anything typed stay awake. Right-click a site's card to keep it awake.",
               keys: ["tabs.sleep", SleepPace.key], words: ["memory", "discard", "suspend", "ram"], kind: .wide),
+        .init(id: "tabs.sleep.dim", group: "memory", icon: "moon",
+              title: "Dim sleeping tabs", detail: "A resting tab's title and icon fade until you go to it",
+              keys: ["tabs.sleep.dim"], words: ["sleep", "dim", "fade", "inactive", "suspend"]),
         .init(id: "tabs.close.after", group: "memory", icon: "timer",
               title: "Close tabs you leave alone", detail: "Pinned, named and grouped tabs stay. ⇧⌘T brings one back",
               more: "Counted from when you last left the tab, while Search is quit too. Private tabs, sound, calls and anything typed stay.",
@@ -301,8 +356,8 @@ enum SettingsIndex {
               title: "Site shortcuts", detail: "A word before your search sends it to that site: \"yt cats\"",
               keys: ["search.keywords"], words: ["keyword", "bang"]),
         .init(id: "links.little", group: "links", icon: "rectangle.on.rectangle",
-              title: "Open links from other apps in a small window", detail: "To read and close, or keep with Open in Search (⌘O)",
-              keys: ["links.little"], words: ["little arc", "mini window"]),
+              title: "Open links from other apps in a small window", detail: "To read and close, or keep with Open in Search (⌘O); a tab's menu opens one too",
+              keys: ["links.little"], words: ["little arc", "mini window", "open in small window"]),
         .init(id: "links.little.tabs", group: "links", icon: "arrow.right.square",
               title: "Go to a tab that has the page", detail: "A link to a page already open in a tab goes to that tab, not a small window",
               keys: ["links.little.tabs"], words: ["switch to tab", "already open", "duplicate"], parent: "links.little"),
@@ -363,8 +418,14 @@ enum SettingsIndex {
               words: ["arc", "import"]),
         .init(id: "spaces", group: "spaces", icon: "square.stack.3d.up",
               title: "Spaces", detail: "Separate sets of tabs, switched with ⌃1–⌃9 or a swipe",
-              more: "Each space can be signed in where the others are or start afresh. Mission Control's own ⌃1–⌃9, if you turned them on, take those keys first.",
+              more: "Each space can be signed in where the others are or start afresh. Mission Control's own Control-1 to Control-9, if you turned them on, take those keys first.",
               keys: ["spaces"], words: ["workspaces", "profiles"]),
+        .init(id: "spaces.commandNumbers", group: "spaces", icon: "command",
+              title: "⌘1–⌘9 switch spaces", detail: "Tabs move to ⌃1–⌃9, as in Arc",
+              more: "The two sets of keys swap places. A space's key you changed in Keyboard & Mouse › Shortcuts stays as you set it. Mission Control's own Control-1 to Control-9, if you turned them on, take those keys first.",
+              keys: [Preferences.spacesOnCommandKey],
+              words: ["arc", "cmd", "command", "control", "ctrl", "spaces", "numbers", "digits", "shortcut", "keys", "⌘1", "⌃1", "switch spaces", "swap"],
+              parent: "spaces"),
         .init(id: "profiles", group: "spaces", icon: "person.2",
               title: "Profiles", detail: "Spaces with their own sign-ins, history and bookmarks",
               more: "In windows of their own, unless Profiles in one window is on. Extensions, passwords and settings are shared.",
@@ -378,6 +439,13 @@ enum SettingsIndex {
               more: "Links from other apps, and links a page in another space opens in a new tab. A site includes its subdomains. Typed addresses, links followed in their own tab and private tabs stay where they are. Right-click a tab to send its site to the space it is in.",
               keys: [SpaceRoutes.key, SpaceRoutes.rulesKey],
               words: ["arc", "air traffic control", "route", "routing", "rules", "domain", "site", "open in space", "default space", "links from other apps"],
+              parent: "spaces"),
+        .init(id: "links.ask", group: "spaces", icon: "questionmark.square.dashed",
+              title: "Ask which space for links from other apps",
+              detail: "Choose the space a link from another app opens in, before it loads",
+              more: "A small panel lists every space: a number key opens the link in that space, and Return in the marked one. With Send links to a space on, Always saves a rule for its site.",
+              keys: ["links.ask", "links.ask.last"],
+              words: ["choose space", "which space", "links from other apps", "panel", "ask"],
               parent: "spaces"),
         .init(id: "pins.keep", group: "pins", icon: "pin.circle",
               title: "Pins keep their site", detail: "Links elsewhere open over the pin, and ⌘W takes it back home",
@@ -465,7 +533,7 @@ enum SettingsIndex {
         .init(id: "clear.cookies", group: "clear", icon: "person.crop.circle.badge.xmark",
               title: "Cookies and sign-ins", detail: "Signs you out of every site", words: ["cookies", "sign out"]),
         .init(id: "clear.cache", group: "clear", icon: "internaldrive",
-              title: "Cache", detail: "Only what was fetched to draw pages", words: ["clear cache"]),
+              title: "Cache", detail: "Only what was fetched to draw pages", words: ["clear cache", "empty caches", "cache storage"]),
 
         // Keyboard & Mouse
         .init(id: "links.peek", group: "mouse", icon: "eye",
@@ -475,6 +543,10 @@ enum SettingsIndex {
         .init(id: "links.peek.stays", group: "mouse", icon: "eye.slash",
               title: "Peek stays with its tab", detail: "Another tab hides it, with its video and sound paused, and coming back shows it",
               keys: ["links.peek.stays"], words: ["peek", "keep peek", "switch tabs"], parent: "links.peek"),
+        .init(id: "links.optionSplit", group: "mouse", icon: "rectangle.split.2x1",
+              title: "⌥-click a link opens it in Split View", detail: "Its page beside the one you're reading, as Open Link in Split View",
+              more: "Off, ⌥-click follows the link as a click does. In Safari it downloads the link instead.",
+              keys: ["links.optionSplit"], words: ["option click", "alt click", "split", "side by side", "link", "open beside"]),
         .init(id: "autoscroll", group: "mouse", icon: "arrow.up.and.down.circle",
               title: "Scroll with the middle button", detail: "Click the wheel, then move the mouse to scroll, as on Windows",
               keys: ["autoscroll"], words: ["middle click", "autoscroll", "wheel"]),
@@ -493,6 +565,10 @@ enum SettingsIndex {
         .init(id: "launcher.key", group: "anywhere", icon: "keyboard",
               title: "Key", detail: "Press it in any app to bring the address field up",
               keys: ["launcher.key"], words: ["hotkey", "global shortcut", "shift command space"], parent: "launcher.on"),
+        .init(id: "launcher.little", group: "anywhere", icon: "macwindow",
+              title: "Open in a small window", detail: "Return opens the page in a small window over the app you're in, not in Search's window",
+              more: "As links from other apps can (Settings › General): a small window with the page and Open in Search, to read and close or to keep. A page already open in a tab, picked from the list, still goes to its tab.",
+              keys: ["launcher.little"], words: ["little arc", "little window", "small window", "quick look", "option command n"], parent: "launcher.on"),
 
         // About
         .init(id: "updates.version", group: "updates", icon: "arrow.down.app",
@@ -510,7 +586,7 @@ enum SettingsIndex {
               keys: ["bench"], words: ["automation", "script", "developer"]),
         .init(id: "agents", group: "developer", icon: "cursorarrow.rays",
               title: "Let coding agents use Search", detail: "Claude Code or Codex can ask to browse in tabs of its own, while you watch",
-              more: "Each time one connects, the window asks you first, and a pill says it is there until it goes or you press Stop. It works in tabs of its own, marked in the row; your tabs it can read only if you tick “Let it see my open tabs”, and never uses. It never sees passwords, card numbers, one-time codes, private tabs, cookies or Settings, and can't download or choose files. It connects through a file on this Mac only, never the network: claude mcp add search -- /path/to/Search/search-mcp.",
+              more: "Each time one connects, the window asks you first, unless you ticked “Always allow” for it — offered only for Claude Code's own `claude`, signed by Anthropic; kept 30 days at most and 7 after its last use, never with your tabs, and asked again after you press Stop; forget it here. Nothing is drawn over the page: the tab it works in wears a small dot, and Stop is on the column's foot (or the tab strip) and in File › Stop Agent (⌃⌥⌘.) until it goes. It works in tabs of its own; your tabs it can read only if you tick “Let it see my open tabs”, and never uses. It never sees passwords, card numbers, one-time codes, private tabs, cookies or Settings, and can't download or choose files. It connects through a file on this Mac only, never the network: claude mcp add search -- /path/to/Search/search-mcp.",
               keys: ["agents"],
               words: ["agent", "ai", "claude", "claude code", "codex", "mcp", "automation", "computer use", "developer"]),
 
@@ -612,19 +688,26 @@ enum SettingsIndex {
         switch item.id {
         case "pages.dusk": return prefs.look != .light
         case "inspector.dark": return prefs.look != .dark
-        case "sidebar.roomy", "sidebar.player": return prefs.sidebar && !prefs.sideIcons
-        case "sidebar.hides", "layout.cards", "pins.list": return prefs.sidebar
+        case "sidebar.roomy", "sidebar.player", "sidebar.doorsUp": return prefs.sidebar && !prefs.sideIcons
+        case "sidebar.hides", "sidebar.slides", "layout.cards", "pins.list": return prefs.sidebar
         case "layout.cardsFullScreen": return prefs.sidebar && prefs.cards
+        case "address.width": return prefs.addressLine && !prefs.sidebar
+        case "tabs.liquid": return LiquidTab.available && !(prefs.sidebar && prefs.sideIcons)
+        case "window.glass.style": return prefs.glass && GlassStyle.liquidAvailable
+        // With spaces on they are in the space's Colour…, beside its colour.
+        case "window.glass.clear", "window.glass.grain": return prefs.glass && !prefs.usesSpaces
         case "pins.folders": return prefs.sidebar && prefs.listsPins
         case "sidebar.foldIcons": return prefs.sidebar && !prefs.sideHides
         case "toolbar.left", "tabs.compact": return !prefs.sidebar
         case "profiles.oneWindow": return Profiles.shared.several
-        case "spaces.links": return prefs.usesSpaces
+        case "spaces.links", "links.ask": return prefs.usesSpaces
         case "tabs.frontBeside": return prefs.newTabPlace == .next
         case "newtab.recent": return prefs.floatingNewTab
         case "links.little.tabs": return prefs.littleLinks
+        case "mail.default": return prefs.webmail != .none
         case "links.peek.stays": return prefs.peeksLinks || prefs.pinsPeek
         case "launcher.key": return prefs.launcher
+        case "icloud.erase": return ICloudSync.shared.on
         default: return true
         }
     }
@@ -634,15 +717,20 @@ enum SettingsIndex {
         switch item.id {
         case "pages.dusk": return "Only while Search isn't set to Light"
         case "inspector.dark": return "Only while Search isn't set to Dark"
-        case "toolbar.left", "tabs.compact": return "Only with the tabs across the top"
-        case "sidebar.roomy": return "Only with titles in the column"
+        case "toolbar.left", "tabs.compact", "address.width": return "Only with the tabs across the top"
+        case "sidebar.roomy", "sidebar.doorsUp": return "Only with titles in the column"
+        case "tabs.liquid": return LiquidTab.available ? "Only with titles in the column, or the tabs across the top" : "Liquid Glass needs macOS 26"
+        case "window.glass.style": return GlassStyle.liquidAvailable ? "Only with Glass on" : "Liquid Glass needs macOS 26"
+        case "window.glass.clear", "window.glass.grain": return "With spaces on, in the space's menu › Colour…"
         case "sidebar.foldIcons": return "Only with the column down a side and not hidden until the edge"
+        case "icloud.erase": return "Only while Sync with iCloud is on"
         case "profiles.oneWindow": return "Only with more than one profile"
-        case "spaces.links": return "Only with Spaces on"
+        case "spaces.links", "links.ask": return "Only with Spaces on"
         case "sidebar.player": return "Only with titles in the sidebar"
         case "tabs.frontBeside": return "Only with New tab position on After current"
         case "newtab.recent": return "Only with the new tab in a floating field"
         case "links.little.tabs": return "Only with links from other apps in a small window"
+        case "mail.default": return "Only with a webmail chosen for email links"
         case "links.peek.stays": return "Only when links or pins open peeks"
         case "launcher.key": return "Only with the address field from any app on"
         default: return "Only with the tabs down a side"
@@ -813,6 +901,7 @@ extension SettingsIndex {
             "arc": prefs.looksLikeArc,
             "profiles.oneWindow": prefs.profilesInOneWindow,
             "tabs.mirror": prefs.mirrorsTabs,
+            "sidebar.slides": prefs.slidesColumn,
             "always": [
                 "splitView": prefs.splitView, "tabs.groups": prefs.usesTabGroups,
                 "panel.sites": prefs.sitesInPanel, "translate": PageTranslator.enabled,
@@ -848,6 +937,9 @@ extension SettingsIndex {
         case "pins.folders":
             guard let on = value as? Bool else { return false }
             prefs.pinFolders = on
+        case "sidebar.slides":
+            guard let on = value as? Bool else { return false }
+            prefs.slidesColumn = on
         case "profiles.oneWindow":
             guard let on = value as? Bool else { return false }
             prefs.profilesInOneWindow = on

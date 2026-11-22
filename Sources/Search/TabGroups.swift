@@ -98,8 +98,18 @@ struct GroupHeading: View {
     @State private var hovering = false
     @State private var dropping = false
     @FocusState private var focused: Bool
+    /// Drawn in the map of every space's rows, not the column: renamed only
+    /// in the column, or a second field takes the keys (see SideRow's editing).
+    @Environment(\.inSpaceMap) private var inMap
 
-    private var editing: Bool { browser.editingGroupID == group.id }
+    private var editing: Bool { !inMap && browser.editingGroupID == group.id }
+
+    /// Soft grey by default; full ink with Settings › Appearance › Tabs ›
+    /// High contrast text, as a tab's title is.
+    private func titleColour(hovering: Bool) -> Color {
+        if browser.prefs.highContrastText { return Palette.ink }
+        return hovering ? Palette.ink.opacity(0.7) : Palette.muted
+    }
 
     /// Its height in the column, a little under a tab's.
     static let height: CGFloat = 24
@@ -134,7 +144,7 @@ struct GroupHeading: View {
                 .font(.system(size: 6.5, weight: .bold))
                 .rotationEffect(.degrees(group.collapsed ? -90 : 0))
         }
-        .foregroundStyle(hovering ? Palette.ink.opacity(0.7) : Palette.muted)
+        .foregroundStyle(titleColour(hovering: hovering))
         .frame(maxWidth: .infinity)
         .frame(height: Self.compactHeight)
         .background(RoundedRectangle(cornerRadius: 6, style: .continuous)
@@ -147,7 +157,7 @@ struct GroupHeading: View {
         .accessibilityLabel(group.name)
         // Rename Group: no room for the name here, so it is typed beside.
         .popover(isPresented: Binding(get: { editing }, set: { if !$0 { browser.editingGroupID = nil } }),
-                 arrowEdge: browser.prefs.sidePosition == .right ? .leading : .trailing) {
+                 hangingFrom: browser.prefs.sidePosition == .right ? .leading : .trailing) {
             TextField(text: $draft, prompt: Text("ui.group_name", bundle: Language.resources)) { Text("ui.group_name", bundle: Language.resources) }
                 .textFieldStyle(.plain)
                 .font(.system(size: 12.5, weight: .medium))
@@ -194,7 +204,7 @@ struct GroupHeading: View {
                     .opacity(hovering ? 1 : 0)
             }
         }
-        .foregroundStyle(Palette.muted)
+        .foregroundStyle(titleColour(hovering: false))
         .padding(.horizontal, 10)
         .frame(height: horizontal ? 28 : Self.height)
         .frame(maxWidth: horizontal ? nil : .infinity, alignment: .leading)
@@ -203,7 +213,8 @@ struct GroupHeading: View {
             .fill(dropping ? greys.wash : (hovering ? greys.hover : .clear)))
         .contentShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
         .onTapGesture { if !editing { browser.toggleTabGroup(group.id) } }
-        .modifier(GroupHeadingShared(browser: browser, group: group, dragSpace: dragSpace, dropping: $dropping))
+        .modifier(GroupHeadingShared(browser: browser, group: group, dragSpace: dragSpace, dropping: $dropping,
+                                     showsColour: !horizontal))
         .onHover { hovering = $0 }
         .onChange(of: editing) { _, now in
             if now {
@@ -232,6 +243,8 @@ private struct GroupHeadingShared: ViewModifier {
     let group: TabGroup
     let dragSpace: String?
     @Binding var dropping: Bool
+    var showsColour = true
+    @State private var choosingColour = false
 
     func body(content: Content) -> some View {
         content
@@ -261,6 +274,9 @@ private struct GroupHeadingShared: ViewModifier {
             .contextMenu {
                 Button { browser.editingGroupID = group.id } label: { Text("ui.rename_group", bundle: Language.resources) }
                 Button { browser.toggleTabGroup(group.id) } label: { Text(LocalizedStringKey(group.collapsed ? "Expand Group" : "Collapse Group"), bundle: Language.resources) }
+                if showsColour {
+                    Button { choosingColour = true } label: { Text("ui.colour", bundle: Language.resources) }
+                }
                 // The whole group into another space, still a group there: Arc's
                 // folders came in wherever Arc had them.
                 if browser.prefs.usesSpaces, browser.spaces.count > 1 {
@@ -277,6 +293,14 @@ private struct GroupHeadingShared: ViewModifier {
                 Divider()
                 Button { browser.removeTabGroup(group.id) } label: { Text("ui.ungroup_tabs", bundle: Language.resources) }
                 Button { browser.closeTabGroup(group.id) } label: { Text("ui.close_group", bundle: Language.resources) }
+            }
+            .popover(isPresented: $choosingColour,
+                     hangingFrom: browser.prefs.sidePosition == .right ? .leading : .trailing) {
+                let index = group.colour ?? 0
+                ColourSwatches(selected: Spaces.colours.indices.contains(index) ? index : 0) {
+                    browser.setTabGroupColour(group.id, to: $0)
+                }
+                .padding(16)
             }
     }
 }

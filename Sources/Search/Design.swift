@@ -90,6 +90,14 @@ struct Greys {
     /// tab's panes), so the two together land where the plain ones do.
     let washOnTile: Color
     let hoverOnTile: Color
+    /// The quiet ink of a tab's title that isn't live, the same way: on
+    /// the plain ground Palette.muted exactly, on a space's Rich or Vivid
+    /// colour as far from it as Palette.muted is from the plain ground,
+    /// where the opaque grey lost a third of its contrast.
+    let muted: Color
+    /// The faintest ink, New tab's, the same way: on Vivid the opaque grey
+    /// all but vanished into the colour.
+    let faint: Color
 
     // Black in a light window, white in a dark one, at the strength that
     // lands on the same grey as Palette's over the ground they lie on (the
@@ -98,10 +106,12 @@ struct Greys {
     // grey sat on it as a grey patch (Drice, 18 Nov 2026).
     static let white = Greys(wash: shade(0.063, 0.073), hover: shade(0.035, 0.045),
                              tile: shade(0.063, 0.073).opacity(0.55), pinLive: shade(0.10, 0.112),
-                             washOnTile: shade(0.0294, 0.0342), hoverOnTile: shade(0.004, 0.005))
+                             washOnTile: shade(0.0294, 0.0342), hoverOnTile: shade(0.004, 0.005),
+                             muted: shade(0.45, 0.5281), faint: shade(0.17, 0.236))
     static let frame = Greys(wash: shade(0.0628, 0.0865), hover: shade(0.0419, 0.0595),
                              tile: shade(0.0314, 0.0432), pinLive: shade(0.0995, 0.1243),
-                             washOnTile: shade(0.0324, 0.0452), hoverOnTile: shade(0.0108, 0.0169))
+                             washOnTile: shade(0.0324, 0.0452), hoverOnTile: shade(0.0108, 0.0169),
+                             muted: shade(0.4241, 0.5459), faint: shade(0.1309, 0.2649))
 
     private static func shade(_ light: CGFloat, _ dark: CGFloat) -> Color {
         Color(nsColor: NSColor(name: nil) { appearance in
@@ -348,9 +358,37 @@ enum Motion {
     }
 
     static func folding(out: Bool) -> Animation? {
+        if reduced { return nil }
+        if let slide = slide(out: out) {
+            return out ? .easeOut(duration: slide) : .easeIn(duration: slide)
+        }
         let spring = fold(out: out)
-        return reduced ? nil : .spring(response: spring.response, dampingFraction: spring.damping)
+        return .spring(response: spring.response, dampingFraction: spring.damping)
     }
+
+    /// Settings › Appearance › Slide the column in and out: the column comes
+    /// out on an ease-out and goes back on an ease-in, over this long, as
+    /// Arc's does, rather than on the short springs above. Nil when off.
+    /// Read at the moment it moves, as `light` is.
+    static func slide(out: Bool) -> TimeInterval? {
+        guard Store.settings.bool(forKey: slidesKey) else { return nil }
+        return out ? 0.26 : 0.22
+    }
+
+    nonisolated static let slidesKey = "sidebar.slides"
+
+    /// Slide the column in and out with the Mac's Reduce Motion on: the
+    /// column fades in place where it would slide, as Apple's own sidebars
+    /// do under Reduce Motion, rather than doing nothing at all, which read
+    /// as a switch that does nothing. Search's own Reduce animations still
+    /// means at once (see `instant`).
+    static var fadesColumn: Bool {
+        !instant && slide(out: true) != nil
+            && (testReduceMotion ?? NSWorkspace.shared.accessibilityDisplayShouldReduceMotion)
+    }
+
+    /// That fade's length.
+    static let fade: TimeInterval = 0.2
 }
 
 /// Search's mark — Drice's Subtract.svg, a pill with an S cut out of it,
@@ -453,29 +491,23 @@ struct Shake: GeometryEffect {
 
 extension View {
     /// What a popover holds, on the ground colour. From macOS 26 a popover
-    /// clips what it holds to its own rounded glass; before, an opaque
-    /// background was drawn out to the content's square edges, past the
-    /// popover's rounded corners (macOS 15, by email). There the popover is
-    /// handed the colour and fills its own shape with it, arrow included.
-    /// `card`: drawn as its own rounded card, with an edge, on macOS 26.
-    func popoverGround(card: Bool = false) -> some View {
-        modifier(PopoverGround(card: card))
+    /// clips what it holds to its own rounded glass, and the background
+    /// fills its arrow too; before, an opaque background was drawn out to the
+    /// content's square edges, past the popover's rounded corners (macOS 15,
+    /// by email). There the popover is handed the colour and fills its own
+    /// shape with it, arrow included. The bookmarks list and card were drawn
+    /// as a rounded card of their own inside the popover, which left the
+    /// arrow in the popover's lighter glass beside the darker card; they're
+    /// on the ground as the rest are now.
+    func popoverGround() -> some View {
+        modifier(PopoverGround())
     }
 }
 
 private struct PopoverGround: ViewModifier {
-    let card: Bool
-
     func body(content: Content) -> some View {
         if #available(macOS 26, *) {
-            if card {
-                content
-                    .background(Palette.ground)
-                    .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-                    .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(Palette.hairline, lineWidth: 1))
-            } else {
-                content.background(Palette.ground)
-            }
+            content.background(Palette.ground)
         } else {
             content.presentationBackground(Palette.ground)
         }

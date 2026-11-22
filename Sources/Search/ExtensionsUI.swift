@@ -158,6 +158,25 @@ struct ExtensionsPage: View {
                             .foregroundStyle(Palette.muted)
                             .lineLimit(1)
                             .help(item.source ?? "")
+                        // Switched on and not running: said as such, with
+                        // WebKit's reason, not a row like any other (#1208).
+                        if item.enabled, context == nil, let reason = extensions.notStarted[item.id] {
+                            Text(Language.shared.format("extension.could_not_start_reason", fallback: "Couldn’t start: %1$@", reason))
+                                .font(.system(size: 11.5))
+                                .foregroundStyle(Palette.unsafe)
+                                .lineLimit(3)
+                                .fixedSize(horizontal: false, vertical: true)
+                                .textSelection(.enabled)
+                        }
+                        // Running, but without what it is for (#1208).
+                        if let limit = context.flatMap({ Extensions.localizedCantDo($0.webExtension.manifest) }) {
+                            Text(limit)
+                                .font(.system(size: 11.5))
+                                .foregroundStyle(Palette.unsafe)
+                                .lineLimit(3)
+                                .fixedSize(horizontal: false, vertical: true)
+                                .textSelection(.enabled)
+                        }
                     }
                     Spacer(minLength: 8)
                     if sites {
@@ -236,7 +255,7 @@ struct ExtensionsPage: View {
 
         private func detail(_ context: WKWebExtensionContext?) -> String {
             var parts = [Language.shared.format("extension.version", fallback: "Version %1$@", item.version), item.fromStore ? "Chrome Web Store" : folder]
-            if item.enabled, context == nil { parts.append(Language.shared.text("extension.could_not_start", fallback: "couldn't start")) }
+            if item.enabled, context == nil, extensions.notStarted[item.id] == nil { parts.append(Language.shared.text("extension.could_not_start", fallback: "couldn't start")) }
             if extensions.newTabPageID == item.id {
                 parts.append(Language.shared.text("extension.shows_in_new_tabs", fallback: "shows in new tabs"))
             }

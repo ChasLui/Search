@@ -39,6 +39,33 @@ enum WhatsNew {
         Toggle(key: "ai", title: "AI on pages", detail: "Summarize a page or ask about it. Choose where it runs in Settings › AI.",
                since: "1.0.5", get: { $0.ai }, set: { $0.ai = $1 }),
     ] : []) + [
+        Toggle(key: "handoff", title: "Handoff to your iPhone", detail: "The page in front comes up in your iPhone's and iPad's app switcher.",
+               since: "1.0.16", get: { $0.handoff }, set: { $0.handoff = $1 }),
+        Toggle(key: "address_line", title: "Always show the address bar", detail: "The page's full address stays in sight, to type in.",
+               since: "1.0.16", get: { $0.addressLine }, set: { $0.addressLine = $1 }),
+        Toggle(key: "glass", title: "Glass window", detail: "The column and the window's edge as frosted glass over your desktop.",
+               since: "1.0.16", get: { $0.glass }, set: { $0.glass = $1 }),
+        Toggle(key: "doors_up", title: "Buttons at the top", detail: "The column's bottom buttons beside back, forward and reload.",
+               since: "1.0.16", get: { $0.doorsUp }, set: { $0.doorsUp = $1 }),
+        Toggle(key: "ask_space_for_links", title: "Ask which space a link opens in", detail: "For links from other apps.",
+               since: "1.0.16", get: { $0.asksSpaceForLinks }, set: { $0.asksSpaceForLinks = $1 }),
+        Toggle(key: "dim_sleeping_tabs", title: "Dim sleeping tabs", detail: "A tab put to sleep fades until you come back to it.",
+               since: "1.0.16", get: { $0.dimsSleepingTabs }, set: { $0.dimsSleepingTabs = $1 }),
+        Toggle(key: "high_contrast_tab_text", title: "High contrast tab text", detail: "Tab titles in full black or white.",
+               since: "1.0.16", get: { $0.highContrastText }, set: { $0.highContrastText = $1 }),
+
+        Toggle(key: "spaces_on_command", title: "⌘1–⌘9 switch spaces", detail: "As in Arc: the tabs move to ⌃1–⌃9.",
+               since: "1.0.15", get: { $0.spacesOnCommand }, set: { $0.spacesOnCommand = $1 },
+               shown: { $0.usesSpaces }),
+        Toggle(key: "same_tabs_every_window", title: "Same tabs in every window", detail: "Every window lists the same open tabs, as Arc's sidebar does.",
+               since: "1.0.15", get: { $0.mirrorsTabs }, set: { $0.mirrorsTabs = $1 }),
+        Toggle(key: "option_click_split", title: "⌥-click a link opens it in Split View", detail: "Beside the page you're reading.",
+               since: "1.0.15", get: { $0.optionClickSplits }, set: { $0.optionClickSplits = $1 }),
+        Toggle(key: "bounce", title: "Bounce at the top and bottom", detail: "Pages stretch past their ends and spring back, as in Safari.",
+               since: "1.0.15", get: { $0.bounces }, set: { $0.bounces = $1 }),
+        Toggle(key: "slide_column", title: "Slide the column in and out", detail: "An eased slide for ⌘S and the column that hides.",
+               since: "1.0.15", get: { $0.slidesColumn }, set: { $0.slidesColumn = $1 }),
+
         Toggle(key: "site_style", title: "Your own style for a site", detail: "Edit Site Style… in the View menu: your CSS for the site you're on, as Arc's Boosts.",
                since: "1.0.14", get: { $0.sitesStyles }, set: { $0.sitesStyles = $1 }),
         Toggle(key: "fullscreen_card", title: "Keep the card in full screen", detail: "The page keeps its room and rounded corners when the window fills the screen.",
@@ -122,6 +149,8 @@ enum WhatsNew {
     ]
 
     static let releases: [Release] = [
+        Release(version: "1.0.16"),
+        Release(version: "1.0.15"),
         Release(version: "1.0.14"),
         Release(version: "1.0.13"),
         Release(version: "1.0.12"),
@@ -181,6 +210,50 @@ enum WhatsNew {
 
     /// Newest first.
     static let notes: [Notes] = [
+        Notes(
+            version: "1.0.16", date: "20 November 2026",
+            headline: "Sync with your iPhone, Handoff, and two days of your fixes.",
+            new: [
+                "Sync with iCloud: open tabs, pins, spaces and bookmarks with Search on iPhone, in public beta. Settings › General.",
+                "Handoff of the page in front to your iPhone and iPad. Settings › General.",
+                "The address bar always in sight, a glass window, and buttons at the top. Settings › Appearance.",
+                "Choose the space a link from another app opens in. Settings › Spaces & Pins.",
+            ],
+            better: [
+                "Switching spaces is about three times quicker with many tabs.",
+                "The accounts under a sign-in box answer ↓, ↑ and Return.",
+                "A sideways scroll in Google Sheets scrolls the sheet instead of going back.",
+            ],
+            fixed: [
+                "Swish and other window managers moving the window, and ⌃⌘F.",
+                "Teams' Shared tab, PDFs that stopped zooming, and Zotero Connector.",
+                "⌘S forgetting the hidden column, and spelling corrected with correction off.",
+                "A crash on macOS 27.2.",
+            ]
+        ),
+        Notes(
+            version: "1.0.15", date: "18 November 2026",
+            headline: "Space gradients, extensions that work, coding agents, and a day of your fixes.",
+            new: [
+                "A gradient or a stronger colour for a space. The space's menu › Colour….",
+                "The same tabs in every window. Settings › Tabs.",
+                "⌘1–⌘9 switch spaces, as in Arc. Settings › Spaces & Pins.",
+                "Email links open in Gmail, Outlook.com, Fastmail or Proton Mail. Settings › General.",
+                "Choose where each extension runs: all sites, some, or on click. Settings › Extensions.",
+                "Claude Code or Codex can browse in tabs of their own while you watch. Settings › About › Developer.",
+            ],
+            better: [
+                "Pages load faster with extensions on.",
+                "Spread two fingers on a peek to open it as a tab.",
+                "A right-click anywhere in the tab column has a menu.",
+            ],
+            fixed: [
+                "Eagle, Cosmos, Raindrop.io, Language Reactor and Voice-over-Translation.",
+                "Signing in to X with passkeys off, and 1Password passkeys.",
+                "Claude's side panel once signed in.",
+                "Extensions reopening their welcome tab at every launch.",
+            ]
+        ),
         Notes(
             version: "1.0.14", date: "17 November 2026",
             headline: "Live folders, your own style for a site, space colours on the window, and your fixes.",

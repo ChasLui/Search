@@ -29,7 +29,8 @@ struct CaptureQuestion: View {
 
     private var question: some View {
         HStack(spacing: 12) {
-            Image(systemName: ask.wants == "location" ? "location" : ask.wants == "microphone" ? "mic" : ask.wants == "notifications" ? "bell" : "video")
+            Image(systemName: ask.wants == "location" ? "location" : ask.wants == "microphone" ? "mic" : ask.wants == "notifications" ? "bell"
+                  : ask.wants == "cookies" ? "person.crop.circle" : "video")
                 .font(.system(size: 11, weight: .medium))
                 .foregroundStyle(Palette.muted)
             Text(captureQuestion)
@@ -44,6 +45,9 @@ struct CaptureQuestion: View {
         case "location": return language.format("permission.location", fallback: "%@ wants to know your location", ask.host)
         case "notifications": return language.format("permission.notifications", fallback: "%@ wants to send you notifications", ask.host)
         case "camera": return language.format("permission.camera", fallback: "%@ wants to use your camera", ask.host)
+        // Safari's question, in fewer words: a yes lets the framed site know
+        // you were on this one.
+        case "cookies": return language.format("permission.cookies", fallback: "%1$@ wants to use its cookies and website data on %2$@, which also lets it see you were there", ask.host, ask.under)
         case "microphone": return language.format("permission.microphone", fallback: "%@ wants to use your microphone", ask.host)
         default: return language.format("permission.camera_microphone", fallback: "%@ wants to use your camera and microphone", ask.host)
         }

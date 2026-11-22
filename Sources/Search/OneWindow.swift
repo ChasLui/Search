@@ -66,7 +66,38 @@ enum OneWindow {
         browser.tucked = false
         guard let window = browser.window else { return }
         window.isExcludedFromWindowsMenu = false
-        if !(Store.testing && NSApp.isHidden) { window.orderFront(nil) }
+        if !(Store.testing && NSApp.isHidden) { onActiveSpace(window, after: nil) { window.orderFront(nil) } }
+    }
+
+    /// `show` orders `window` in on the desktop (macOS Space) you are
+    /// looking at: the one `old` is on, as `old` is in front of you. A
+    /// window ordered out keeps the desktop it was last on, and ordered in
+    /// again went back there — a profile's window came back on the desktop
+    /// where it was last left, and each switch threw you from one desktop to
+    /// the other until every profile's window had been dragged to the same
+    /// one. Only for the order-in: afterwards the window keeps its desktop
+    /// as any other, and clicking Search in the Dock goes to it. `old` not
+    /// on the desktop you're on (switched by a script while you are
+    /// elsewhere), nothing is moved.
+    static func onActiveSpace(_ window: NSWindow, after old: NSWindow?, show: () -> Void) {
+        let kept = window.collectionBehavior
+        guard old?.isOnActiveSpace ?? true else { return show() }
+        let joining = joiningActiveSpace(kept)
+        window.collectionBehavior = joining
+        show()
+        // Put back once macOS has placed it, unless something else changed it since.
+        DispatchQueue.main.async {
+            if window.collectionBehavior == joining { window.collectionBehavior = kept }
+        }
+    }
+
+    /// `behavior` with the window moved to the active desktop when ordered
+    /// in: none of the ways of being on every desktop, which exclude it.
+    static func joiningActiveSpace(_ behavior: NSWindow.CollectionBehavior) -> NSWindow.CollectionBehavior {
+        var behavior = behavior
+        behavior.remove([.canJoinAllSpaces, .stationary])
+        behavior.insert(.moveToActiveSpace)
+        return behavior
     }
 
     /// The windows' side of a profile switch (Browsers.bring): `window`
@@ -100,8 +131,11 @@ enum OneWindow {
     private static func place(_ window: NSWindow, over old: NSWindow?, full: Bool, leaving: @escaping () -> Bool) {
         let isFull = window.styleMask.contains(.fullScreen)
         if let old, !isFull { window.setFrame(old.frame, display: false) }
-        if let old, old.isVisible { window.order(.above, relativeTo: old.windowNumber) }
-        window.makeKeyAndOrderFront(nil)
+        // On the desktop `old` is on, not the one `window` was last on.
+        onActiveSpace(window, after: old) {
+            if let old, old.isVisible { window.order(.above, relativeTo: old.windowNumber) }
+            window.makeKeyAndOrderFront(nil)
+        }
         guard full != isFull else {
             // Straight over it, then it steps out from under: no gap between.
             old?.orderOut(nil)
@@ -140,24 +174,21 @@ extension Browsers {
             bring(next, over: current)
             return next
         }
-        let space = Store.settings.string(forKey: "space.current.\(id.uuidString)").flatMap(UUID.init)
-            .flatMap { last in Spaces.read(profile: id).first { $0.id == last }?.id }
-            ?? Profiles.shared.profile(id).home
-        let next = sibling(of: current, in: id, at: space)
+        let next = sibling(of: current, in: id, at: lastSpace(profile: id))
         bring(next, over: current)
         return next
     }
 
     /// The window of `profile` in `current`'s merged window: the one already
-    /// there, a window of that profile standing on its own (it joins), or a
-    /// new one, made out of sight at `space`.
-    private static func sibling(of current: Browser, in profile: UUID, at space: UUID) -> Browser {
+    /// there, a window of that profile standing on its own, on screen or
+    /// out of sight (it joins), or a new one, made out of sight at `space`.
+    static func sibling(of current: Browser, in profile: UUID, at space: UUID) -> Browser {
         let group = current.mergeID ?? UUID()
         current.mergeID = group
         current.window?.animationBehavior = .none
         if let there = OneWindow.siblings(of: current).first(where: { $0.profileID == profile }) { return there }
         if let alone = all.last(where: { other in
-            other.profileID == profile && other.isOpen && !other.isPopup && other.mergeID == nil
+            other.profileID == profile && (other.isOpen || other.tucked) && !other.isPopup && other.mergeID == nil
                 && other.window?.styleMask.contains(.fullScreen) != true
         }) {
             alone.mergeID = group

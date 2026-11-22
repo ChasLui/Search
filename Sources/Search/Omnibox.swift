@@ -34,18 +34,26 @@ struct Omnibox: View {
     var fitted = false
     /// The page whose pane this field stands on, with Split View on.
     var tab: Tab.ID?
+    /// Only the list, as wide as this, for the address line's field
+    /// (AddressLine.swift), which stands where the line is.
+    var listOnly: CGFloat?
 
-    init(browser: Browser, over: Bool, fitted: Bool = false, tab: Tab.ID? = nil) {
+    init(browser: Browser, over: Bool, fitted: Bool = false, tab: Tab.ID? = nil, listOnly: CGFloat? = nil) {
         self.browser = browser
         self.typing = browser.typing
         self.over = over
         self.fitted = fitted
         self.tab = tab
+        self.listOnly = listOnly
     }
 
     var body: some View {
         Group {
-            if fitted {
+            if let width = listOnly {
+                if browser.fieldShowing, !browser.offers.isEmpty || browser.siteOffer != nil || browser.switcherNote != nil {
+                    list.frame(width: width)
+                }
+            } else if fitted {
                 GeometryReader { geometry in
                     content(width: min(Metrics.fieldWidth, max(0, geometry.size.width - 28)))
                 }
@@ -59,8 +67,9 @@ struct Omnibox: View {
     private func content(width: CGFloat) -> some View {
         ZStack {
             // Keep the container mounted: only the field scales, while the
-            // page's cover fades without pulling its edges into view.
-            if browser.fieldShowing {
+            // page's cover fades without pulling its edges into view. Not
+            // while the address line has the field (AddressLine.swift).
+            if browser.fieldShowing, !browser.editingInline {
                 if over {
                     // The page is still there, just out of the way.
                     Rectangle()
@@ -256,6 +265,9 @@ struct Omnibox: View {
                     // Kept by you, not only visited: the bookmark's mark,
                     // at the end now that the site's icon leads the row.
                     symbol("bookmark")
+                } else if offer.kind == .elsewhere {
+                    // Open on another device: iCloud Tabs' mark.
+                    symbol("laptopcomputer.and.iphone")
                 }
             }
             .padding(.horizontal, 12)
@@ -464,11 +476,14 @@ struct AddressField: NSViewRepresentable {
     @ObservedObject private var typing: FieldState
     /// The pane's page, for a field standing on one (see Coordinator.focus).
     var tab: Tab.ID?
+    /// Its type, smaller in the address line (AddressLine.swift).
+    var size: CGFloat = 15.5
 
-    init(browser: Browser, tab: Tab.ID? = nil) {
+    init(browser: Browser, tab: Tab.ID? = nil, size: CGFloat = 15.5) {
         self.browser = browser
         self.typing = browser.typing
         self.tab = tab
+        self.size = size
     }
 
     func makeCoordinator() -> Coordinator { Coordinator(browser: browser) }
@@ -487,7 +502,7 @@ struct AddressField: NSViewRepresentable {
         field.isBordered = false
         field.drawsBackground = false
         field.focusRingType = .none
-        field.font = .systemFont(ofSize: 15.5)
+        field.font = .systemFont(ofSize: size)
         field.textColor = Palette.NS.ink
         field.lineBreakMode = .byClipping
         field.cell?.usesSingleLineMode = true
@@ -498,7 +513,7 @@ struct AddressField: NSViewRepresentable {
         // SwiftUI picks its own colour for a placeholder, and on a pale ground
         // that colour was near-white.
         let words = Self.placeholderWords(for: browser)
-        field.placeholderAttributedString = Self.placeholder(words)
+        field.placeholderAttributedString = Self.placeholder(words, size: size)
         field.setAccessibilityLabel(Self.accessibilityName(for: browser))
         context.coordinator.placeheld = words
         return field
@@ -507,9 +522,11 @@ struct AddressField: NSViewRepresentable {
     /// What the empty field asks for: with a site put in it with Tab, the
     /// words to search that site for; otherwise an address, and where it
     /// will open, since the field looks the same whichever key raised it.
+    /// In the address bar there is no doubt where: it is the tab's own.
     private static func placeholderWords(for browser: Browser) -> String {
         let language = Language.shared
         if let site = browser.siteChip { return language.format("search.site.action", fallback: "Search %1$@", site.name) }
+        if browser.editingInline { return language.text("search.enter_address", fallback: "Enter a web address") }
         switch browser.fieldMode {
         case .blank: return language.text("address.enter", fallback: "Enter a web address")
         case .newTab: return language.text("address.new_tab", fallback: "New tab: enter a web address")
@@ -530,11 +547,11 @@ struct AddressField: NSViewRepresentable {
         }
     }
 
-    private static func placeholder(_ words: String) -> NSAttributedString {
+    private static func placeholder(_ words: String, size: CGFloat) -> NSAttributedString {
         NSAttributedString(
             string: words,
             attributes: [
-                .font: NSFont.systemFont(ofSize: 15.5),
+                .font: NSFont.systemFont(ofSize: size),
                 .foregroundColor: NSColor(Palette.ink.opacity(0.3)),
             ]
         )
@@ -563,7 +580,7 @@ struct AddressField: NSViewRepresentable {
         let words = Self.placeholderWords(for: browser)
         if coordinator.placeheld != words {
             coordinator.placeheld = words
-            field.placeholderAttributedString = Self.placeholder(words)
+            field.placeholderAttributedString = Self.placeholder(words, size: size)
             field.setAccessibilityLabel(Self.accessibilityName(for: browser))
             DispatchQueue.main.async { coordinator.showPlaceholder(in: field) }
         }
@@ -582,7 +599,7 @@ struct AddressField: NSViewRepresentable {
     /// field had no window to ask: the request went nowhere and nothing asked
     /// again, so ⌘T left a field with no caret and typing that went nowhere
     /// until it was clicked. Now the request waits for the window.
-    final class Field: NSTextField {
+    final class Field: RoomyField {
         var arrived: (() -> Void)?
 
         override func viewDidMoveToWindow() {
@@ -752,5 +769,48 @@ struct AddressField: NSViewRepresentable {
                 return false
             }
         }
+    }
+}
+
+/// A one-line field whose text stops a little short of its trailing edge.
+///
+/// Scrolled to the end of a long query, the field editor put the caret and
+/// the last letter right against the field's edge, a fraction of a point in
+/// (0.2 to 1 measured), where anything that clips the field there — the row
+/// or the pill around it, a wider caret — hid the caret and part of the last
+/// letter (idea 736). The text is now laid out, drawn and edited in a rect
+/// `margin` short of that edge, so the editor scrolls the caret that far in.
+class RoomyField: NSTextField {
+    override class var cellClass: AnyClass? {
+        get { RoomyFieldCell.self }
+        set {}
+    }
+}
+
+final class RoomyFieldCell: NSTextFieldCell {
+    /// What is kept clear past the caret at the end of the text.
+    static let margin: CGFloat = 4
+
+    private static func short(_ rect: NSRect) -> NSRect {
+        var inner = rect
+        inner.size.width = max(0, inner.width - margin)
+        return inner
+    }
+
+    override func drawingRect(forBounds rect: NSRect) -> NSRect {
+        Self.short(super.drawingRect(forBounds: rect))
+    }
+
+    // The field editor is laid in the frame it is handed here, not in the
+    // drawing rect above.
+    override func edit(withFrame rect: NSRect, in controlView: NSView, editor textObj: NSText,
+                       delegate: Any?, event: NSEvent?) {
+        super.edit(withFrame: Self.short(rect), in: controlView, editor: textObj, delegate: delegate, event: event)
+    }
+
+    override func select(withFrame rect: NSRect, in controlView: NSView, editor textObj: NSText,
+                         delegate: Any?, start selStart: Int, length selLength: Int) {
+        super.select(withFrame: Self.short(rect), in: controlView, editor: textObj, delegate: delegate,
+                     start: selStart, length: selLength)
     }
 }

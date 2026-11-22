@@ -22,12 +22,19 @@ struct SettingsPanel: View {
     @ObservedObject private var shield = Shield.shared
     @ObservedObject private var sync = Sync.shared
     @ObservedObject private var language = Language.shared
+    @ObservedObject private var icloud = ICloudSync.shared
     /// The keys rows name, as Settings › Shortcuts has them now.
     @ObservedObject private var shortcuts = ShortcutStore.shared
     @State private var isDefault = Links.isDefault
+    /// Whether Search opens email links, and which app does now.
+    @State private var mailDefault = Mail.isDefault
+    @State private var mailHandler = Mail.handlerName
     /// A site shortcut being written, kept out of Preferences until it's saved.
     @State private var draft: Keyword?
     @State private var page: Page = Page.named(Store.settings.string(forKey: "settings.page") ?? "") ?? .general
+    /// The chosen section's white, slid from one to the next as the tab
+    /// column slides its live tab's (Side.swift).
+    @Namespace private var chosen
     /// What is typed in Find a setting.
     @State private var query = ""
     @FocusState private var finding: Bool
@@ -175,7 +182,7 @@ struct SettingsPanel: View {
                 }
                 ForEach(block) { item in
                     PageRow(page: item, on: !searching && page == item,
-                            count: searching ? counts[item] ?? 0 : nil) {
+                            count: searching ? counts[item] ?? 0 : nil, chosen: chosen) {
                         query = ""
                         page = item
                     }
@@ -183,10 +190,18 @@ struct SettingsPanel: View {
             }
             Spacer(minLength: 0)
         }
+        .animation(slide, value: page)
         .padding(8)
         .frame(width: SettingsPanel.rail, alignment: .leading)
         .frame(maxHeight: .infinity, alignment: .top)
         .background(Palette.wash.opacity(0.45), in: Rectangle())
+    }
+
+    /// The white's move: the tab column's glide, a touch longer and with a
+    /// little give at the end, so the eye follows it down the rail. None
+    /// with Reduce Motion, and a plain ease in Low Power Mode, as glide.
+    private var slide: Animation? {
+        Motion.reduced ? nil : Motion.light ? .easeOut(duration: 0.2) : .spring(response: 0.45, dampingFraction: 0.72)
     }
 
     /// Find a setting: the wash, the glass, ⌘F beside it until something
@@ -238,6 +253,7 @@ struct SettingsPanel: View {
         let on: Bool
         /// While searching: how many rows of this section match.
         let count: Int?
+        let chosen: Namespace.ID
         let act: () -> Void
         @State private var hovering = false
 
@@ -263,11 +279,17 @@ struct SettingsPanel: View {
                 .opacity(count == 0 ? 0.4 : 1)
                 .padding(.horizontal, 10)
                 .frame(height: 30)
-                .background(
-                    RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .fill(on ? Palette.ground : (hovering ? Palette.hover : .clear))
-                        .shadow(color: .black.opacity(on ? 0.06 : 0), radius: 3, y: 1)
-                )
+                .background {
+                    if on {
+                        RoundedRectangle(cornerRadius: 8, style: .continuous)
+                            .fill(Palette.ground)
+                            .shadow(color: .black.opacity(0.06), radius: 3, y: 1)
+                            .matchedGeometryEffect(id: "chosen", in: chosen)
+                    } else if hovering {
+                        RoundedRectangle(cornerRadius: 8, style: .continuous)
+                            .fill(Palette.hover)
+                    }
+                }
                 .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
             }
             .buttonStyle(.plain)
@@ -374,11 +396,13 @@ struct SettingsPanel: View {
         let title = title(of: item)
         let need = counts ? "" : SettingsIndex.needs(item)
         let detail = counts ? detail(of: item) : language.text(need, fallback: need)
+        // The switch that swaps ⌘1–⌘9 and ⌃1–⌃9 names both as they were.
+        let relabel: (String) -> String = item.id == "spaces.commandNumbers" ? { $0 } : shortcuts.relabel
         return SettingRow(
             icon: item.icon,
-            title: shortcuts.relabel(title == item.title ? item.localizedTitle : title),
-            detail: shortcuts.relabel(detail == item.detail ? item.localizedDetail : detail),
-            more: counts ? item.localizedMore.map(shortcuts.relabel) : nil,
+            title: relabel(title == item.title ? item.localizedTitle : title),
+            detail: relabel(detail == item.detail ? item.localizedDetail : detail),
+            more: counts ? item.localizedMore.map(relabel) : nil,
             wide: item.kind == .wide,
             lit: lit == item.id
         ) {
@@ -430,6 +454,8 @@ struct SettingsPanel: View {
     private func title(of item: SettingsItem) -> String {
         switch item.id {
         case "updates.version": return versionTitle
+        // ⌃ while it picks the tabs (Settings › Spaces & Pins).
+        case "tabs.shortcuts" where prefs.usesSpaces && prefs.spacesOnCommand: return language.text("settings.tabs.shortcuts_held", fallback: "Show tab numbers while ⌃ is held")
         default: return item.title
         }
     }
@@ -438,9 +464,13 @@ struct SettingsPanel: View {
         switch item.id {
         case "general.default":
             return isDefault ? language.text("Search is the default browser on this Mac", fallback: "Search is the default browser on this Mac") : item.detail
+        case "mail.default":
+            if mailDefault { return language.text("settings.mail.open_here", fallback: "Email links from other apps open here") }
+            return mailHandler.map { language.format("settings.mail.go_to", fallback: "Email links from other apps go to %1$@ now", $0) } ?? item.detail
         case "downloads.folder":
             return prefs.downloads.path.replacingOccurrences(of: NSHomeDirectory(), with: "~")
-        case "sync": return sync.on ? sync.summary : item.detail
+        case "sync": return icloud.on ? language.text("settings.sync.off_icloud", fallback: "Off while Sync with iCloud is on") : sync.on ? sync.summary : item.detail
+        case "icloud": return icloud.summary(folderSyncOn: sync.on, otherwise: item.detail)
         case "search.engine": return searchDetail
         case "search.shift": return shiftDetail
         case "search.suggest": return suggestDetail
@@ -507,6 +537,36 @@ struct SettingsPanel: View {
                     }
                 }
             }
+        case "mail.webmail":
+            Picker("", selection: $prefs.webmail) {
+                ForEach(Webmail.allCases) { mail in
+                    Text(language.text("webmail.\(mail.rawValue)", fallback: mail.title)).tag(mail)
+                    if mail == .none { Divider() }
+                }
+            }
+            .labelsHidden()
+            .pickerStyle(.menu)
+            .fixedSize()
+        case "mail.default":
+            if mailDefault {
+                Image(systemName: "checkmark")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(Palette.ink)
+                    .frame(width: 24)
+            } else {
+                // Only ever from this click: macOS asks to confirm.
+                Pill("ui.make_default", filled: true) {
+                    Mail.becomeDefault { worked in
+                        mailDefault = Mail.isDefault
+                        mailHandler = Mail.handlerName
+                        if worked && mailDefault {
+                            browser.announce("Email links now open here", localizedKey: "announcement.mail_open_here")
+                        } else {
+                            browser.announce("macOS didn't change it", localizedKey: "announcement.mail_unchanged")
+                        }
+                    }
+                }
+            }
         case "general.import":
             // Coming from another browser, now or any time later: the same
             // page as File › Bring Things Over… and the Welcome's.
@@ -521,7 +581,27 @@ struct SettingsPanel: View {
             .fixedSize()
         case "sync":
             // On asks for the folder first; cancelled, it stays off.
+            // Never with Sync with iCloud: the two would undo each other.
             Switch(on: Binding(get: { sync.on }, set: { $0 ? sync.choose() : sync.turnOff() }))
+                .disabled(icloud.on && !sync.on)
+                .opacity(icloud.on && !sync.on ? 0.4 : 1)
+        case "handoff": Switch(on: $prefs.handoff)
+        case "icloud":
+            // Off limits in a build not signed for iCloud, and while the
+            // folder sync is on.
+            let locked = !icloud.on && (!icloud.available || sync.on)
+            Switch(on: Binding(get: { icloud.on }, set: { $0 ? icloud.turnOn() : icloud.turnOff() }))
+                .disabled(locked)
+                .opacity(locked ? 0.4 : 1)
+        case "icloud.erase":
+            Pill("ui.delete") {
+                let alert = NSAlert()
+                alert.messageText = language.text("settings.icloud.erase.confirm", fallback: "Delete Search's data from iCloud?")
+                alert.informativeText = language.text("settings.icloud.erase.message", fallback: "Open tabs, pins, spaces, bookmarks and settings leave iCloud for every device. What is on each device stays. Sync with iCloud turns off here and on your other devices.")
+                alert.addButton(withTitle: language.text("ui.delete", fallback: "Delete"))
+                alert.addButton(withTitle: language.text("ui.cancel", fallback: "Cancel"))
+                if alert.runModal() == .alertFirstButtonReturn { icloud.erase() }
+            }
         case "quit.confirm": Switch(on: $prefs.confirmsQuit)
         case "downloads.folder": Pill("ui.change") { chooseFolder() }
         case "downloads.ask": Switch(on: $prefs.asksWhereToSave)
@@ -554,6 +634,7 @@ struct SettingsPanel: View {
                         set: { layout in withAnimation(Motion.glide) { prefs.tabsLayout = layout } }
                      ))
         case "sidebar.hides": Switch(on: $prefs.sideHides)
+        case "sidebar.slides": Switch(on: $prefs.slidesColumn)
         case "sidebar.foldIcons": Switch(on: $prefs.foldsToIcons)
         case "layout.cards":
             Pictures(options: [(true, "As a card", AnyView(CardPicture(card: true))),
@@ -563,19 +644,32 @@ struct SettingsPanel: View {
                         set: { on in withAnimation(Motion.glide) { prefs.cards = on } }
                      ))
         case "layout.cardsFullScreen": Switch(on: $prefs.cardsInFullScreen)
+        case "address.shown": Switch(on: $prefs.addressLine)
+        case "address.width": Segmented(options: AddressWidth.allCases.map { ($0, $0.title) }, selection: $prefs.addressWidth)
+        case "window.glass": Switch(on: $prefs.glass)
+        case "window.glass.style": Segmented(options: GlassStyle.allCases.map { ($0, $0.title) }, selection: $prefs.glassStyle)
+        case "window.glass.clear": Slider(value: $prefs.glassClear, in: 0...1).controlSize(.small).frame(width: 160)
+        case "window.glass.grain": Slider(value: $prefs.glassGrain, in: 0...1).controlSize(.small).frame(width: 160)
         case "toolbar.left": Switch(on: $prefs.navigationLeft)
         case "tabs.compact":
             Switch(on: Binding(
                 get: { prefs.compactStrip },
                 set: { on in withAnimation(Motion.glide) { prefs.compactStrip = on } }
             ))
+        case "tabs.liquid": Switch(on: $prefs.liquidTabs)
         case "sidebar.roomy":
             Switch(on: Binding(
                 get: { prefs.roomyTabs },
                 set: { on in withAnimation(Motion.glide) { prefs.roomyTabs = on } }
             ))
         case "sidebar.player": Switch(on: $prefs.showsPlayer)
+        case "sidebar.doorsUp":
+            Switch(on: Binding(
+                get: { prefs.doorsUp },
+                set: { on in withAnimation(Motion.glide) { prefs.doorsUp = on } }
+            ))
         case "glyph": Segmented(options: Glyph.allCases.map { ($0, $0.title) }, selection: $prefs.glyph, localized: true)
+        case "tabs.highContrast": Switch(on: $prefs.highContrastText)
         case "tabs.reading": Switch(on: $prefs.showsReading)
         case "tabs.give": Switch(on: $prefs.tabsGive)
         case "bookmarks.bar": Switch(on: $prefs.bookmarksBar)
@@ -615,6 +709,7 @@ struct SettingsPanel: View {
                     .font(.system(size: 11))
                     .foregroundStyle(Palette.muted)
             }
+        case "tabs.sleep.dim": Switch(on: $prefs.dimsSleepingTabs)
         case "tabs.close.after":
             Picker("", selection: $prefs.tabLife) {
                 ForEach(TabLife.allCases) { life in
@@ -718,9 +813,11 @@ struct SettingsPanel: View {
                 .disabled(!arcHere)
                 .opacity(arcHere ? 1 : 0.4)
         case "spaces": Switch(on: $prefs.usesSpaces)
+        case "spaces.commandNumbers": Switch(on: $prefs.spacesOnCommand)
         case "profiles": Pill("ui.new_profile") { ProfileMenu.askNew() }
         case "profiles.oneWindow": Switch(on: $prefs.profilesInOneWindow)
         case "spaces.links": Switch(on: $prefs.sendsLinksToSpaces)
+        case "links.ask": Switch(on: $prefs.asksSpaceForLinks)
         case "pins.keep": Switch(on: $prefs.pinsKeepSite)
         case "pins.list": Switch(on: $prefs.listsPins)
         case "pins.folders": Switch(on: $prefs.pinFolders)
@@ -785,11 +882,13 @@ struct SettingsPanel: View {
             .pickerStyle(.menu)
             .fixedSize()
         case "links.peek.stays": Switch(on: $prefs.peekStays)
+        case "links.optionSplit": Switch(on: $prefs.optionClickSplits)
         case "autoscroll": Switch(on: $prefs.autoScroll)
         case "pages.bounce": Switch(on: $prefs.bounces)
         case "swipe.history": Switch(on: $prefs.holdsHistory)
         case "launcher.on": Switch(on: $prefs.launcher)
         case "launcher.key": LauncherKeyBox(prefs: prefs)
+        case "launcher.little": Switch(on: $prefs.launcherLittle)
         case "note.switcher": Always()
         case "updates.version": versionControl
         case "updates.auto": Switch(on: $prefs.installsUpdates)
@@ -845,6 +944,8 @@ struct SettingsPanel: View {
                     }
                 }
             }
+        case "agents":
+            if !searched, prefs.agents { RememberedAgents() }
         case "passwords.apple":
             ApplePasswordsCard(prefs: prefs, bare: true)
                 .under()
@@ -1599,5 +1700,39 @@ private struct NotificationSites: View {
                 }
             }
         }
+    }
+}
+
+/// The coding agents you said to always allow (AgentTrust), each with who
+/// signed the program that starts it and when it was last let in, and
+/// Forget. Under "Let coding agents use Search".
+private struct RememberedAgents: View {
+    @ObservedObject private var trust = AgentTrust.shared
+    @ObservedObject private var language = Language.shared
+
+    var body: some View {
+        ForEach(trust.remembered) { entry in
+            Rule()
+            let detail = (entry.suspended == true
+                          ? language.text("settings.trust.stopped", fallback: "Asked again since you stopped it")
+                          : language.text("settings.trust.allowed", fallback: "Allowed without asking"))
+                       + language.format("settings.trust.detail", fallback: " · signed by %1$@ · last used %2$@ · until %3$@",
+                                         entry.signer, Self.when(entry.used), Self.day(entry.expires))
+            let more = entry.path.isEmpty ? nil : language.format("settings.trust.more", fallback: "Started by %1$@ (%2$@, team %3$@), last seen at %4$@. Let in only while that program still passes its code signature and it calls itself “%5$@”.",
+                                                                  (entry.path as NSString).lastPathComponent, entry.identifier, entry.team, entry.path, entry.client)
+            SettingRow(icon: "checkmark.shield", title: entry.client, detail: detail, more: more) {
+                Pill("ui.forget") { trust.forget(entry.id) }
+            }
+        }
+    }
+
+    private static func day(_ date: Date) -> String {
+        date.formatted(.dateTime.day().month(.abbreviated))
+    }
+
+    private static func when(_ date: Date) -> String {
+        let format = RelativeDateTimeFormatter()
+        format.unitsStyle = .full
+        return Date().timeIntervalSince(date) < 60 ? "just now" : format.localizedString(for: date, relativeTo: Date())
     }
 }

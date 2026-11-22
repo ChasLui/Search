@@ -29,14 +29,37 @@ struct ShortcutsPage: View {
             || key.localizedCaseInsensitiveContains(words.replacingOccurrences(of: " ", with: ""))
     }
 
+    /// The keys that pick a tab by its place: not a menu command, and not
+    /// yours to move one by one, but listed so they can be found, with the
+    /// switch that hands ⌘1–⌘9 to the spaces.
+    private var numbersShown: Bool {
+        let words = hunt.trimmingCharacters(in: .whitespaces)
+        guard !words.isEmpty else { return true }
+        let key = words.replacingOccurrences(of: " ", with: "")
+        return language.text("shortcuts.tab_numbers", fallback: "Tab 1 to 9").localizedCaseInsensitiveContains(words) || "numbers".localizedCaseInsensitiveContains(words)
+            || KeyCombo.tabNumbers.localizedCaseInsensitiveContains(key)
+            || (1...9).contains { KeyCombo.tabNumber($0).display.localizedCaseInsensitiveContains(key) }
+    }
+
+    private var numbersNote: String {
+        if prefs.usesSpaces && prefs.spacesOnCommand {
+            return language.text("shortcuts.tab_numbers_command", fallback: "The ninth is the last. ⌘1–⌘9 switch spaces: Settings › Spaces & Pins")
+        }
+        return prefs.usesSpaces
+            ? language.text("shortcuts.tab_numbers_spaces", fallback: "The ninth is the last. To switch spaces with them instead: Settings › Spaces & Pins")
+            : language.text("shortcuts.tab_numbers_alone", fallback: "The ninth is the last. With spaces on, they can switch spaces instead")
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
             Hunt(text: $hunt, prompt: "Search commands or keys", focus: $hunting)
             let found = Command.all.filter(shown)
-            if found.isEmpty { Nothing("ui.no_command_called_that_or_on_that_key") }
+            let numbers = numbersShown
+            if found.isEmpty, !numbers { Nothing("ui.no_command_called_that_or_on_that_key") }
             ForEach(Command.Section.allCases, id: \.self) { section in
                 let commands = found.filter { $0.section == section }
-                if !commands.isEmpty {
+                let numbered = section == .tabs && numbers
+                if !commands.isEmpty || numbered {
                 VStack(alignment: .leading, spacing: 6) {
                     Caption(section == .app ? section.rawValue : language.text(section.rawValue, fallback: section.rawValue))
                     Card {
@@ -50,6 +73,12 @@ struct ShortcutsPage: View {
                                     .disabled(store.key(for: command.id) == nil)
                                 Button { store.reset(command.id) } label: { Text("ui.reset_to_default", bundle: Language.resources) }
                                     .disabled(!store.isChanged(command.id))
+                            }
+                        }
+                        if numbered {
+                            if !commands.isEmpty { Rule() }
+                            Line(language.text("shortcuts.tab_numbers", fallback: "Tab 1 to 9"), numbersNote) {
+                                FixedKey(text: KeyCombo.tabNumbers)
                             }
                         }
                     }
@@ -97,6 +126,26 @@ extension ShortcutsPage {
                 }
             }
         }
+    }
+}
+
+/// Keys that are listed but not moved here, drawn as a KeyBox at rest.
+private struct FixedKey: View {
+    @ObservedObject private var language = Language.shared
+    let text: String
+
+    var body: some View {
+        Text(text)
+            .font(.system(size: 12))
+            .foregroundStyle(Palette.muted)
+            .lineLimit(1)
+            .padding(.horizontal, 10)
+            .frame(minWidth: 64, minHeight: 24)
+            .overlay(
+                RoundedRectangle(cornerRadius: 7, style: .continuous)
+                    .strokeBorder(Palette.hairline, lineWidth: 1)
+            )
+            .help(language.text("shortcuts.set_in_settings", fallback: "Set in Settings › Spaces & Pins"))
     }
 }
 
@@ -171,6 +220,10 @@ private struct KeyBox: View {
         }
         guard let combo = KeyCombo(event: event) else { return }
         guard combo.isUsable else { return say("Add ⌘, ⌥ or ⌃") }
+        // ⌘1–⌘9 (or ⌃1–⌃9) pick tabs: the whole set moves, with its switch.
+        guard !combo.isTabNumber else {
+            return say(browser.prefs.usesSpaces ? "Picks a tab — see Spaces & Pins" : "Picks a tab")
+        }
         guard !KeyCombo.isReserved(combo) else { return say("Can’t be changed") }
         // The switcher stays up while its key's ⌃, ⌥ or ⌘ is held, and
         // takes the tab picked when it is let go of: a key needs one.

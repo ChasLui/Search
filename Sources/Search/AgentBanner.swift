@@ -1,9 +1,16 @@
 import SwiftUI
 
-// What the window shows of a coding agent (AgentControl): the question when
-// one connects, and while it is allowed, a small pill saying so with Stop.
-// Both rise from the foot of the window with the page's own questions, in
-// the window it asked in only. Neither takes the keys: Return never allows,
+// What the window shows of a coding agent (AgentControl). When one
+// connects, the question, rising from the foot of the window with the
+// page's own questions, in the window it asked in only. Never anything over
+// the page after that: while it is allowed, the tab it is working in wears
+// a dot on its icon's corner (AgentMark), moving with it from tab to tab and
+// gone once it is idle; Stop is on that row under the pointer, on a quiet
+// line at the foot of the column — or at the far end of the strip when the
+// tabs are across the top — and in File › Stop Agent, all for as long as it
+// is connected, and gone with it.
+//
+// Neither the question nor its buttons take the keys: Return never allows,
 // and nothing an agent sends reaches these buttons, which only a click of
 // yours presses: a press through Accessibility, with no mouse event in the
 // window behind it, is ignored (AgentRules.isClick). Mouse events made up by
@@ -31,13 +38,175 @@ private struct AgentSessionBar: View {
     let browser: Browser
 
     var body: some View {
-        if session.browser === browser {
-            switch session.consent.state {
-            case .asking: AgentQuestion(session: session)
-            case .allowed: AgentPill(session: session)
-            default: EmptyView()
+        if session.browser === browser, session.consent.state == .asking {
+            AgentQuestion(session: session)
+        }
+    }
+}
+
+/// Connected, in the chrome: a quiet line at the foot of the column (`.row`),
+/// a mark there when the column is icons only (`.icon`), or at the far end
+/// of the strip (`.door`). Each with Stop.
+struct AgentStatus: View {
+    enum Style { case row, icon, door }
+    @ObservedObject var browser: Browser
+    let style: Style
+    @ObservedObject private var agents = AgentControl.shared
+
+    var body: some View {
+        if let session = agents.session, session.browser === browser {
+            AgentStatusFace(session: session, style: style)
+        }
+    }
+}
+
+private struct AgentStatusFace: View {
+    @ObservedObject var session: AgentSession
+    let style: AgentStatus.Style
+
+    var body: some View {
+        if session.consent.state == .allowed {
+            switch style {
+            case .icon:
+                Button { AgentControl.shared.stopSession() } label: {
+                    Image(systemName: "stop.circle")
+                        .font(.system(size: 13))
+                        .foregroundStyle(Palette.muted)
+                        .frame(width: 28, height: 28)
+                        .contentShape(Rectangle())
+                        .background(ClickSpot { AgentControl.shared.stopButton = $0 })
+                }
+                .buttonStyle(.plain)
+                .help(Language.shared.format("agent.click_to_stop", fallback: "%1$@. Click to stop it.", AgentWords.short(session)))
+            case .row, .door:
+                VStack(alignment: .leading, spacing: 1) {
+                    HStack(spacing: 6) {
+                        Text(session.justAdmitted ? AgentWords.admitted(session)
+                             : style == .door ? AgentWords.short(session) : AgentWords.line(session))
+                            .font(.system(size: 11, weight: session.justAdmitted ? .medium : .regular))
+                            .foregroundStyle(session.justAdmitted ? Palette.ink : Palette.muted)
+                            .lineLimit(1)
+                            .truncationMode(.tail)
+                        Text("·").font(.system(size: 11)).foregroundStyle(Palette.muted)
+                        AgentStop()
+                        if style == .row { Spacer(minLength: 0) }
+                    }
+                    // Let in without asking: always said, under it.
+                    if session.auto, style == .row {
+                        Text(Language.shared.text("agent.allowed_automatically", fallback: "Allowed automatically"))
+                            .font(.system(size: 10))
+                            .foregroundStyle(Palette.muted.opacity(0.8))
+                            .lineLimit(1)
+                    }
+                }
+                .padding(.horizontal, style == .row ? 10 : 4)
+                .help(Language.shared.format("agent.banner_help", fallback: "%1$@. Stop disconnects it; its tabs stay.", AgentWords.short(session)))
+                .fixedSize(horizontal: style == .door, vertical: true)
             }
         }
+    }
+}
+
+private struct AgentStop: View {
+    @State private var hovering = false
+    var body: some View {
+        Button { AgentControl.shared.stopSession() } label: {
+            Text("Stop", bundle: Language.resources)
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(hovering ? Palette.ink : Palette.ink.opacity(0.75))
+                .contentShape(Rectangle())
+                .background(ClickSpot { AgentControl.shared.stopButton = $0 })
+        }
+        .buttonStyle(.plain)
+        .onHover { hovering = $0 }
+        .help(Text("Disconnect it. Its tabs stay where they are.", bundle: Language.resources))
+    }
+}
+
+/// On the icon's corner of an agent's tab, the row's layout never changing
+/// for it: while the agent works there, a small dot in the accent colour;
+/// otherwise, for as long as the tab is open, a fainter hollow ring, so a
+/// tab an agent opened is always told from yours. Each ringed with the row's
+/// ground so it reads on any icon.
+struct AgentMark: View {
+    @ObservedObject var tab: Tab
+
+    var body: some View {
+        if tab.agentWorking {
+            Circle()
+                .fill(Color.accentColor)
+                .frame(width: 6, height: 6)
+                .padding(1.5)
+                .background(Circle().fill(Palette.ground))
+                .offset(x: 3, y: 3)
+                .allowsHitTesting(false)
+                .help(Language.shared.text("agent.working_here", fallback: "A coding agent is working in this tab"))
+                .transition(.opacity)
+        } else if tab.agent {
+            Circle()
+                .strokeBorder(Palette.muted, lineWidth: 1)
+                .frame(width: 5.5, height: 5.5)
+                .padding(1.5)
+                .background(Circle().fill(Palette.ground))
+                .offset(x: 3, y: 3)
+                .allowsHitTesting(false)
+                .help(Language.shared.text("Opened by a coding agent", fallback: "Opened by a coding agent"))
+        }
+    }
+}
+
+/// Stop, on the row of the tab an agent is working in, under the pointer.
+struct AgentRowStop: View {
+    var body: some View {
+        Button { AgentControl.shared.stopSession() } label: {
+            Text("ui.stop", bundle: Language.resources)
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(Palette.ink)
+                .padding(.horizontal, 7)
+                .padding(.vertical, 2)
+                .background(Palette.ground, in: Capsule())
+                .overlay(Capsule().strokeBorder(Palette.hairline, lineWidth: 1))
+                .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .help(Text("agent.stop_help", bundle: Language.resources))
+    }
+}
+
+/// File › Stop Agent: there while one is connected.
+struct StopAgentMenuItem: View {
+    @ObservedObject private var agents = AgentControl.shared
+
+    var body: some View {
+        Button(agents.shownIn == nil ? "Stop Agent" : "Stop \(agents.session?.client ?? "Agent")") {
+            AgentControl.shared.stopSession()
+        }
+        .shortcut("file.stopAgent")
+        .disabled(agents.shownIn == nil)
+    }
+}
+
+/// What the line says.
+enum AgentWords {
+    @MainActor
+    static func line(_ session: AgentSession) -> String {
+        session.busy
+            ? Language.shared.format("agent.is_using", fallback: "%@ is using Search", session.client)
+            : Language.shared.format("agent.idle", fallback: "%@, idle", session.client)
+    }
+
+    /// Said for a few seconds once let in without asking.
+    @MainActor
+    static func admitted(_ session: AgentSession) -> String {
+        Language.shared.format("agent.let_in", fallback: "%@ let in automatically", session.client)
+    }
+
+    /// In the strip, where there is room for one short line.
+    @MainActor
+    static func short(_ session: AgentSession) -> String {
+        session.auto
+            ? Language.shared.format("agent.short_auto", fallback: "%@ · Allowed automatically", session.client)
+            : line(session)
     }
 }
 
@@ -72,6 +241,27 @@ private struct AgentQuestion: View {
                 .font(.system(size: 12))
                 .foregroundStyle(Palette.ink)
                 .padding(.leading, 23)
+            // Offered only for a program its signature names (AgentTrust);
+            // otherwise, why not.
+            if let why = session.noAlways {
+                Text(Language.shared.format("agent.cant_remember", fallback: "Can't be remembered: %1$@.", why))
+                    .font(.system(size: 10.5))
+                    .foregroundStyle(Palette.muted)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.leading, 23)
+            } else {
+                Toggle(isOn: Binding(
+                    get: { session.wantsAlways },
+                    set: { _ in AgentControl.shared.toggleAlways(event: NSApp.currentEvent) })) {
+                    Text(Language.shared.format("agent.always_allow", fallback: "Always allow %@", session.client))
+                }
+                    .toggleStyle(.checkbox)
+                    .background(ClickSpot { AgentControl.shared.alwaysBox = $0 })
+                    .font(.system(size: 12))
+                    .foregroundStyle(Palette.ink)
+                    .padding(.leading, 23)
+                    .help(alwaysHelp)
+            }
             HStack(spacing: 12) {
                 Spacer(minLength: 8)
                 Button { AgentControl.shared.answer(allow: false, event: NSApp.currentEvent) } label: {
@@ -102,46 +292,19 @@ private struct AgentQuestion: View {
         .padding(.horizontal, 16)
     }
 
+    private var alwaysHelp: String {
+        guard let launcher = session.launcher else { return "" }
+        return "Next time, if it is started by \(launcher.name), signed by \(launcher.who), and calls itself “\(session.client)”, "
+            + "it is let in without asking, for 30 days at most and 7 after it was last used, seeing only its own tabs. "
+            + "Stop shows as ever, and stopping it asks again next time. Forget it in Settings › About › Developer."
+    }
+
     /// The name is the program's own word for itself; this is macOS's.
     private var detail: String {
         if session.program.isEmpty {
             return language.text("agent.details", fallback: "It works in tabs of its own while you watch, until you press Stop. It never sees passwords, card numbers, private tabs or Settings.")
         }
         return language.format("agent.details_from", fallback: "From %@ on this Mac. It works in tabs of its own while you watch, until you press Stop. It never sees passwords, card numbers, private tabs or Settings.", session.program)
-    }
-}
-
-/// "● Claude Code is using Search   Stop".
-private struct AgentPill: View {
-    @ObservedObject var session: AgentSession
-    @ObservedObject private var language = Language.shared
-
-    var body: some View {
-        HStack(spacing: 10) {
-            Circle()
-                .fill(Color.accentColor)
-                .frame(width: 7, height: 7)
-            Text(language.format("agent.is_using", fallback: "%@ is using Search", session.client))
-                .font(.system(size: 12))
-                .foregroundStyle(Palette.ink)
-                .lineLimit(1)
-            Button { AgentControl.shared.stopSession() } label: {
-                Text("ui.stop", bundle: Language.resources)
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(Palette.ink)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 3)
-                    .overlay(Capsule().strokeBorder(Palette.hairline, lineWidth: 1))
-            }
-            .buttonStyle(.plain)
-            .help(Text("ui.disconnect_it_its_tabs_stay_where_they_are", bundle: Language.resources))
-        }
-        .padding(.leading, 14)
-        .padding(.trailing, 6)
-        .padding(.vertical, 6)
-        .background(Palette.ground, in: Capsule())
-        .overlay(Capsule().strokeBorder(Palette.hairline, lineWidth: 1))
-        .shadow(color: .black.opacity(0.10), radius: 14, y: 4)
     }
 }
 

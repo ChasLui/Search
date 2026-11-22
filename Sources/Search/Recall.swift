@@ -57,6 +57,9 @@ struct HistoryPanel: View {
     /// The list as drawn: each day's name, then its pages. Worked out when
     /// the history or the search changes, not each time the panel is drawn.
     @State private var lines: [Listed] = []
+    /// Which history Clear takes: nil for every space's, as Safari's All
+    /// Profiles; shown only when a signed-out space keeps one of its own.
+    @State private var clearsIn: UUID?
     private var clearing: Bool { browser.recallMode == .clearing }
 
     var body: some View {
@@ -134,6 +137,8 @@ struct HistoryPanel: View {
             refresh()
         }
         .onChange(of: browser.recallHunt) { _, _ in refresh() }
+        // Another space may keep a history of its own (Spaces.history).
+        .onChange(of: browser.spaceID) { _, _ in refresh() }
     }
 
     /// Three separate things, worded so nobody has to guess which one signs
@@ -141,9 +146,20 @@ struct HistoryPanel: View {
     private var sweeps: some View {
         VStack(alignment: .leading, spacing: 10) {
             Card {
-                Line("ui.history", "ui.everywhere_you_have_been", localizedTitle: true, localizedDetail: true) {
+                Line("ui.history", historyDetail, localizedTitle: true) {
+                    let scopes = browser.historyScopes
+                    if !scopes.isEmpty {
+                        Picker("", selection: $clearsIn) {
+                            Text(language.text("ui.all_spaces", fallback: "All Spaces")).tag(UUID?.none)
+                            ForEach(scopes, id: \.space) { Text($0.name).tag(UUID?.some($0.space)) }
+                        }
+                        .labelsHidden()
+                        .pickerStyle(.menu)
+                        .fixedSize()
+                    }
                     Pill("ui.clear") {
-                        browser.clearHistory()
+                        browser.clearHistory(in: scopes.contains { $0.space == clearsIn } ? clearsIn : nil)
+                        clearsIn = nil
                         refresh()
                         withAnimation(Motion.settle) { browser.recallMode = .history }
                     }
@@ -163,6 +179,13 @@ struct HistoryPanel: View {
             }
         }
         .transition(.opacity)
+    }
+
+    private var historyDetail: String {
+        guard let clearsIn, let scope = browser.historyScopes.first(where: { $0.space == clearsIn }) else {
+            return language.text("ui.everywhere_you_have_been", fallback: "Everywhere you have been")
+        }
+        return language.format("history.where_in_space", fallback: "Where you have been in %1$@", scope.name)
     }
 
     private func refresh() {
@@ -333,7 +356,7 @@ struct DownloadsPanel: View {
         if fetches.entries.isEmpty && loot.kept.isEmpty {
             Card { Nothing("ui.nothing_downloaded_yet") }
         } else {
-            ScrollView(showsIndicators: false) {
+            FadingScroll {
                 LazyVStack(alignment: .leading, spacing: 10) {
                     if !fetches.entries.isEmpty {
                         VStack(alignment: .leading, spacing: 6) {
@@ -372,7 +395,54 @@ struct DownloadsPanel: View {
                 }
                 .padding(.bottom, 2)
             }
+            // Hairlines from edge to edge, as Settings' are: the cards hold
+            // icons, not text, at the inset a rule would start from.
+            .environment(\.ruleInset, 0)
             .listHeight(420)
+        }
+    }
+
+    /// The list's scroll, fading out at its foot while more lies below
+    /// rather than cutting a line in half; less as the end comes up, and
+    /// not at all once it is in view. A mask, so it is the same in light
+    /// and dark and over whatever the list is drawn on.
+    private struct FadingScroll<Content: View>: View {
+        @ViewBuilder let content: () -> Content
+        /// Where the list ends, and how tall the scroll is: the end lies
+        /// below the foot by the difference.
+        @State private var end: CGFloat = 0
+        @State private var height: CGFloat = 0
+        private let fade: CGFloat = 24
+        private static var space: String { "downloads.list" }
+
+        var body: some View {
+            ScrollView(showsIndicators: false) {
+                content()
+                    // Read where it is rather than sent up as a preference:
+                    // one from inside the scroll never came out of it here.
+                    .background(GeometryReader { list in
+                        let bottom = list.frame(in: .named(Self.space)).maxY
+                        Color.clear
+                            .onAppear { end = bottom }
+                            .onChange(of: bottom) { _, new in end = new }
+                    })
+            }
+            .coordinateSpace(name: Self.space)
+            // Measured beside the scroll, not around it, so it sizes itself
+            // as it always has.
+            .background(GeometryReader { view in
+                Color.clear
+                    .onAppear { height = view.size.height }
+                    .onChange(of: view.size.height) { _, new in height = new }
+            })
+            .mask {
+                VStack(spacing: 0) {
+                    Rectangle()
+                    LinearGradient(colors: [.black, .black.opacity(1 - min(1, max(0, end - height) / fade))],
+                                   startPoint: .top, endPoint: .bottom)
+                        .frame(height: fade)
+                }
+            }
         }
     }
 
