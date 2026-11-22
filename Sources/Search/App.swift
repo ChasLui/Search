@@ -110,6 +110,10 @@ struct SearchApp: App {
                     .disabled(!(browser.active?.isWeb ?? false))
             }
             CommandGroup(after: .pasteboard) {
+                // As Safari's: what ⇧⌘V already does while you type, said
+                // in the menu (idea 814).
+                Button(language.text("ui.paste_and_match_style", fallback: "Paste and Match Style")) { Browser.pasteMatchingStyle() }
+                    .shortcut("edit.pasteMatchStyle")
                 Button(language.text("ui.copy_clean_link", fallback: "Copy Clean Link")) { browser.copyCleanLink() }
                     .shortcut("edit.copyCleanLink")
                     .disabled(browser.active?.isBlank ?? true)
@@ -1982,6 +1986,9 @@ struct ContentView: View {
             browser.recalling = true
         case "j" where shifted:
             browser.showDownloads()
+        case "v" where shifted && flags.contains(.option):
+            // ⌥⇧⌘V, Paste and Match Style as in Safari: never Paste and Go.
+            Browser.pasteMatchingStyle()
         case "v" where shifted:
             // In a text field this key is paste without formatting — a Google
             // Doc, a form, the address field. It only means Paste and Go when
