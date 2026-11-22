@@ -4,6 +4,7 @@ import SwiftUI
 /// preview is the same renderer as the blank tab, drawn once small and kept.
 struct ThemesPage: View {
     @ObservedObject var prefs: Preferences
+    @ObservedObject private var language = Language.shared
     /// The family on show. A family with nothing chosen yet (an image not
     /// picked) can be on show without being on the wall.
     @State private var family: HomeTheme.Family
@@ -28,7 +29,7 @@ struct ThemesPage: View {
 
             switch family {
             case .off:
-                Text("The blank tab stays plain.")
+                Text("themes.off_detail", bundle: Language.resources)
                     .font(.system(size: 12)).foregroundStyle(Palette.muted)
             case .wall:
                 grid(HomeTheme.walls.map { theme in
@@ -53,7 +54,9 @@ struct ThemesPage: View {
             }
 
             if family == .wall || family == .stickers {
-                Toggle("Shuffle: a different one each day", isOn: $prefs.homeShuffle)
+                Toggle(isOn: $prefs.homeShuffle) {
+                    Text("themes.shuffle", bundle: Language.resources)
+                }
                     .toggleStyle(.checkbox)
                     .font(.system(size: 12))
             }
@@ -82,7 +85,7 @@ struct ThemesPage: View {
             RoundedRectangle(cornerRadius: 9, style: .continuous)
                 .fill(Palette.ground)
                 .overlay(RoundedRectangle(cornerRadius: 9, style: .continuous).strokeBorder(Palette.hairline, lineWidth: 1))
-                .overlay(Text("Search or enter address")
+                .overlay(Text("address_line.placeholder", bundle: Language.resources)
                     .font(.system(size: 11)).foregroundStyle(Palette.muted))
                 .frame(width: 220, height: 30)
             tabs(side: side, right: right)
@@ -179,11 +182,13 @@ struct ThemesPage: View {
                                                        ? Palette.ink : Palette.hairline, lineWidth: 1.5))
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel("Colour \(hex)")
+                .accessibilityLabel(Language.shared.format("themes.colour_swatch", fallback: "Colour %@", hex))
             }
-            ColorPicker("Colour", selection: Binding(
+            ColorPicker(selection: Binding(
                 get: { Color(hex: prefs.homeTuning.solid) },
-                set: { prefs.homeTuning.solid = $0.hex; prefs.homeTheme = .solid }), supportsOpacity: false)
+                set: { prefs.homeTuning.solid = $0.hex; prefs.homeTheme = .solid }), supportsOpacity: false) {
+                Text("themes.colour", bundle: Language.resources)
+            }
         }
     }
 
@@ -201,14 +206,18 @@ struct ThemesPage: View {
                 }
             })
             HStack(spacing: 16) {
-                ColorPicker("From", selection: Binding(
+                ColorPicker(selection: Binding(
                     get: { Color(hex: prefs.homeTuning.gradientA) },
-                    set: { prefs.homeTuning.gradientA = $0.hex; prefs.homeTheme = .gradient }), supportsOpacity: false)
-                ColorPicker("To", selection: Binding(
+                    set: { prefs.homeTuning.gradientA = $0.hex; prefs.homeTheme = .gradient }), supportsOpacity: false) {
+                    Text("themes.from", bundle: Language.resources)
+                }
+                ColorPicker(selection: Binding(
                     get: { Color(hex: prefs.homeTuning.gradientB) },
-                    set: { prefs.homeTuning.gradientB = $0.hex; prefs.homeTheme = .gradient }), supportsOpacity: false)
+                    set: { prefs.homeTuning.gradientB = $0.hex; prefs.homeTheme = .gradient }), supportsOpacity: false) {
+                    Text("themes.to", bundle: Language.resources)
+                }
             }
-            ThemeSlider(title: "Angle", value: prefs.homeTuning.angle, range: 0...360, unit: "°") {
+            ThemeSlider(title: Language.shared.text("themes.angle", fallback: "Angle"), value: prefs.homeTuning.angle, range: 0...360, unit: "°") {
                 prefs.homeTuning.angle = $0
                 prefs.homeTheme = .gradient
             }
@@ -228,7 +237,7 @@ struct ThemesPage: View {
             .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
             .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Palette.hairline, lineWidth: 1))
             VStack(alignment: .leading, spacing: 8) {
-                Pill("Choose Image…") {
+                Pill(Language.shared.text("themes.choose_image", fallback: "Choose Image…")) {
                     // Cancelled, or not copied: what was there stays.
                     guard let kept = HomeTheme.choose() else { return }
                     let old = prefs.homeThemeImage
@@ -237,13 +246,13 @@ struct ThemesPage: View {
                     prefs.homeTheme = .custom
                 }
                 if prefs.homeThemeImage != nil {
-                    Pill("Remove") {
+                    Pill(Language.shared.text("ui.remove", fallback: "Remove")) {
                         HomeTheme.forget(prefs.homeThemeImage)
                         prefs.homeThemeImage = nil
                         if prefs.homeTheme == .custom { prefs.homeTheme = .off }
                     }
                 }
-                Text("A copy is kept inside Search.")
+                Text("themes.copy_kept", bundle: Language.resources)
                     .font(.system(size: 11)).foregroundStyle(Palette.muted)
             }
         }
@@ -254,16 +263,16 @@ struct ThemesPage: View {
     @ViewBuilder
     private var sliders: some View {
         VStack(alignment: .leading, spacing: 8) {
-            ThemeSlider(title: "Intensity", value: prefs.homeTuning.intensity * 100, range: 0...100, unit: "%") {
+            ThemeSlider(title: Language.shared.text("themes.intensity", fallback: "Intensity"), value: prefs.homeTuning.intensity * 100, range: 0...100, unit: "%") {
                 prefs.homeTuning.intensity = $0 / 100
             }
             if prefs.homeTheme == .stickers {
-                ThemeSlider(title: "Density", value: prefs.homeTuning.density * 100, range: 0...100, unit: "%") {
+                ThemeSlider(title: Language.shared.text("themes.density", fallback: "Density"), value: prefs.homeTuning.density * 100, range: 0...100, unit: "%") {
                     prefs.homeTuning.density = $0 / 100
                 }
             }
             if prefs.homeTheme == .stickers {
-                ThemeSlider(title: "Scale", value: prefs.homeTuning.scale * 100, range: 0...100, unit: "%") {
+                ThemeSlider(title: Language.shared.text("themes.scale", fallback: "Scale"), value: prefs.homeTuning.scale * 100, range: 0...100, unit: "%") {
                     prefs.homeTuning.scale = $0 / 100
                 }
             }

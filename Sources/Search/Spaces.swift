@@ -1190,14 +1190,13 @@ enum SpaceMenu {
             // A profile's last space goes with the profile.
             let profile = Profiles.shared.profile(browser.profileID)
             menu.addItem(.separator())
-            menu.addItem(item("Delete Profile “\(profile.name)”…") {
-                Ask.sure("Delete “\(profile.name)”?",
-                         detail: "“\(here.name)” is its last space. The profile's windows close, its spaces go with their tabs and pins, and its cookies, sign-ins, history and bookmarks are erased from this Mac.",
+            menu.addItem(item(Language.shared.format("profile.delete", fallback: "Delete “%@”…", profile.name)) {
+                Ask.sure(Language.shared.format("profile.delete_confirm", fallback: "Delete “%@”?", profile.name),
+                         detail: Language.shared.format("profile.delete_last_space_detail", fallback: "“%1$@” is its last space. The profile's windows close, its spaces go with their tabs and pins, and its cookies, sign-ins, history and bookmarks are erased from this Mac.", here.name),
                          confirm: "Delete", returnCancels: true) {
                     Profiles.shared.delete(profile.id)
                 }
             })
-        }
         }
         return menu
     }

@@ -20,10 +20,15 @@ struct ClientIdentity {
     let issuer: String
     let expires: Date?
 
-    var label: String {
+    @MainActor var label: String {
         var text = name
-        if !issuer.isEmpty { text += " — issued by \(issuer)" }
-        if let expires { text += ", expires \(expires.formatted(date: .abbreviated, time: .omitted))" }
+        if !issuer.isEmpty {
+            text += Language.shared.format("client_cert.issued_by", fallback: " — issued by %@", issuer)
+        }
+        if let expires {
+            text += Language.shared.format("client_cert.expires", fallback: ", expires %@",
+                                           expires.formatted(date: .abbreviated, time: .omitted))
+        }
         return text
     }
 
@@ -107,7 +112,7 @@ enum ClientCertificates {
     /// Your identities whose certificate was issued by one of the
     /// authorities the site names, still valid today. A site that names none
     /// takes any of them, as in Safari.
-    static func matching(_ issuers: [Data]?) -> [ClientIdentity] {
+    @MainActor static func matching(_ issuers: [Data]?) -> [ClientIdentity] {
         var query: [CFString: Any] = [
             kSecClass: kSecClassIdentity,
             kSecMatchLimit: kSecMatchLimitAll,
@@ -124,7 +129,7 @@ enum ClientCertificates {
                   seen.insert(SecCertificateCopyData(cert) as Data).inserted else { return nil }
             let (issuer, expires) = describe(cert)
             if let expires, expires < Date() { return nil }
-            let name = SecCertificateCopySubjectSummary(cert) as String? ?? "Certificate"
+            let name = SecCertificateCopySubjectSummary(cert) as String? ?? Language.shared.text("client_cert.certificate", fallback: "Certificate")
             return ClientIdentity(identity: identity, certificate: cert, name: name, issuer: issuer, expires: expires)
         }
     }
@@ -270,7 +275,7 @@ extension Browser {
     private func showCertificatePicker(_ ask: CertificateAsk, host: String, found: [ClientIdentity],
                                        over webView: WKWebView, finish: @escaping (ClientIdentity?, Bool) -> Void) {
         if Store.testing {
-            ClientCertificates.askedInTest.append(found.map(\.label))
+            ClientCertificates.askedInTest.append(found.map { $0.label })
             let index = ClientCertificates.answerInTest
             return finish(index.flatMap { found.indices.contains($0) ? found[$0] : nil }, true)
         }
@@ -281,10 +286,10 @@ extension Browser {
             return finish(nil, false)
         }
         let alert = NSAlert()
-        alert.messageText = "\(host) asks for a certificate"
-        alert.informativeText = "Choose the certificate to identify yourself to this site. It is sent only if you continue."
-        alert.addButton(withTitle: "Continue")
-        alert.addButton(withTitle: "Cancel")
+        alert.messageText = Language.shared.format("client_cert.asks", fallback: "%@ asks for a certificate", host)
+        alert.informativeText = Language.shared.text("client_cert.choose", fallback: "Choose the certificate to identify yourself to this site. It is sent only if you continue.")
+        alert.addButton(withTitle: Language.shared.text("Continue", fallback: "Continue"))
+        alert.addButton(withTitle: Language.shared.text("Cancel", fallback: "Cancel"))
         let menu = NSPopUpButton(frame: NSRect(x: 0, y: 0, width: 360, height: 26), pullsDown: false)
         // Items made one by one, each tagged with its place: addItem(withTitle:)
         // drops a title already there, and two cards can hold certificates

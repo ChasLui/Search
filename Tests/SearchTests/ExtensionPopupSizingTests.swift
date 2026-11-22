@@ -36,7 +36,10 @@ final class ExtensionPopupSizingTests: XCTestCase {
         let first = try await measure(web)
         let second = try await measure(web)
         let third = try await measure(web)
-        XCTAssertEqual(first, [515, 315])
+        // The page names 500×300 and asks for no scroll bar: a bar shown
+        // while it was measured at 25 points takes no room in the size
+        // (#1311), and the margins' overflow leaves it at 500×300.
+        XCTAssertEqual(first, [500, 300])
         XCTAssertEqual(second, first)
         XCTAssertEqual(third, first)
     }

@@ -5686,7 +5686,8 @@ final class Browser: NSObject, ObservableObject {
             for tab in going { self.finishMove(tab, toSpace: id, quietly: true) }
             self.writeSession(now: true)
             if let row = self.parked[id] { self.writeSession(now: true, space: id, row: row) }
-            self.announce("Moved \(going.count) tabs to \(destination.name)")
+            self.announce("Moved \(going.count) tabs to \(destination.name)",
+                          localizedKey: "announcement.moved_tabs", arguments: [going.count, destination.name])
             then?()
         }
         let store = Spaces.store(for: id)

@@ -159,7 +159,10 @@ struct TabBar: View {
                                     // What the run's tabs really take, against
                                     // what they were worked out to (see measures).
                                     .onGeometryChange(for: CGFloat.self, of: { $0.size.width }) { laid in
-                                        let missed = max(0, (laid - content(in: geo.size.width, each: each)).rounded(.up))
+                                        let worked = measures(in: geo.size.width, displayed: displayed,
+                                                              grouped: grouped, pins: pins.count,
+                                                              splits: splits).content - unaccounted
+                                        let missed = max(0, (laid - worked).rounded(.up))
                                         if missed != unaccounted { unaccounted = missed }
                                         TabBar.laidOut = laid
                                     }
@@ -1698,16 +1701,16 @@ struct TabMenu: View {
         let count = picked.count
         if picked.allSatisfy({ $0.pin == nil && !$0.shy && !$0.bench }) { groupMenu }
         if picked.allSatisfy({ $0.pin == nil && $0.isWeb && !$0.shy }) {
-            Button("Pin \(count) Tabs") { for each in picked { browser.pin(each) } }
+            Button { for each in picked { browser.pin(each) } } label: { CountText(key: "count.pin_tabs", count: count) }
             if browser.prefs.showsPinRows {
-                Button("Pin \(count) Tabs as Rows") { for each in picked { browser.pin(each, listed: true) } }
+                Button { for each in picked { browser.pin(each, listed: true) } } label: { CountText(key: "count.pin_tabs_as_rows", count: count) }
             }
         } else if picked.allSatisfy({ $0.pin != nil }) {
-            Button("Unpin \(count) Tabs") { for each in picked { browser.unpin(each) } }
+            Button { for each in picked { browser.unpin(each) } } label: { CountText(key: "count.unpin_tabs", count: count) }
         }
         if browser.prefs.usesSpaces, picked.allSatisfy({ !$0.bench && !$0.everywhere
                && $0.address.flatMap({ Browser.extensionHost(of: $0) }) == nil }) {
-            Menu("Move to Space") {
+            Menu {
                 ForEach(browser.spaces.filter { $0.id != browser.spaceID }) { space in
                     Button {
                         browser.move(picked, toSpace: space.id)
@@ -1716,45 +1719,55 @@ struct TabMenu: View {
                     }
                 }
                 if browser.spaces.count > 1 { Divider() }
-                Button("New Space…") {
+                Button {
                     browser.askForSpace { space in
                         browser.move(picked, toSpace: space.id) {
                             browser.switchSpace(to: space.id)
                         }
                     }
+                } label: {
+                    Text("ui.new_space_0d5525", bundle: Language.resources)
                 }
+            } label: {
+                Text("ui.move_to_space", bundle: Language.resources)
             }
-            .help("Pages moved to a Space with different sign-ins reopen there.")
+            .help(Text("ui.pages_moved_to_a_space_with_different_sign_ins_reopen_t", bundle: Language.resources))
         }
         if browser.prefs.splitView && !browser.pickedTabsArePaired {
-            Button("Open \(count) Tabs in Split View") { browser.pairPickedTabs(focus: tab) }
+            Button { browser.pairPickedTabs(focus: tab) } label: { CountText(key: "count.open_split", count: count) }
                 .disabled(browser.pickedSplit == nil)
         }
         // Into a window already open, as Move to Window lists them.
         let others = Browsers.all.filter { $0 !== browser && $0.isOpen && !$0.isPopup && $0.profileID == browser.profileID }
         if !others.isEmpty, picked.allSatisfy({ $0.pin == nil && !$0.bench }) {
-            Menu("Move to Window") {
+            Menu {
                 ForEach(Array(others.enumerated()), id: \.offset) { _, other in
                     Button(other.windowName) { for each in picked { browser.moveToWindow(each, other) } }
                 }
+            } label: {
+                Text("ui.move_to_window", bundle: Language.resources)
             }
         }
         Divider()
-        Button("Copy Addresses") { browser.copySelectedTabLinks() }
+        Button { browser.copySelectedTabLinks() } label: { Text("ui.copy_addresses", bundle: Language.resources) }
             .disabled(browser.selectedTabLinkCount == 0)
         // Unmute when every one is muted; otherwise the ones still playing
         // are muted and the rest left as they are.
         let muted = picked.allSatisfy(\.muted)
-        Button(muted ? "Unmute \(count) Tabs" : "Mute \(count) Tabs") {
+        Button {
             for each in picked where each.muted == muted { each.toggleMute() }
+        } label: {
+            CountText(key: muted ? "count.unmute_tabs" : "count.mute_tabs", count: count)
         }
-        Button("Put \(count) Tabs to Sleep") {
+        Button {
             for each in picked where browser.awake(because: each) == nil { browser.sleep(each) }
+        } label: {
+            CountText(key: "count.put_tabs_to_sleep", count: count)
         }
         .disabled(picked.allSatisfy { browser.awake(because: $0) != nil })
         Divider()
-        Button("Close \(count) Tabs") { browser.closePickedTabs() }
-        Button("Close Other Tabs") { browser.closeOthers(but: picked) }
+        Button { browser.closePickedTabs() } label: { CountText(key: "count.close_tabs", count: count) }
+        Button { browser.closeOthers(but: picked) } label: { Text("ui.close_other_tabs", bundle: Language.resources) }
             .disabled(browser.tabs.count <= count)
     }
 
@@ -1779,7 +1792,6 @@ struct TabMenu: View {
             // A split pinned whole is rows only.
             if rows && browser.pinnedPair(of: tab) == nil {
                 Button { browser.setListed(tab, !tab.listed) } label: { Text(LocalizedStringKey(tab.listed ? "Show as Square" : "Show as Row"), bundle: Language.resources) }
-            }
             }
             // Settings › Tabs › Folders in pinned rows: a row of this
             // space's own into a folder, a new one or one there is.

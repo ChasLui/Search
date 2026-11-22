@@ -174,18 +174,20 @@ private final class PointerLockPanel: NSPanel {
 /// "Press Esc to show your pointer", the key as a key, light on dark
 /// whatever the page is.
 private struct PointerLockHint: View {
-    static let words = "Press Esc to show your pointer"
+    @MainActor static var words: String {
+        Language.shared.text("pointer_lock.words", fallback: "Press Esc to show your pointer")
+    }
 
     var body: some View {
         HStack(spacing: 6) {
-            Text("Press")
+            Text("pointer_lock.press", bundle: Language.resources)
             Text("Esc")
                 .font(.system(size: 12, weight: .semibold))
                 .padding(.horizontal, 6)
                 .frame(height: 20)
                 .overlay(RoundedRectangle(cornerRadius: 5, style: .continuous)
                     .strokeBorder(Color.white.opacity(0.6), lineWidth: 1))
-            Text("to show your pointer")
+            Text("pointer_lock.to_show", bundle: Language.resources)
         }
         .font(.system(size: 14, weight: .medium))
         .foregroundStyle(Color.white)

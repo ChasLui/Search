@@ -14,14 +14,14 @@ enum HomeTheme: String, CaseIterable, Identifiable {
     enum Family: String, CaseIterable, Identifiable {
         case off, wall, stickers, solid, gradient, image
         var id: String { rawValue }
-        var title: String {
+        @MainActor var title: String {
             switch self {
-            case .off: return "Off"
-            case .wall: return "Wall painting"
-            case .stickers: return "Stickers"
-            case .solid: return "Solid colour"
-            case .gradient: return "Gradient"
-            case .image: return "Image"
+            case .off: return Language.shared.text("themes.family.off", fallback: "Off")
+            case .wall: return Language.shared.text("themes.family.wall", fallback: "Wall painting")
+            case .stickers: return Language.shared.text("themes.family.stickers", fallback: "Stickers")
+            case .solid: return Language.shared.text("themes.family.solid", fallback: "Solid colour")
+            case .gradient: return Language.shared.text("themes.family.gradient", fallback: "Gradient")
+            case .image: return Language.shared.text("themes.family.image", fallback: "Image")
             }
         }
         /// What choosing the family alone puts on the wall.
@@ -49,23 +49,23 @@ enum HomeTheme: String, CaseIterable, Identifiable {
         }
     }
 
-    var title: String {
+    @MainActor var title: String {
         switch self {
-        case .off: return "Off"
-        case .openRoad: return "Open Road"
-        case .desertHighway: return "Desert Highway"
-        case .coastalCliffs: return "Coastal Cliffs"
-        case .mountainLake: return "Mountain Lake"
-        case .riceTerraces: return "Rice Terraces"
-        case .northernLights: return "Northern Lights"
-        case .saturnRise: return "Saturn Rise"
-        case .moonscape: return "Moonscape"
-        case .cityAtNight: return "City at Night"
-        case .monsoonForest: return "Monsoon Forest"
-        case .stickers: return "Stickers"
-        case .solid: return "Solid colour"
-        case .gradient: return "Gradient"
-        case .custom: return "Image"
+        case .off: return Language.shared.text("themes.family.off", fallback: "Off")
+        case .openRoad: return Language.shared.text("themes.wall.open_road", fallback: "Open Road")
+        case .desertHighway: return Language.shared.text("themes.wall.desert_highway", fallback: "Desert Highway")
+        case .coastalCliffs: return Language.shared.text("themes.wall.coastal_cliffs", fallback: "Coastal Cliffs")
+        case .mountainLake: return Language.shared.text("themes.wall.mountain_lake", fallback: "Mountain Lake")
+        case .riceTerraces: return Language.shared.text("themes.wall.rice_terraces", fallback: "Rice Terraces")
+        case .northernLights: return Language.shared.text("themes.wall.northern_lights", fallback: "Northern Lights")
+        case .saturnRise: return Language.shared.text("themes.wall.saturn_rise", fallback: "Saturn Rise")
+        case .moonscape: return Language.shared.text("themes.wall.moonscape", fallback: "Moonscape")
+        case .cityAtNight: return Language.shared.text("themes.wall.city_at_night", fallback: "City at Night")
+        case .monsoonForest: return Language.shared.text("themes.wall.monsoon_forest", fallback: "Monsoon Forest")
+        case .stickers: return Language.shared.text("themes.family.stickers", fallback: "Stickers")
+        case .solid: return Language.shared.text("themes.family.solid", fallback: "Solid colour")
+        case .gradient: return Language.shared.text("themes.family.gradient", fallback: "Gradient")
+        case .custom: return Language.shared.text("themes.family.image", fallback: "Image")
         }
     }
 
@@ -116,7 +116,7 @@ enum HomeTheme: String, CaseIterable, Identifiable {
         panel.allowedContentTypes = [.image]
         panel.allowsMultipleSelection = false
         panel.canChooseDirectories = false
-        panel.prompt = "Choose"
+        panel.prompt = Language.shared.text("ui.choose", fallback: "Choose…")
         guard panel.runModal() == .OK, let url = panel.url else { return nil }
         return keep(url)
     }
@@ -125,18 +125,18 @@ enum HomeTheme: String, CaseIterable, Identifiable {
 enum StickerPack: String, CaseIterable, Identifiable, Codable {
     case space, roadTrip, ocean, jungle, streetFood, retroTech, weather, music, wonders, search
     var id: String { rawValue }
-    var title: String {
+    @MainActor var title: String {
         switch self {
-        case .space: return "Space"
-        case .roadTrip: return "Road Trip"
-        case .ocean: return "Ocean"
-        case .jungle: return "Jungle"
-        case .streetFood: return "Street Food"
-        case .retroTech: return "Retro Tech"
-        case .weather: return "Weather"
-        case .music: return "Music"
-        case .wonders: return "Wonders"
-        case .search: return "Search"
+        case .space: return Language.shared.text("themes.pack.space", fallback: "Space")
+        case .roadTrip: return Language.shared.text("themes.pack.road_trip", fallback: "Road Trip")
+        case .ocean: return Language.shared.text("themes.pack.ocean", fallback: "Ocean")
+        case .jungle: return Language.shared.text("themes.pack.jungle", fallback: "Jungle")
+        case .streetFood: return Language.shared.text("themes.pack.street_food", fallback: "Street Food")
+        case .retroTech: return Language.shared.text("themes.pack.retro_tech", fallback: "Retro Tech")
+        case .weather: return Language.shared.text("themes.pack.weather", fallback: "Weather")
+        case .music: return Language.shared.text("themes.pack.music", fallback: "Music")
+        case .wonders: return Language.shared.text("themes.pack.wonders", fallback: "Wonders")
+        case .search: return Language.shared.text("themes.pack.search", fallback: "Search")
         }
     }
 }
@@ -144,7 +144,15 @@ enum StickerPack: String, CaseIterable, Identifiable, Codable {
 enum GradientPreset: String, CaseIterable, Identifiable {
     case dusk, sea, peach, mint, mono
     var id: String { rawValue }
-    var title: String { rawValue.capitalized }
+    @MainActor var title: String {
+        switch self {
+        case .dusk: return Language.shared.text("themes.gradient.dusk", fallback: "Dusk")
+        case .sea: return Language.shared.text("themes.gradient.sea", fallback: "Sea")
+        case .peach: return Language.shared.text("themes.gradient.peach", fallback: "Peach")
+        case .mint: return Language.shared.text("themes.gradient.mint", fallback: "Mint")
+        case .mono: return Language.shared.text("themes.gradient.mono", fallback: "Mono")
+        }
+    }
     var colours: (a: String, b: String, angle: Double) {
         switch self {
         case .dusk: return ("#E9B8A0", "#8E86B8", 150)

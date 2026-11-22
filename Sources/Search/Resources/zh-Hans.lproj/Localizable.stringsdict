@@ -533,5 +533,71 @@
 			<key>other</key><string>已复制 %ld 个地址</string>
 		</dict>
 	</dict>
+	<key>count.pin_tabs</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key><string>%#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key><string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key><string>ld</string>
+			<key>one</key><string>固定 %ld 个标签页</string>
+			<key>other</key><string>固定 %ld 个标签页</string>
+		</dict>
+	</dict>
+	<key>count.pin_tabs_as_rows</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key><string>%#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key><string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key><string>ld</string>
+			<key>one</key><string>固定 %ld 个标签页为行</string>
+			<key>other</key><string>固定 %ld 个标签页为行</string>
+		</dict>
+	</dict>
+	<key>count.unpin_tabs</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key><string>%#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key><string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key><string>ld</string>
+			<key>one</key><string>取消固定 %ld 个标签页</string>
+			<key>other</key><string>取消固定 %ld 个标签页</string>
+		</dict>
+	</dict>
+	<key>count.mute_tabs</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key><string>%#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key><string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key><string>ld</string>
+			<key>one</key><string>静音 %ld 个标签页</string>
+			<key>other</key><string>静音 %ld 个标签页</string>
+		</dict>
+	</dict>
+	<key>count.unmute_tabs</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key><string>%#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key><string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key><string>ld</string>
+			<key>one</key><string>取消静音 %ld 个标签页</string>
+			<key>other</key><string>取消静音 %ld 个标签页</string>
+		</dict>
+	</dict>
+	<key>count.put_tabs_to_sleep</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key><string>%#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key><string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key><string>ld</string>
+			<key>one</key><string>让 %ld 个标签页休眠</string>
+			<key>other</key><string>让 %ld 个标签页休眠</string>
+		</dict>
+	</dict>
 </dict>
 </plist>

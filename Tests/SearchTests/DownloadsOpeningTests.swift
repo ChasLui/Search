@@ -202,6 +202,10 @@ final class DownloadsOpeningTests: XCTestCase {
     /// small step, ending where asked (idea 897). Staged far off every
     /// screen, never in front of anything.
     func testTheWindowResizesInSmallSteps() async throws {
+        // This Mac's Reduce Motion would make the move immediate by design
+        // (see Motion.reduced); the animation itself is what is checked.
+        Motion.testReduceMotion = false
+        defer { Motion.testReduceMotion = nil }
         let panel = NSPanel(contentRect: NSRect(x: -30000, y: -30000, width: 380, height: 150),
                             styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
         panel.isOpaque = false

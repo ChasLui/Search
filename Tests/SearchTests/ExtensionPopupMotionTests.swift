@@ -115,9 +115,15 @@ final class ExtensionPopupMotionTests: XCTestCase {
             try await Task.sleep(for: .milliseconds(10))
         }
         let overflowFirst = try XCTUnwrap(overflowSizes.first, "the overflow popup never appeared")
-        XCTAssertTrue(overflowSizes.allSatisfy {
-            abs($0.width - overflowFirst.width) <= 2 && abs($0.height - overflowFirst.height) <= 2
-        }, "static overflow caused the popup to oscillate: \(overflowSizes)")
+        // The page names 500×300 and its div is 10 points taller. Since
+        // #1311 no scroll bar's room is added, so the popup opens at the
+        // named size and follows the div once, growing to 310 within its
+        // first eight ticks; after that it only grows. What it must not do
+        // is rock back — the 500↔515 loop the measurement once had.
+        XCTAssertTrue(overflowSizes.allSatisfy { abs($0.width - overflowFirst.width) <= 2 },
+                      "static overflow moved the popup sideways: \(overflowSizes)")
+        XCTAssertTrue(progresses(overflowSizes.map(\.height)),
+                      "static overflow made the popup shrink again: \(overflowSizes)")
         _ = try await overflow.evaluateJavaScript("document.querySelector('div').style.cssText = 'width:490px;height:290px'")
         for _ in 0..<120 {
             if overflow.frame.width == 500 { break }

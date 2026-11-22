@@ -533,5 +533,71 @@
 			<key>other</key><string>%ld addresses copied</string>
 		</dict>
 	</dict>
+	<key>count.pin_tabs</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key><string>%#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key><string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key><string>ld</string>
+			<key>one</key><string>Pin %ld Tab</string>
+			<key>other</key><string>Pin %ld Tabs</string>
+		</dict>
+	</dict>
+	<key>count.pin_tabs_as_rows</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key><string>%#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key><string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key><string>ld</string>
+			<key>one</key><string>Pin %ld Tab as Row</string>
+			<key>other</key><string>Pin %ld Tabs as Rows</string>
+		</dict>
+	</dict>
+	<key>count.unpin_tabs</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key><string>%#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key><string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key><string>ld</string>
+			<key>one</key><string>Unpin %ld Tab</string>
+			<key>other</key><string>Unpin %ld Tabs</string>
+		</dict>
+	</dict>
+	<key>count.mute_tabs</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key><string>%#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key><string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key><string>ld</string>
+			<key>one</key><string>Mute %ld Tab</string>
+			<key>other</key><string>Mute %ld Tabs</string>
+		</dict>
+	</dict>
+	<key>count.unmute_tabs</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key><string>%#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key><string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key><string>ld</string>
+			<key>one</key><string>Unmute %ld Tab</string>
+			<key>other</key><string>Unmute %ld Tabs</string>
+		</dict>
+	</dict>
+	<key>count.put_tabs_to_sleep</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key><string>%#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key><string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key><string>ld</string>
+			<key>one</key><string>Put %ld Tab to Sleep</string>
+			<key>other</key><string>Put %ld Tabs to Sleep</string>
+		</dict>
+	</dict>
 </dict>
 </plist>
