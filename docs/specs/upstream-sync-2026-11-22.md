@@ -134,6 +134,7 @@
   - `ExtensionPopupSizingTests.testBodyMarginDoesNotCauseScrollbarOscillation`：断言仍是 #1311 之前的 515×315（经典滚动条 17pt 留白）；#1311 后稳定为 500×300，已更新。
   - `ExtensionPopupMotionTests` 亮/暗两项：`overflow.html` 在 #1311 后先以声明的 500×300 打开，再于前 8 次跟踪内按内容长到 310；原断言要求 2.8 秒内尺寸完全不变。改为宽度不横跳、高度不回缩（仍能捕获修复前的 500↔515 回抖）。
 - 第二轮（2026-11-22 14:57–15:21）：本地化检查通过（2610 strings / 41 plurals）；主套件 1262 项、27 项跳过、0 失败；43 个隔离用例全部通过；退出码 0。
+- GitHub Actions（PR #15，提交 `e1c3628`）：`tests` 34m55s 通过，`beta-dmg` 8m35s 通过，CodeRabbit skipping。
 
 ## 未验收项
 
@@ -142,4 +143,4 @@
 - 触控板轻扫（swipe back closes）、真实指针锁定（游戏）、真实客户端证书站点：分别依赖触控板手势、WebKit pointer lock 授权与钥匙串中的真实身份，仅由探针与合成用例覆盖。
 - 输入法与 VoiceOver 下新 Themes 页面、证书选择器与指针锁定提示的实际朗读顺序。
 - 浅色/深色下 10 幅壁画、贴纸包与渐变的实机视觉检查。
-- GitHub CI：本 worktree 尚未 push，远端结果未产生。
+- PR #15 的合并未执行（合并需另行授权）。
