@@ -749,7 +749,7 @@ struct FetchDoor: View {
             }
             .buttonStyle(.plain)
             .onHover { hovering = $0 }
-            .help(Text("ui.downloads_j", bundle: Language.resources))
+            .shortcutHelp(Language.shared.text("page.downloads", fallback: "Downloads"), "history.downloads")
             .background(ButtonSpot { spot.view = $0; if browser.downloadsHanging { float(true) } })
             .onChange(of: browser.downloadsHanging) { _, on in float(on) }
             // The doors moving while the list hangs: it follows them.

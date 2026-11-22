@@ -1176,6 +1176,8 @@
 "ui.new_space" = "新建空间";
 "ui.new_space_0d5525" = "新建空间…";
 "ui.new_tab" = "新标签页";
+"ui.space_click_menu" = "%1$@ — 点按打开该空间的菜单";
+"ui.close_tabs_under_line_help" = "关闭这条线以下的标签页。固定项和分组保留；按 %1$@ 可全部恢复。";
 "ui.new_tab_position" = "新标签页位置";
 "ui.new_tab_t" = "新建标签页   ⌘T";
 "ui.new_window" = "新建窗口";

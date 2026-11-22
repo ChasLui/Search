@@ -1176,6 +1176,8 @@
 "ui.new_space" = "New space";
 "ui.new_space_0d5525" = "New Space…";
 "ui.new_tab" = "New Tab";
+"ui.space_click_menu" = "%1$@ — click for the space’s menu";
+"ui.close_tabs_under_line_help" = "Close the tabs under the line. Pins and groups stay; %1$@ brings them all back.";
 "ui.new_tab_position" = "New tab position";
 "ui.new_tab_t" = "New Tab   ⌘T";
 "ui.new_window" = "New Window";
