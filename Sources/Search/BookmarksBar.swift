@@ -63,8 +63,13 @@ struct BookmarksBar: View {
                         }
                     }
                     .overlay {
+                        // A middle-click: a bookmark in a new tab behind, a
+                        // folder's bookmarks each in one (idea 959), as Brave
+                        // and Firefox do.
                         if let url = node.url.flatMap(URL.init(string:)) {
                             MiddleClick { browser.pickBookmark(url, inNewTab: true) }
+                        } else if node.isFolder {
+                            MiddleClick { browser.openAll(node) }
                         }
                     }
                     .contextMenu { BookmarkActions(browser: browser, bookmarks: bookmarks, node: node) }
@@ -214,9 +219,7 @@ struct BookmarkActions: View {
     @ViewBuilder
     func folderMenu(_ node: Bookmark) -> some View {
         let urls = (node.children ?? []).compactMap { $0.url.flatMap(URL.init(string:)) }
-        Button {
-            for url in urls { browser.open(url, foreground: false, atEnd: true, from: browser.active, mayWait: true) }
-        } label: { Text("ui.open_all_in_new_tabs", bundle: Language.resources) }
+        Button { browser.openAll(node) } label: { Text("ui.open_all_in_new_tabs", bundle: Language.resources) }
         .disabled(urls.isEmpty)
         Button { browser.openInNewWindow(urls) } label: { Text("ui.open_all_in_new_window", bundle: Language.resources) }
             .disabled(urls.isEmpty)
@@ -333,7 +336,11 @@ struct SideBookmarks: View {
                 }
             }
             .overlay {
-                if let url { MiddleClick { browser.pickBookmark(url, inNewTab: true) } }
+                if let url {
+                    MiddleClick { browser.pickBookmark(url, inNewTab: true) }
+                } else if node.isFolder {
+                    MiddleClick { browser.openAll(node) }
+                }
             }
             .onHover { hovering = $0 }
             .contextMenu { BookmarkActions(browser: browser, bookmarks: bookmarks, node: node) }
