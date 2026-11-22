@@ -39,12 +39,18 @@ struct ApplePasswordsCard: View {
 
     @ViewBuilder private var pairing: some View {
         switch apple.state {
-        case .idle:
-            Line(apple.trouble ?? "Not connected", "ui.your_mac_shows_a_code_and_you_type_it_here_once_per_lau", localizedTitle: true, localizedDetail: true) {
-                Pill("ui.connect") { Task { await apple.connect() } }
+        case .idle, .starting:
+            // One row for both, its button kept and only greyed while
+            // starting: a start that fails at once leaves it as it was (idea 781).
+            if apple.refused {
+                Line(apple.trouble ?? "Not connected", "ui.macos_stops_apple_helper", localizedTitle: true, localizedDetail: true) { EmptyView() }
+            } else {
+                Line(ApplePasswords.title(state: apple.state, trouble: apple.trouble, connecting: apple.connecting),
+                     "ui.your_mac_shows_a_code_and_you_type_it_here_once_per_lau", localizedTitle: true, localizedDetail: true) {
+                    Pill("ui.connect") { Task { await apple.connect() } }
+                        .disabled(apple.state == .starting)
+                }
             }
-        case .starting:
-            Line("ui.connecting", "ui.waiting_for_your_mac_to_show_a_code", localizedTitle: true, localizedDetail: true) { EmptyView() }
         case .code, .checking:
             Line("ui.enter_the_code_your_mac_shows", apple.state == .checking ? "Checking…" : "Six digits, from the Passwords window", localizedTitle: true, localizedDetail: true) {
                 HStack(spacing: 8) {
@@ -131,8 +137,9 @@ struct ApplePairingCard: View {
                             if digits.count == 6 { send() }
                         }
                         .onSubmit(send)
-                } else if apple.state == .idle {
+                } else if !apple.refused, apple.state == .idle || apple.state == .starting {
                     Pill("ui.try_again_042c86", filled: true) { Task { await apple.connect() } }
+                        .disabled(apple.state == .starting)
                 }
                 Spacer(minLength: 0)
                 Pill("ui.cancel") { browser.endApplePairing(paired: false) }
@@ -158,7 +165,7 @@ struct ApplePairingCard: View {
     private var title: String {
         switch apple.state {
         case .idle: return apple.trouble ?? "Not connected"
-        case .starting: return "Connecting to Apple Passwords…"
+        case .starting: return apple.connecting ? "Connecting to Apple Passwords…" : apple.trouble ?? "Connecting to Apple Passwords…"
         case .code: return "Enter the code your Mac shows"
         case .checking: return "Checking…"
         case .paired: return "Connected"
