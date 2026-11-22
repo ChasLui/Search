@@ -913,6 +913,8 @@ struct SettingsPanel: View {
         case "about.notes": Pill("ui.what_s_new") { browser.lead(to: InternalPage(.notes)) }
         case "bench": Switch(on: $prefs.bench)
         case "agents": Switch(on: $prefs.agents)
+        case "news.updates": OptInSettingsField(betaOnly: false) { _ = browser.open($0, foreground: true) }
+        case "news.iphone": OptInSettingsField(betaOnly: true) { _ = browser.open($0, foreground: true) }
         default: EmptyView()
         }
     }
