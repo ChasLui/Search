@@ -135,6 +135,7 @@
   - `ExtensionPopupMotionTests` 亮/暗两项：`overflow.html` 在 #1311 后先以声明的 500×300 打开，再于前 8 次跟踪内按内容长到 310；原断言要求 2.8 秒内尺寸完全不变。改为宽度不横跳、高度不回缩（仍能捕获修复前的 500↔515 回抖）。
 - 第二轮（2026-11-22 14:57–15:21）：本地化检查通过（2610 strings / 41 plurals）；主套件 1262 项、27 项跳过、0 失败；43 个隔离用例全部通过；退出码 0。
 - GitHub Actions（PR #15，提交 `e1c3628`）：`tests` 34m55s 通过，`beta-dmg` 8m35s 通过，CodeRabbit skipping。
+- 纯文档提交 `c1a593b` 的 `tests` 首跑失败于 `WakeLatencyTests.testAWokenPageLoadsAsSoonAsItsViewIsInAWindow`（上游 #1074 的 8ms 时序断言）；同一分支的上一提交 `e1c3628`、本机两轮完整 CI 均通过该用例，失败 job 重跑后通过。判为 runner 时序抖动，未改测试。
 
 ## 未验收项
 
