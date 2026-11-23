@@ -144,4 +144,17 @@
 - 触控板轻扫（swipe back closes）、真实指针锁定（游戏）、真实客户端证书站点：分别依赖触控板手势、WebKit pointer lock 授权与钥匙串中的真实身份，仅由探针与合成用例覆盖。
 - 输入法与 VoiceOver 下新 Themes 页面、证书选择器与指针锁定提示的实际朗读顺序。
 - 浅色/深色下 10 幅壁画、贴纸包与渐变的实机视觉检查。
-- PR #15 的合并未执行（合并需另行授权）。
+- PR #15 已由仓库所有者合并。
+
+## 追加同步：pin folders 上云（同日）
+
+- 上游 `c48f067..7c1c0ec` 共 1 个提交（`7c1c0ec` Sync with iCloud: pin folders travel to the other Macs (idea 903)），`git cherry-pick -x` 自动合并，无冲突；fork 提交 `e00ef13`。
+- 内容：每个空间的 pin folders 作为独立记录 `pinfolders.<space>` 上云（id、name、parent、live feed）；折叠状态与 live folder 的帖子留在各 Mac；joining 按 id 合并；先到的 pin 暂缺 folder 时保留 folder id，folder 到达后归位。新增 `ICloudStandIn.swift`（bench `icloudpair`，仅测试运行）与 `Tests/icloud_two_macs.py`。
+- 适配：fork 的 `ICloudSync` 本地化层（summary/say/title/suggestion）保持原样；新 `ICloudLocal` 方法由 `MacSide` 与测试替身实现；本提交没有新增界面文案，资源计数保持 2610 strings / 41 plurals。
+- 验证：
+  - `swift build` 通过；`python3 Tests/check-localization.py` 通过。
+  - `swift test --filter SearchTests.ICloudSyncTests`：34 项通过（含 folders、1.0.16 升级、joining、iPhone 透传）。
+  - `SEARCH_DEV=1 ./build.sh debug` 构建 app 后运行 `python3 Tests/icloud_two_macs.py`：23 项通过（两个隐藏探针，CloudKit 由共享文件夹替身）。
+  - 完整 `python3 Tests/run-ci-tests.py`（2026-11-22 17:54–18:16）：本地化检查通过（2610 strings / 41 plurals）；主套件 1270 项、27 项跳过、0 失败；43 个隔离用例全部通过；退出码 0。
+  - GitHub Actions：见本追加同步 PR 的 checks。
+- 未验收：真实 CloudKit 的双 Mac 往返（探针以共享文件夹替身，不接触 CloudKit）；iPhone 对 `pinfolders.*` 记录的透传仅由单测覆盖；本追加同步的 PR 合并未执行（需另行授权）。
