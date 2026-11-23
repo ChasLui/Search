@@ -17,6 +17,8 @@ struct SearchApp: App {
     @ObservedObject private var language = Language.shared
     /// Only for History's tabs on your other devices (Sync with iCloud).
     @ObservedObject private var icloud = ICloudSync.shared
+    /// Only for Help › Search for iPhone…, for now (IPhoneAsk.swift).
+    @ObservedObject private var iphoneAsk = IPhoneAskWatch.shared
     /// Links from other apps, and the Dock icon.
     @NSApplicationDelegateAdaptor(Links.self) private var links
 
@@ -448,8 +450,15 @@ struct SearchApp: App {
                 Button(language.text("ui.clear_history", fallback: "Clear History")) { browser.clearHistory() }
                     .shortcut("history.clear")
             }
-            // Search › Check for Updates…, under About, as in any Mac app.
-            CommandGroup(after: .appInfo) { UpdateMenuItem() }
+            // Search › About Search, our own window with a What's New button
+            // (About.swift); then Check for Updates…, as in any Mac app, and
+            // What's New…, this version's card again (idea 968).
+            CommandGroup(replacing: .appInfo) {
+                Button("About Search") { AboutWindow.show() }
+                UpdateMenuItem()
+                Button("What's New…") { WhatsNew.showAgain(in: browser) }
+                    .disabled(WhatsNew.current == nil)
+            }
             CommandGroup(after: .appSettings) {
                 Button(language.text("ui.settings", fallback: "Settings…")) { browser.tuning = true }
                     .shortcut("app.settings")
@@ -458,7 +467,7 @@ struct SearchApp: App {
                 Button(language.text("ui.passwords", fallback: "Passwords…")) { browser.managing = true }
                     .shortcut("app.passwords")
             }
-            QuitAndHelp()
+            QuitAndHelp(iphoneAsk: iphoneAsk.open)
         }
     }
 }
@@ -467,7 +476,8 @@ struct SearchApp: App {
 /// value, because a scene's commands take at most ten.
 private struct QuitAndHelp: Commands {
     @ObservedObject private var language = Language.shared
-
+    /// Whether Help offers Search for iPhone… (IPhoneAsk.swift).
+    let iphoneAsk: Bool
     var body: some Commands {
         CommandGroup(replacing: .appTermination) {
             Button(language.text("ui.quit_search", fallback: "Quit Search")) {
@@ -477,6 +487,12 @@ private struct QuitAndHelp: Commands {
         }
         CommandGroup(replacing: .help) {
             Button(language.text("ui.send_feedback", fallback: "Send Feedback…")) { Links.writeFeedback() }
+            // For now, until the iPhone beta opens (IPhoneAsk.swift).
+            if iphoneAsk {
+                Button(language.text("iphoneask.menu_title", fallback: IPhoneAsk.menuTitle)) {
+                    Browsers.frontBrowser.iphoneAsking = true
+                }
+            }
         }
     }
 }
@@ -884,6 +900,8 @@ struct ContentView: View {
         } else if !browser.prefs.splitView {
             ZStack {
                 HomeGrid(browser: browser)
+                // The iPhone beta, a line under the field for now (IPhoneAsk.swift).
+                IPhoneAskNewTab(browser: browser)
                 Omnibox(browser: browser, over: !(browser.active?.isBlank ?? true))
             }
             // Centred on the page, not on the window. The column of tabs
@@ -917,6 +935,15 @@ struct ContentView: View {
                     _ = browser.open(url, foreground: true)
                 })
             } close: { browser.newsShowing = false }
+        }
+        // Help › Search for iPhone… (see IPhoneAsk.swift).
+        if browser.iphoneAsking {
+            sheet {
+                IPhoneAskCard(close: { browser.iphoneAsking = false }, open: { url in
+                    browser.iphoneAsking = false
+                    _ = browser.open(url, foreground: true)
+                })
+            } close: { browser.iphoneAsking = false }
         }
         if browser.reviewing {
             // No dimming for this one: the whole point is to keep looking at
@@ -1114,6 +1141,7 @@ struct ContentView: View {
             .onChange(of: browser.activeID) { _, _ in handBack() }
             .animation(Motion.settle, value: browser.welcoming)
             .animation(Motion.settle, value: browser.newsShowing)
+            .animation(Motion.settle, value: browser.iphoneAsking)
             .animation(Motion.settle, value: browser.reviewing)
             .animation(Motion.settle, value: browser.styling)
         .onAppear {
