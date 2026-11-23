@@ -23,7 +23,9 @@ final class NoWindowsTests: XCTestCase {
         _ = NSApplication.shared
         // Somewhere the window server won't move it: inside the screen's
         // visible frame, above the Dock if the runner has one.
-        let visible = NSScreen.main?.visibleFrame ?? NSRect(x: 0, y: 0, width: 640, height: 480)
+        let visible = NSScreen.screens.first?.visibleFrame
+            ?? NSScreen.main?.visibleFrame
+            ?? NSRect(x: 0, y: 0, width: 640, height: 480)
         let frame = NSRect(x: visible.minX + 40, y: visible.minY + 40, width: 320, height: 200)
         let window = NSWindow(contentRect: frame, styleMask: [.titled], backing: .buffered, defer: false)
         // Deferred: its window in the window server is made on ordering in.
