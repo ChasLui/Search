@@ -97,6 +97,10 @@ upstream 的文件整体覆盖。
   的命令标题一致）。
 - `99bb38a` / `2b2a752` / `ab9ee07`：浮动视频逻辑无冲突。
 - `4f3a003`、`9bd3214` 等无冲突。
+- `f5dd8a0`：新增 `NoWindowsTests` 把窗口的内容矩形与请求的矩形逐点比较。GitHub
+  runner 的屏幕可见区域底边被 Dock 占去 103 点，窗口 ordered in 时 AppKit 会把
+  它移到 `visibleFrame.minY`，断言因此失败（本机 Dock 不占底边时不会）。测试改为
+  把窗口放在可见区域内（`visibleFrame.origin + 40`），断言意图不变。
 - `0c0e711`/`e0f22c8`/`c56b140` 新增设置项与分组 `news`，全部补 en/zh 资源。
 
 ## 国际化
