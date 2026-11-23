@@ -1561,7 +1561,7 @@
 "settings.passkeys.entitlement" = "Needs an Apple entitlement this build doesn't have";
 "settings.passkeys.denied" = "macOS was told no: System Settings › Privacy & Security › Passkeys";
 "settings.arc.absent" = "Arc isn't on this Mac. Bring Things Over can read an export";
-"settings.keyword.explain" = "A word, then the site's search address with %s where the words go";
+"settings.keyword.explain" = "Type a word, like yt, then the site's search address with %s where the words you type go";
 "settings.keyword.taken" = "%1$@ already goes to %2$@";
 "settings.keyword.will_search" = "%1$@ will search %2$@";
 "settings.search.no_suggestions" = "A custom engine has no suggestions to give, so nothing is sent";
