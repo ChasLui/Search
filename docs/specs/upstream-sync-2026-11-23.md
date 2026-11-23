@@ -135,7 +135,8 @@ upstream 的文件整体覆盖。
 - `plutil -lint`：en/zh `Localizable.strings` 均 OK。
 - `swift test --filter LanguageTests`：19/19 通过。
 - 新增套件定向运行：OptInTests、CertificateExceptionTests、SyncDefaultTests、
-  SideBookmarksTests、ExtensionLimitsTests 通过；`ApplePasswordsRowTests` 的
+  SideBookmarksTests、ExtensionLimitsTests、NoWindowsTests（修正放置后连跑三次）
+  通过；`ApplePasswordsRowTests` 的
   `testOverAPipeAProgramKilledAtLaunchIsRefusedQuietly` 在本机稳定失败：
   `HostPipe.exitGrace` 取 1.5 秒、而拒绝判定窗口是 1 秒，本机子进程启动 + EOF
   通知超过 1 秒，于是短暂显示「Connecting…」并以 `.gone` 文案收尾。上游实现与
@@ -145,11 +146,12 @@ upstream 的文件整体覆盖。
   41 个复数键）；主套件 1375 个用例、30 个跳过、1 个失败——只有上述
   `ApplePasswordsRowTests` 的启动时序用例；五个隔离套件逐进程运行全部通过。
   退出码 1 仅来自该时序用例。`SyncDefaultTests` 在补齐英文副本比较后 14/14 通过。
+- GitHub Actions（`macos-26`，run 45110661745，`819a8bc`）：`tests`（19m39s）与
+  `beta-dmg`（11m11s）均通过。`ApplePasswordsRowTests` 的启动时序失败未在
+  runner 上复现。
 
 ## 未完成 / 待复核
 
-- GitHub Actions 全部通过与否（tests、beta-dmg）。
-- 本机 `ApplePasswordsRowTests` 的启动时序失败在 CI 上的结果。
 - 双语言切换、浅深色、双窗口、macOS 14、真实输入法和 VoiceOver 的人工复核。
 - 横向标签栏色带与设置搜索的视觉检查（`Tests/group_band.py`、`Tests/settings_layout.py`
   等 probe 需要构建 app 与独立 profile）。
