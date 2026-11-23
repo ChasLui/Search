@@ -116,6 +116,9 @@ upstream 的文件整体覆盖。
 - 枚举器、嵌套设置说明与新增命令（Next Space、Previous Space、Open File…、
   Paste and Match Style、Open Image in Split View、Open Link in Private Tab）
   都有对应资源。
+- 新增的 `SyncDefaultTests` 有两处把 `ICloudSync.summary` 的英文副本逐字比对；
+  中文系统语言下会取到中文。按 `ICloudSyncTests` 的既有做法在用例内临时选英文并
+  恢复（`SyncDefaultTests: ask for the English copy they compare against`）。
 - `WhatsNew.swift` 的 1.0.18 fixed.3 把 `\u{2026}` 写成实际省略号，便于
   `check-localization.py` 比对。
 
@@ -134,7 +137,10 @@ upstream 的文件整体覆盖。
   通知超过 1 秒，于是短暂显示「Connecting…」并以 `.gone` 文案收尾。上游实现与
   测试与 `upstream/main` 完全一致，本机差异属于时序环境问题，待 GitHub Actions
   （macos-26）复核。
-- 完整 `python3 Tests/run-ci-tests.py`：运行中，结果见文末更新。
+- 完整 `python3 Tests/run-ci-tests.py`（`6060908`）：本地化检查通过（2736 条、
+  41 个复数键）；主套件 1375 个用例、30 个跳过、1 个失败——只有上述
+  `ApplePasswordsRowTests` 的启动时序用例；五个隔离套件逐进程运行全部通过。
+  退出码 1 仅来自该时序用例。`SyncDefaultTests` 在补齐英文副本比较后 14/14 通过。
 
 ## 未完成 / 待复核
 
