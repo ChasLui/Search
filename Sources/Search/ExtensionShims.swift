@@ -487,6 +487,9 @@ enum ExtensionShims {
         var found = Set<String>()
         var scripts: [String] = []
         let folderPathLength = folder.standardizedFileURL.path.count
+        // Whether its own scripts ask for getBackgroundPage: only then does
+        // its worker need `window` to be a name it can read (see the script).
+        var namesWindow = false
         let walker = FileManager.default.enumerator(at: folder, includingPropertiesForKeys: nil)
         while let url = walker?.nextObject() as? URL {
             guard url.pathExtension == "js" else { continue }
@@ -499,6 +502,7 @@ enum ExtensionShims {
             guard url.lastPathComponent != file, var source = text else { continue }
             // Not the shim's own words, in a worker that already carries it.
             if source.hasPrefix(marker), let end = source.range(of: ender) { source = String(source[end.upperBound...]) }
+            if url.lastPathComponent != contentFile, source.contains("getBackgroundPage") { namesWindow = true }
             let range = NSRange(source.startIndex..., in: source)
             for match in eventExpression.matches(in: source, range: range) {
                 guard let a = Range(match.range(at: 1), in: source), let b = Range(match.range(at: 2), in: source) else { continue }
@@ -513,6 +517,7 @@ enum ExtensionShims {
             .replacingOccurrences(of: "__SEARCH_SCRIPTS__", with: shipped)
             .replacingOccurrences(of: "__SEARCH_CHROME__", with: Crx.chromeVersion)
             .replacingOccurrences(of: "__SEARCH_VERBOSE__", with: Store.testing ? "true" : "false")
+            .replacingOccurrences(of: "__SEARCH_NAMES_WINDOW__", with: namesWindow ? "yes" : "no")
     }
 
     /// The shim as a content script runs it: everything up to the `return`
@@ -914,8 +919,14 @@ enum ExtensionShims {
       // the worker's `chrome` be replaced (its events stop). So the name
       // `window` reads as undefined in the worker instead of throwing:
       // `typeof window` and `self.window` are as before, and a worker that
-      // sets `self.window` itself gets what it set.
-      if (worker && !("window" in root)) {
+      // sets `self.window` itself gets what it set. Only for an extension
+      // whose scripts ask for getBackgroundPage at all (ExtensionShims
+      // .shim(for:)): the name is there to be found, so `'window' in self`
+      // reads true, and Readwise Highlighter's worker, which sets
+      // `self.window = globalThis` only when that reads false, as it does
+      // in Chrome, then threw on `'crypto' in window` and never started
+      // (no button, no right-click items, nothing saved).
+      if (worker && "__SEARCH_NAMES_WINDOW__" !== "no" && !("window" in root)) {
         try {
           Object.defineProperty(root, "window", {
             configurable: true, enumerable: false,
@@ -5091,12 +5102,18 @@ enum ExtensionShims {
       // their object: `const t = chrome.i18n.getMessage; t("key")` — how Monarch
       // Money's bundle reads every string, so its options page had no text.
       // Chrome's are plain functions. Bound to their object, as Chrome's act.
+      // And getMessage("") is "" in Chrome, where WebKit throws: uBlock
+      // Origin's i18n module asks it for every bare aria-label as it loads,
+      // so the module failed and with it the popup's whole script — its
+      // dashboard button and switches did nothing (idea 975).
       for (const ns of new Set([chrome.i18n, root.browser && root.browser.i18n])) {
         if (!ns) continue;
         for (const key of ["getMessage", "getUILanguage", "detectLanguage", "getAcceptLanguages"]) {
           const fn = ns[key];
           if (typeof fn === "function" && !fn.__searchBound) {
-            const bound = function () { return fn.apply(ns, arguments); };
+            const bound = key === "getMessage"
+              ? function (name) { return name === "" ? "" : fn.apply(ns, arguments); }
+              : function () { return fn.apply(ns, arguments); };
             try { Object.defineProperty(bound, "__searchBound", { value: true }); } catch (e) {}
             put(ns, key, bound);
           }
