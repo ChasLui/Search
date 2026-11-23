@@ -41,8 +41,7 @@ struct SettingsPanel: View {
     /// A row gone to from a result, lit for a moment.
     @State private var lit: String?
     /// What Set Up Like Arc changed, for Undo.
-    @State private var arcBefore: Preferences.ArcSetup? = SettingsPanel.arcBefore
-    @MainActor static var arcBefore: Preferences.ArcSetup?
+    @ObservedObject private var likeArc = LikeArc.shared
 
     enum Page: String, CaseIterable, Identifiable {
         case general, appearance, themes, tabs, browsing, spaces, passwords, privacy, ai, extensions, keyboard, about
@@ -843,11 +842,9 @@ struct SettingsPanel: View {
     private func spacesControl(_ id: String) -> some View {
         switch id {
         case "arc.setup":
-            if let before = arcBefore, prefs.looksLikeArc {
+            if likeArc.undoable(prefs) {
                 Pill("ui.undo") {
-                    withAnimation(Motion.glide) { prefs.restore(before) }
-                    arcBefore = nil
-                    SettingsPanel.arcBefore = nil
+                    withAnimation(Motion.glide) { likeArc.undo(prefs) }
                     browser.announce("Put back as it was")
                 }
             } else if prefs.looksLikeArc {
@@ -1184,10 +1181,7 @@ struct SettingsPanel: View {
     }
 
     private func setUpLikeArc() {
-        let before = prefs.arcSnapshot
-        let changed = withAnimation(Motion.glide) { prefs.setUpLikeArc() }
-        arcBefore = before
-        SettingsPanel.arcBefore = before
+        let changed = withAnimation(Motion.glide) { likeArc.setUp(prefs) }
         browser.announce(changed.isEmpty ? "Already set up like Arc" : "Turned on: " + changed.joined(separator: ", "), localized: {
             let language = Language.shared
             if changed.isEmpty { return language.text("Already set up like Arc", fallback: "Already set up like Arc") }
