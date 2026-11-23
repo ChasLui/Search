@@ -454,9 +454,9 @@ struct SearchApp: App {
             // (About.swift); then Check for Updates…, as in any Mac app, and
             // What's New…, this version's card again (idea 968).
             CommandGroup(replacing: .appInfo) {
-                Button("About Search") { AboutWindow.show() }
+                Button(language.text("About Search", fallback: "About Search")) { AboutWindow.show() }
                 UpdateMenuItem()
-                Button("What's New…") { WhatsNew.showAgain(in: browser) }
+                Button(language.text("What's New…", fallback: "What's New…")) { WhatsNew.showAgain(in: browser) }
                     .disabled(WhatsNew.current == nil)
             }
             CommandGroup(after: .appSettings) {

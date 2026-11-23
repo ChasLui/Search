@@ -46,6 +46,7 @@ enum AboutWindow {
 /// What the About window holds. Its own view, so the bench can draw it.
 struct AboutView: View {
     let whatsNew: () -> Void
+    @ObservedObject private var language = Language.shared
 
     var body: some View {
         VStack(spacing: 0) {
@@ -56,13 +57,13 @@ struct AboutView: View {
             Text(verbatim: "Search")
                 .font(.system(size: 15, weight: .semibold))
                 .foregroundStyle(Palette.ink)
-            Text(verbatim: AboutView.versionLine)
+            Text(AboutView.versionLine)
                 .font(.system(size: 11))
                 .foregroundStyle(Palette.muted)
                 .textSelection(.enabled)
                 .padding(.top, 3)
             if WhatsNew.current != nil {
-                Pill("What's New", action: whatsNew)
+                Pill("page.release-notes", action: whatsNew)
                     .padding(.top, 12)
             }
             // For now: the iPhone beta's waitlist (IPhoneAsk.swift).
@@ -83,7 +84,10 @@ struct AboutView: View {
     /// As the standard panel writes it: "Version 1.0.18 (202611221830)".
     static var versionLine: String {
         let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? ""
-        return build.isEmpty ? "Version \(Updater.version)" : "Version \(Updater.version) (\(build))"
+        let language = Language.shared
+        return build.isEmpty
+            ? language.format("about.version", fallback: "Version %1$@", Updater.version)
+            : language.format("about.version_build", fallback: "Version %1$@ (%2$@)", Updater.version, build)
     }
 
     static var copyright: String {

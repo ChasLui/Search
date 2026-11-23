@@ -225,10 +225,10 @@ struct WelcomePanel: View {
     private var arcCard: some View {
         HStack(spacing: 14) {
             VStack(alignment: .leading, spacing: 3) {
-                Text("Coming from Arc?")
+                Text(language.text("welcome.arc.title", fallback: "Coming from Arc?"))
                     .font(.system(size: 13.5))
                     .foregroundStyle(Palette.ink)
-                Text(arcSaid ?? "Tabs on the left, spaces, pinned rows, and Arc's habits: tabs that close after 12 hours, peek, the floating video.")
+                Text(arcSaid ?? language.text("welcome.arc.detail", fallback: "Tabs on the left, spaces, pinned rows, and Arc's habits: tabs that close after 12 hours, peek, the floating video."))
                     .font(.system(size: 11.5))
                     .foregroundStyle(Palette.muted)
                     .fixedSize(horizontal: false, vertical: true)
@@ -240,11 +240,11 @@ struct WelcomePanel: View {
                     arcSaid = nil
                 }
             } else if prefs.looksLikeArc {
-                Text(arcSaid == nil ? "Set up like Arc" : "")
+                Text(arcSaid == nil ? language.text("welcome.arc.set_up", fallback: "Set up like Arc") : "")
                     .font(.system(size: 12))
                     .foregroundStyle(Palette.faint)
             } else {
-                Big("Set Up Like Arc") {
+                Big("settings.arc.setup.title") {
                     arcSaid = LikeArc.said(withAnimation(Motion.glide) { likeArc.setUp(prefs) })
                 }
             }

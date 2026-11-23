@@ -102,6 +102,7 @@ struct IPhoneAskLine: View {
     /// Kept up after the press, for its thanks.
     @State private var thanked = false
     @ObservedObject private var reach = OptIn.Reach.shared
+    @ObservedObject private var language = Language.shared
 
     var body: some View {
         if IPhoneAsk.on && ((!beta && !dismissed && reach.online) || thanked) {
@@ -109,7 +110,7 @@ struct IPhoneAskLine: View {
                 if asking || opened || thanked {
                     VStack(alignment: centred ? .center : .leading, spacing: 6) {
                         if !thanked {
-                            Text(IPhoneAsk.pitch)
+                            Text(language.text("iphoneask.pitch", fallback: IPhoneAsk.pitch))
                                 .font(.system(size: 11.5))
                                 .foregroundStyle(Palette.muted)
                                 .multilineTextAlignment(centred ? .center : .leading)
@@ -122,14 +123,14 @@ struct IPhoneAskLine: View {
                 } else if spot == .about {
                     // The About window is narrow: the question, then the two.
                     VStack(spacing: 4) {
-                        Text(IPhoneAsk.short)
+                        Text(language.text("iphoneask.short", fallback: IPhoneAsk.short))
                             .font(.system(size: 11.5))
                             .foregroundStyle(Palette.muted)
                         choices
                     }
                 } else {
                     HStack(spacing: 6) {
-                        Text(IPhoneAsk.short)
+                        Text(language.text("iphoneask.short", fallback: IPhoneAsk.short))
                             .font(.system(size: 11.5))
                             .foregroundStyle(Palette.muted)
                         choices
@@ -147,14 +148,14 @@ struct IPhoneAskLine: View {
     private var choices: some View {
         HStack(spacing: 6) {
                         Button { asking = true } label: {
-                            Text(IPhoneAsk.action).underline()
+                            Text(language.text("iphoneask.action", fallback: IPhoneAsk.action)).underline()
                         }
                         .buttonStyle(.plain)
                         .font(.system(size: 11.5))
                         .foregroundStyle(Palette.ink)
                         Text(verbatim: "·").font(.system(size: 11.5)).foregroundStyle(Palette.faint)
                         Button { IPhoneAsk.dismiss() } label: {
-                            Text(IPhoneAsk.notNow)
+                            Text(language.text("iphoneask.not_now", fallback: IPhoneAsk.notNow))
                         }
                         .buttonStyle(.plain)
                         .font(.system(size: 11.5))
@@ -197,9 +198,10 @@ struct IPhoneAskNewTab: View {
 struct IPhoneAskCard: View {
     let close: () -> Void
     var open: (URL) -> Void = { NSWorkspace.shared.open($0) }
+    @ObservedObject private var language = Language.shared
 
     var body: some View {
-        Plate(IPhoneAsk.cardTitle, width: 400, close: close) {
+        Plate(language.text("iphoneask.card_title", fallback: IPhoneAsk.cardTitle), width: 400, close: close) {
             VStack(alignment: .leading, spacing: 10) {
                 IPhoneAskLine(spot: .help, opened: true)
                 OptInFinePrint(open: open)
@@ -207,7 +209,7 @@ struct IPhoneAskCard: View {
         } foot: {
             HStack {
                 Spacer()
-                Quick(IPhoneAsk.notNow, tint: Palette.muted) {
+                Quick(language.text("iphoneask.not_now", fallback: IPhoneAsk.notNow), tint: Palette.muted) {
                     IPhoneAsk.dismiss()
                     close()
                 }

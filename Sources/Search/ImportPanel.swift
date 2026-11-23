@@ -662,7 +662,7 @@ struct ImportPanel: View {
     /// pressed, what it turned on with Undo.
     private var arcOffer: some View {
         HStack(alignment: .firstTextBaseline, spacing: 10) {
-            Text(arcSaid ?? "Tabs on the left, pinned rows, and Arc's habits too?")
+            Text(arcSaid ?? language.text("import.arc_offer", fallback: "Tabs on the left, pinned rows, and Arc's habits too?"))
                 .font(.system(size: 12.5))
                 .foregroundStyle(arcSaid == nil ? Palette.muted : Palette.ink)
                 .fixedSize(horizontal: false, vertical: true)
@@ -673,7 +673,7 @@ struct ImportPanel: View {
                     arcSaid = nil
                 }
             } else if arcSaid == nil {
-                Pill("Set Up Like Arc", filled: true) {
+                Pill("settings.arc.setup.title", filled: true) {
                     arcSaid = LikeArc.said(withAnimation(Motion.glide) { likeArc.setUp(browser.prefs) })
                 }
             }

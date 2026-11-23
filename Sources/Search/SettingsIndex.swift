@@ -1031,8 +1031,13 @@ final class LikeArc: ObservableObject {
     /// since, there is nothing to undo.
     func undoable(_ prefs: Preferences) -> Bool { before != nil && prefs.looksLikeArc }
 
-    static func said(_ changed: [String]) -> String {
-        changed.isEmpty ? "Already set up like Arc" : "Turned on: " + changed.joined(separator: ", ")
+    @MainActor static func said(_ changed: [String]) -> String {
+        let language = Language.shared
+        if changed.isEmpty { return language.text("Already set up like Arc", fallback: "Already set up like Arc") }
+        let list = ListFormatter()
+        list.locale = language.locale
+        let names = changed.map { language.text($0, fallback: $0) }
+        return language.format("announcement.turned_on", fallback: "Turned on: %1$@", list.string(from: names) ?? names.joined(separator: ", "))
     }
 }
 
