@@ -77,7 +77,7 @@ private struct AgentStatusFace: View {
                         .background(ClickSpot { AgentControl.shared.stopButton = $0 })
                 }
                 .buttonStyle(.plain)
-                .help(Language.shared.format("agent.click_to_stop", fallback: "%1$@. Click to stop it.", AgentWords.short(session)))
+                .shortcutHelp(Language.shared.format("agent.click_to_stop", fallback: "%1$@. Click to stop it.", AgentWords.short(session)), "file.stopAgent")
             case .row, .door:
                 VStack(alignment: .leading, spacing: 1) {
                     HStack(spacing: 6) {
@@ -169,7 +169,7 @@ struct AgentRowStop: View {
                 .contentShape(Capsule())
         }
         .buttonStyle(.plain)
-        .help(Text("agent.stop_help", bundle: Language.resources))
+        .shortcutHelp(Language.shared.text("agent.stop_help", fallback: "Stop the coding agent. Its tabs stay where they are."), "file.stopAgent")
     }
 }
 

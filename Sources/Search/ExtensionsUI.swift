@@ -96,6 +96,8 @@ struct ExtensionsPage: View {
                         Pill("ui.choose") { extensions.installFolder() }
                     }
                 }
+
+                FromSafariApps(extensions: extensions)
             }
         }
 
@@ -103,6 +105,54 @@ struct ExtensionsPage: View {
             guard Crx.id(in: link) != nil else { return }
             extensions.install(from: link)
             link = ""
+        }
+    }
+
+    /// Safari web extensions inside the apps on this Mac (SafariApps), off
+    /// unless you turn it on: only then are the Applications folders looked
+    /// through.
+    @available(macOS 15.4, *)
+    private struct FromSafariApps: View {
+        @ObservedObject var extensions: Extensions
+        @State private var on = SafariApps.on
+        @State private var found: [SafariApps.Found] = []
+
+        var body: some View {
+            Card {
+                VStack(spacing: 0) {
+                    Line("settings.extensions.safariApps.title", "extensions.safari_apps_detail", localizedTitle: true, localizedDetail: true) {
+                        Switch(on: $on)
+                    }
+                    if on {
+                        if found.isEmpty {
+                            Rule()
+                            Nothing("ui.no_safari_extensions")
+                        }
+                        ForEach(found, id: \.id) { item in
+                            Rule()
+                            Line(item.name, Language.shared.format("ui.in_app", fallback: "In %1$@", item.app)) {
+                                if extensions.installed.contains(where: { $0.id == item.id }) {
+                                    Text("ui.added", bundle: Language.resources).font(.system(size: 12)).foregroundStyle(Palette.muted)
+                                } else {
+                                    Pill("Add") { SafariApps.add(item, to: extensions) }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            .onAppear { if on { look() } }
+            .onChange(of: on) { _, now in
+                Store.settings.set(now, forKey: SafariApps.key)
+                if now { look() } else { found = [] }
+            }
+        }
+
+        private func look() {
+            Task.detached(priority: .userInitiated) {
+                let all = SafariApps.scan()
+                await MainActor.run { found = all }
+            }
         }
     }
 

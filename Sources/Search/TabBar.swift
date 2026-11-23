@@ -34,8 +34,8 @@ struct TabBar: View {
     /// the address when it is in sight. The badge was left out, and the row
     /// was laid out 28 points wider than the window gave it.
     private var leading: CGFloat {
-        (browser.prefs.navigationLeft ? Metrics.helm - 8 + Metrics.tabGap : 0)
-            + (Profiles.shared.several ? ProfileBadge.width + Metrics.tabGap : 0)
+        (browser.prefs.navigationLeft && browser.prefs.helmDoors > 0 ? Metrics.helm(browser.prefs) - 8 + Metrics.tabGap : 0)
+            + (browser.prefs.showsProfileDoor ? ProfileBadge.width + Metrics.tabGap : 0)
             + (browser.prefs.addressLine ? browser.prefs.addressWidth.width + AddressLine.after + Metrics.tabGap : 0)
     }
     /// How much wider the run's tabs were laid out than they were worked out
@@ -77,12 +77,12 @@ struct TabBar: View {
 
                 HStack(spacing: Metrics.tabGap) {
                     // Back, forward and reload by the lights, when asked.
-                    if browser.prefs.navigationLeft { Helm(browser: browser) }
+                    if browser.prefs.navigationLeft, browser.prefs.helmDoors > 0 { Helm(browser: browser) }
                     // The space on screen, first, when there are spaces.
                     // Above the tabs, for the name it shows over them a moment
                     // after a switch.
                     // The profile, once there is more than one (see Profiles.swift).
-                    if Profiles.shared.several { ProfileBadge(browser: browser) }
+                    if browser.prefs.showsProfileDoor { ProfileBadge(browser: browser) }
                     // The page's address, when it is to be in sight: before the tabs.
                     if browser.prefs.addressLine {
                         AddressLine(browser: browser)
@@ -123,18 +123,30 @@ struct TabBar: View {
                                                        group: nil, strip: geo.size.width, each: each, splits: splits)
                                             }
                                             if pinLine { PinLine() }
+                                            let ungrouped = grouped.ungrouped
+                                            let spaced = GroupBand.spaced(grouped.groups.map(\.group), looseAfter: !ungrouped.isEmpty)
                                             ForEach(grouped.groups) { group in
+                                                let members = group.tabs
+                                                // An open group's band, its name
+                                                // to its last tab (GroupBand); a
+                                                // folded one is drawn as before.
+                                                let banded = !group.group.collapsed
                                                 GroupHeading(browser: browser, group: group.group,
                                                              horizontal: true, dragSpace: "strip")
                                                     .id("group-\(group.id)")
-                                                let members = group.tabs
+                                                    .background {
+                                                        if banded {
+                                                            GroupBand(group: group.group, piece: group.group.id, first: true, last: members.isEmpty)
+                                                        }
+                                                    }
                                                 let memberSteps = steps(members, each: each, splits: splits)
                                                 ForEach(Array(members.enumerated()), id: \.element.id) { index, tab in
                                                     topTab(tab, index: index, steps: memberSteps,
-                                                           group: group.id, strip: geo.size.width, each: each, splits: splits)
+                                                           group: group.id, strip: geo.size.width, each: each, splits: splits,
+                                                           band: banded ? group.group : nil, last: index == members.count - 1)
                                                 }
+                                                if spaced.contains(group.id) { GroupBand.Air() }
                                             }
-                                            let ungrouped = grouped.ungrouped
                                             let ungroupedSteps = steps(ungrouped, each: each, splits: splits)
                                             ForEach(Array(ungrouped.enumerated()), id: \.element.id) { index, tab in
                                                 topTab(tab, index: index, steps: ungroupedSteps,
@@ -251,6 +263,7 @@ struct TabBar: View {
                             )
                     }
                     .buttonStyle(.plain)
+                    .shortcutHelp(Language.shared.text("ui.new_tab", fallback: "New Tab"), "file.newTab")
                     .onHover { plussed = $0 }
                     .opacity(nearby ? 1 : 0)
                     .scaleEffect(nearby ? 1 : 0.7, anchor: .leading)
@@ -267,11 +280,13 @@ struct TabBar: View {
                         AgentStatus(browser: browser, style: .door)
                         // Only while a download is running, and a moment after.
                         FetchDoor(browser: browser, fetches: browser.fetches)
-                        ExtensionSlot(browser: browser)
-                        if !browser.prefs.navigationLeft {
+                        ExtensionSlot(browser: browser, puzzle: !browser.prefs.hidesExtensionsDoor)
+                        if !browser.prefs.navigationLeft, browser.prefs.helmDoors > 0 {
                             Helm(browser: browser).padding(.trailing, 8)
                         }
-                        BookmarkDoor(browser: browser, arrowEdge: .bottom)
+                        if !browser.prefs.hidesBookmarksDoor {
+                            BookmarkDoor(browser: browser, arrowEdge: .bottom)
+                        }
                         SpaceButtons(browser: browser)
                     }
                     .background {
@@ -393,13 +408,24 @@ struct TabBar: View {
                                 height: Metrics.strip, interactive: false, pill: pill)
                     }
                     if line { PinLine() }
+                    let spaced = GroupBand.spaced(groupsShown.map(\.group), looseAfter: !looseShown.isEmpty)
                     ForEach(groupsShown) { drawn in
+                        // The same band as the row on screen (GroupBand).
+                        let members = drawn.tabs.filter { fit.contains($0.id) }
+                        let banded = !drawn.group.collapsed
                         GroupHeading(browser: browser, group: drawn.group, horizontal: true)
-                        ForEach(drawn.tabs.filter { fit.contains($0.id) }) { tab in
+                            .background {
+                                if banded { GroupBand(group: drawn.group, piece: drawn.group.id, first: true, last: members.isEmpty) }
+                            }
+                        ForEach(members) { tab in
                             rowItem(tab, splits: splits, activeID: row.active,
                                     width: each, room: strip - lights - 12,
                                     height: Metrics.strip, interactive: false, pill: pill)
+                                .background {
+                                    if banded { GroupBand(group: drawn.group, piece: tab.id, last: tab.id == members.last?.id) }
+                                }
                         }
+                        if spaced.contains(drawn.group.id) { GroupBand.Air() }
                     }
                     ForEach(looseShown) { tab in
                         rowItem(tab, splits: splits, activeID: row.active,
@@ -444,8 +470,10 @@ struct TabBar: View {
     /// for the run.
     /// `steps`: every place in the run the tab is carried along (see
     /// `steps(_:each:splits:)`), worked out once for the run as `each` is.
+    /// `band`: the open group it is drawn in, whose band it carries a piece
+    /// of (GroupBand); `last`, the piece that ends it.
     private func topTab(_ tab: Tab, index: Int, steps: [CGFloat], group: UUID?, strip: CGFloat,
-                        each: CGFloat, splits: SplitItems) -> some View {
+                        each: CGFloat, splits: SplitItems, band: TabGroup? = nil, last: Bool = false) -> some View {
         let isPairRepresentative = splits.pairs[tab.id] != nil
         return rowItem(tab, splits: splits, activeID: browser.activeID,
                        width: each, room: strip - lights - leading - 12,
@@ -467,6 +495,12 @@ struct TabBar: View {
                     browser.moveDisplayedTab(tab, to: $0)
                 }
             })
+            // After Carried: its piece stays where the tab's place is while
+            // the tab itself goes with the hand.
+            .background {
+                if let band { GroupBand(group: band, piece: tab.id, last: last) }
+            }
+            .modifier(RecordsItem(id: tab.id))
             .id(tab.id)
     }
 
@@ -579,7 +613,7 @@ struct TabBar: View {
             $0 + GroupHeading.width(for: $1.name, numbered: browser.prefs.showsTabShortcuts && $1.collapsed)
         }
         let fixed = CGFloat(pins) * Metrics.pinWidth + headingWidth
-            + CGFloat(max(0, pins + loose + headers - 1)) * Metrics.tabGap + (pinLine ? PinLine.space : 0)
+            + CGFloat(max(0, pins + loose + headers - 1)) * Metrics.tabGap + (pinLine ? PinLine.space : 0) + bandAir
         let room = room(in: strip)
         let minExtra = pairWidthExtra(in: visiblePairs, base: Metrics.tabMinWidth, splits: browser.splits)
         let each = loose == 0 ? Metrics.tabWidth
@@ -596,6 +630,23 @@ struct TabBar: View {
     /// The run's tabs as last laid out, and the run they are shown in, for
     /// the bench.
     static var laidOut: CGFloat = 0
+    /// Each group band piece of a row drawn for the bench (GroupBand).
+    static var drawnBands: [UUID: GroupBand.Drawn] = [:]
+    /// Where each tab of a row drawn for the bench was laid out (RecordsItem).
+    static var drawnItems: [UUID: CGRect] = [:]
+    /// Each title of a row drawn for the bench (RecordsTitle), by its tab's
+    /// id and which line: "title" or "rest", the address said at rest.
+    static var drawnTitles: [String: DrawnTitle] = [:]
+    struct DrawnTitle {
+        var text: String
+        var size: CGFloat
+        var medium = false
+        /// Cut in the middle, as a site's name is, rather than at the end.
+        var middle = false
+        /// Not faded out under the other line.
+        var shown = true
+        var width: CGFloat = 0
+    }
     static var runShown: CGFloat = 0
     static var scrolls = false
 
@@ -607,12 +658,20 @@ struct TabBar: View {
         tabs.contains { $0.pin != nil } && (groups > 0 || tabs.contains { $0.pin == nil })
     }
 
+    /// The air after the open groups' bands something follows in this
+    /// window's run (GroupBand.Air), for the widths.
+    private var bandAir: CGFloat {
+        guard browser.prefs.usesTabGroups else { return 0 }
+        let loose = browser.displayedTabs.contains { $0.pin == nil && browser.group(of: $0) == nil }
+        return CGFloat(GroupBand.spaced(browser.tabGroups, looseAfter: loose).count) * GroupBand.Air.space
+    }
+
     /// The strip, less the lights, the helm when it leads, the plus, the
     /// doors at the far end and the air around them. The doors are measured;
     /// until they have been, the helm and the bookmarks stand in for them —
     /// unless the helm leads, when nothing at the far end may be a real zero.
     private func room(in strip: CGFloat) -> CGFloat {
-        let far = doors > 0 || browser.prefs.navigationLeft ? doors : Metrics.helm + 26
+        let far = doors > 0 || browser.prefs.navigationLeft ? doors : Metrics.helm(browser.prefs) + 26
         return max(0, strip - lights - dot - leading - 12 - Metrics.plusWidth - far - 3 * Metrics.tabGap)
     }
 
@@ -663,6 +722,23 @@ struct TabBar: View {
     }
 }
 
+/// On a row drawn off screen for the bench, where a tab of the run was laid
+/// out (TabBar.drawnItems); nothing on the window's own row.
+private struct RecordsItem: ViewModifier {
+    @Environment(\.recordsBands) private var records
+    let id: UUID
+
+    func body(content: Content) -> some View {
+        if records {
+            content.onGeometryChange(for: CGRect.self, of: { $0.frame(in: .named("strip")) }) { rect in
+                TabBar.drawnItems[id] = rect
+            }
+        } else {
+            content
+        }
+    }
+}
+
 /// The line between what is kept and what comes and goes, standing up in the
 /// strip as the column's own lies across it (see KeepLine in Side.swift). The
 /// same hairline grey, as tall as a tab's mark, with the run's gap on either
@@ -697,9 +773,9 @@ struct Helm: View {
             // Nowhere to go and nothing to reload: the doors stay in place,
             // greyed, so the row doesn't shift when a tab arrives.
             Helm.stack(vertical) {
-                Door(icon: "chevron.left") {}
-                Door(icon: "chevron.right") {}
-                Door(icon: "arrow.clockwise") {}
+                if !browser.prefs.hidesBack { Door(icon: "chevron.left") {} }
+                if !browser.prefs.hidesForward { Door(icon: "chevron.right") {} }
+                if !browser.prefs.hidesReload { Door(icon: "arrow.clockwise") {} }
             }
             .opacity(0.3)
             .allowsHitTesting(false)
@@ -720,16 +796,24 @@ struct Helm: View {
             let back = !tab.isBlank && tab.canGoBack
             let forward = !tab.isBlank && tab.canGoForward
             Helm.stack(vertical) {
-                Door(icon: "chevron.left", help: "Back   ⌘[", held: { Rewind.menu(tab, back: true) }) { browser.back() }
-                    .disabled(!back)
-                    .opacity(back ? 1 : 0.3)
-                Door(icon: "chevron.right", help: "Forward   ⌘]", held: { Rewind.menu(tab, back: false) }) { browser.forward() }
-                    .disabled(!forward)
-                    .opacity(forward ? 1 : 0.3)
+                // Each can be hidden in Settings › Appearance (idea 815).
+                if !browser.prefs.hidesBack {
+                    Door(icon: "chevron.left", help: "Back", shortcut: "tabs.back", held: { Rewind.menu(tab, back: true) }) { browser.back() }
+                        .disabled(!back)
+                        .opacity(back ? 1 : 0.3)
+                }
+                if !browser.prefs.hidesForward {
+                    Door(icon: "chevron.right", help: "Forward", shortcut: "tabs.forward", held: { Rewind.menu(tab, back: false) }) { browser.forward() }
+                        .disabled(!forward)
+                        .opacity(forward ? 1 : 0.3)
+                }
                 // Reload, or stop while it is still coming.
+                if !browser.prefs.hidesReload {
                 Door(
                     icon: tab.loading ? "xmark" : "arrow.clockwise",
-                    help: tab.loading ? "Stop   ⌘." : "Reload   ⌘R"
+                    // Stop's ⌘. is the Mac's own, not one of Settings › Shortcuts.
+                    help: tab.loading ? "Stop   ⌘." : "Reload",
+                    shortcut: tab.loading ? nil : "view.reload"
                 ) {
                     if tab.loading { tab.stop() } else { browser.reload() }
                 }
@@ -744,6 +828,7 @@ struct Helm: View {
                         Button { browser.reload(fromOrigin: true) } label: { Text("ui.reload_page_from_origin", bundle: Language.resources) }
                             .shortcut("view.reloadOrigin")
                     }
+                }
                 }
             }
             .animation(Motion.quick, value: back)
@@ -853,15 +938,50 @@ private struct TabPill: View, Equatable {
     /// pick the tab lands on, so only the tab you're on, already picked,
     /// wears one, in place of its mark while the pointer is on it, as in
     /// Chrome.
-    private var compact: Bool { !editing && !pinned && width < Metrics.tabTitled }
+    ///
+    /// Too narrow is less room for the title than Metrics.tabTitleRoom,
+    /// three letters or so: past that the title was a lone "…" beside the
+    /// mark, which said nothing the mark alone doesn't.
+    private var compact: Bool { !editing && !pinned && titleRoom < Metrics.tabTitleRoom }
+    /// What the title gets: the tab, less its own parts (Metrics.tabFixed),
+    /// less the signs before the title that stay while the page does. The
+    /// shortcut numbers and the cross under the pointer come and go, and
+    /// the tab doesn't change shape for them.
+    private var titleRoom: CGFloat {
+        var room = width - Metrics.tabFixed
+        if tab.isBlank { room += Metrics.tabMark + Metrics.tabSpacing }
+        if tab.bench && !tab.agent { room -= Metrics.tabGlyph + Metrics.tabSpacing }
+        if tab.shy { room -= Metrics.tabGlyph + Metrics.tabSpacing }
+        if tab.recording { room -= Metrics.tabGlyph + Metrics.tabSpacing }
+        if !tab.blockedPopups.isEmpty { room -= Metrics.tabSign + Metrics.tabSpacing }
+        if tab.translation != nil { room -= Metrics.tabSign + Metrics.tabSpacing }
+        return room
+    }
     /// A speaker to press at the end of the pill: the page plays sound, or
     /// was muted. The ring, while the page is still coming, goes first.
     private var speaker: Bool { !editing && !tab.loading && (tab.noisy || tab.muted) }
     /// Where the page is, said on the tab you're on (Settings › Tabs › Show
     /// the address on the tab you're on).
-    private var rest: AtRest? { live && !editing ? AtRest.said(tab.restAddress, always: prefs.showsAddress) : nil }
+    /// Where there is room for the site's name beside its lock and port:
+    /// a name cut down to "…" says nothing, so the title stands in for it.
+    /// A warning is said however little room there is, the lock first.
+    private var rest: AtRest? {
+        guard live && !editing, let said = AtRest.said(tab.restAddress, always: prefs.showsAddress) else { return nil }
+        return said.warns || titleRoom - AtRestLine.besideName(said, size: 12.5) >= Metrics.tabTitleRoom ? said : nil
+    }
     private var atRest: Bool { rest != nil }
-    private var dim: Bool { prefs.dimsSleepingTabs && tab.asleep && !live && !hovering }
+    /// A grouped tab's page let go (Browser.putAway), or asleep: dimmed
+    /// whatever Dim sleeping tabs says, as its row in the column is, so a
+    /// press on its minus is seen to have done something (idea 950).
+    private var dim: Bool {
+        (prefs.dimsSleepingTabs || browser.group(of: tab) != nil) && tab.asleep && !live && !hovering
+    }
+    /// Its cross is a minus in a group, as in the column: closing it puts
+    /// its page away and leaves the tab (Browser.closeTab). Read here, not
+    /// when the row made the pill: the pill isn't made again when the tab
+    /// lets its page go, and the cross only shows under the pointer.
+    private var crossSymbol: String { browser.putsAway(tab) ? "minus" : "xmark" }
+    private var crossHelp: String { browser.putsAway(tab) ? "Put Away" : "Close Tab" }
 
     /// A pinned tab is a square, an edited one is a field, everything else is
     /// its share of what is left.
@@ -960,11 +1080,12 @@ private struct TabPill: View, Equatable {
         if compact {
             ZStack {
                 if live && hovering {
-                    Image(systemName: "xmark")
+                    Image(systemName: crossSymbol)
                         .font(.system(size: 8, weight: .semibold))
                         .foregroundStyle(Palette.muted)
                         .frame(width: 15, height: 15)
                         .background(Palette.ink.opacity(0.07), in: Circle())
+                        .help(crossHelp)
                         .transition(.opacity)
                 } else if let number = shortcutNumbers[tab.id] {
                     TabShortcutNumber(number: number)
@@ -992,13 +1113,13 @@ private struct TabPill: View, Equatable {
     }
 
     private var titled: some View {
-        HStack(spacing: 6) {
+        HStack(spacing: Metrics.tabSpacing) {
             if editing {
                 TabAddressField(browser: browser)
                     .frame(height: 16)
             } else {
                 if !tab.isBlank {
-                    Mark(icon: prefs.glyph == .icons ? tab.icon : nil, letter: tab.monogram, size: 15, dim: dim,
+                    Mark(icon: prefs.glyph == .icons ? tab.icon : nil, letter: tab.monogram, size: Metrics.tabMark, dim: dim,
                          contrast: prefs.highContrastText)
                         .overlay(alignment: .bottomTrailing) { AgentMark(tab: tab) }
                 }
@@ -1027,10 +1148,10 @@ private struct TabPill: View, Equatable {
                 // The page is translated (Translate.swift).
                 TranslateSign(tab: tab, colour: colour)
                 TitleAtRest(label: tab.displayLabel, rest: rest, shown: atRest, hovering: hovering,
-                            size: 12.5, colour: colour, roomy: false, dim: dim)
+                            size: 12.5, colour: colour, roomy: false, dim: dim, record: tab.id)
             }
 
-            Spacer(minLength: 2)
+            Spacer(minLength: Metrics.tabSpring)
 
             if !editing, let number = shortcutNumbers[tab.id] {
                 TabShortcutNumber(number: number)
@@ -1051,17 +1172,18 @@ private struct TabPill: View, Equatable {
                 // ring while the page is still coming, never both.
                 ZStack {
                     if hovering {
-                        Image(systemName: "xmark")
+                        Image(systemName: crossSymbol)
                             .font(.system(size: 8, weight: .semibold))
                             .foregroundStyle(Palette.muted)
                             .frame(width: 15, height: 15)
                             .background(Palette.ink.opacity(0.07), in: Circle())
+                            .help(crossHelp)
                             .transition(.opacity)
                     } else if tab.loading {
                         Ring().transition(.opacity)
                     }
                 }
-                .frame(width: editing || (speaker && !hovering) ? 0 : 15, height: 15)
+                .frame(width: editing || (speaker && !hovering) ? 0 : Metrics.tabCloseSlot, height: 15)
                 .opacity(editing ? 0 : 1)
                 // The cross is 15 points across because that is how big it should
                 // look. What you have to hit is the whole right-hand end of the
@@ -1080,8 +1202,8 @@ private struct TabPill: View, Equatable {
                 .animation(Motion.quick, value: tab.loading)
             }
         }
-        .padding(.leading, 11)
-        .padding(.trailing, editing ? 11 : 7)
+        .padding(.leading, Metrics.tabLead)
+        .padding(.trailing, editing ? Metrics.tabLead : Metrics.tabTrail)
         .padding(.vertical, 6)
         .frame(width: span, alignment: .leading)
         .animation(Motion.quick, value: speaker)
@@ -1943,7 +2065,7 @@ struct TabMenu: View {
         // The card a click on the tab you are on shows under its address.
         Button {
             if browser.activeID != tab.id { browser.select(tab) }
-            browser.beginTabEdit(tab)
+            browser.beginTabEdit(tab, card: true)
         } label: { Text("ui.site_information", bundle: Language.resources) }
         .disabled(tab.isBlank || tab.address == nil || tab.pin != nil)
         Button {

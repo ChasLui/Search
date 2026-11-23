@@ -93,7 +93,7 @@ struct AddressLine: View {
             .background(ViewAnchor(box: line))
             .contentShape(Rectangle())
             .onTapGesture { if !browser.editing { browser.edit(); browser.inlineEdit = true } }
-            .help(language.text("address_line.help", fallback: "Type an address or a search"))
+            .shortcutHelp(language.text("address_line.help", fallback: "Type an address or a search"), "file.openAddress")
             // ⌘L's suggestions, hanging under the line at its width.
             .overlay(alignment: .topLeading) {
                 if browser.editingInline {
