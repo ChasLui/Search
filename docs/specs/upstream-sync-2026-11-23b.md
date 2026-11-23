@@ -78,10 +78,11 @@ PR #17 合并后（`chaslui-dev` 为 `b566a67`），上游 `main` 又从 `6f2b18
 - 完整 `python3 Tests/run-ci-tests.py`：通过（exit 0）；本地化检查 2753 条、
   41 个复数键；主套件 1382 个用例、30 个跳过、0 失败；五个隔离套件逐进程运行
   全部通过。
+- GitHub Actions（`macos-26`，run 45163506615，`ad4e0ea`）：`tests`（24m13s）与
+  `beta-dmg`（12m30s）均通过。
 
 ## 未完成 / 待复核
 
-- GitHub Actions 结果。
 - 上游新增探针（`Tests/iphone_ask.py`、`Tests/live_folder_post_place.py`、
   `Tests/extension_popup_link.py`、`Tests/extension_i18n_empty.py`）未在本机执行。
 - 双语言切换、浅深色、双窗口、macOS 14、真实输入法和 VoiceOver 的人工复核。
