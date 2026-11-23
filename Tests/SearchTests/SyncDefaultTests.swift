@@ -161,6 +161,10 @@ final class SyncDefaultTests: XCTestCase {
     // MARK: - without iCloud: waits, quietly
 
     func testWithoutICloudInThisBuildTheChoiceWaits() {
+        let language = Language.shared
+        let previousLanguage = language.selection
+        language.select(.english)
+        defer { language.select(previousLanguage) }
         let icloud = sync(available: false)
         icloud.turnOnOrWait()
         XCTAssertTrue(icloud.on)
@@ -176,6 +180,10 @@ final class SyncDefaultTests: XCTestCase {
     }
 
     func testSignedOutWaitsWithoutAnError() async {
+        let language = Language.shared
+        let previousLanguage = language.selection
+        language.select(.english)
+        defer { language.select(previousLanguage) }
         let engine = ICloudSyncTests.FakeEngine()
         engine.state = .signedOut
         let icloud = sync(engine: engine)
