@@ -272,7 +272,7 @@ enum WhatsNew {
                 "In full screen, the menu bar no longer comes down over the tabs.",
                 "Selecting text in a field at the very top of a page, and Rename on a pinned square.",
                 "Asking to save a password nobody typed, and YouTube previews floating as a video.",
-                "Windows coming back twice, sites at .local names, and tabs showing a lone \u{2026}.",
+                "Windows coming back twice, sites at .local names, and tabs showing a lone ….",
             ]
         ),
         Notes(

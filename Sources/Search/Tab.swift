@@ -2549,7 +2549,7 @@ final class PageView: WKWebView {
             // after the items above, in a tab that keeps nothing. Not on a
             // private page, where Open Link in New Tab is private already.
             if configuration.websiteDataStore.isPersistent, let shy = item.copy() as? NSMenuItem {
-                shy.title = "Open Link in Private Tab"
+                shy.title = Language.shared.text("Open Link in Private Tab", fallback: "Open Link in Private Tab")
                 shy.identifier = NSUserInterfaceItemIdentifier("SearchOpenLinkInPrivateTab")
                 shy.keyEquivalentModifierMask = []
                 shy.isAlternate = false

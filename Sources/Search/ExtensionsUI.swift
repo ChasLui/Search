@@ -120,19 +120,19 @@ struct ExtensionsPage: View {
         var body: some View {
             Card {
                 VStack(spacing: 0) {
-                    Line("From Safari apps", "Safari extensions that came inside apps in Applications, added as unpacked extensions. Only their JavaScript runs: the app's own part doesn't, so anything that needs it (native messaging, content blockers) won't work.") {
+                    Line("settings.extensions.safariApps.title", "extensions.safari_apps_detail", localizedTitle: true, localizedDetail: true) {
                         Switch(on: $on)
                     }
                     if on {
                         if found.isEmpty {
                             Rule()
-                            Nothing("No Safari extensions in your apps.")
+                            Nothing("ui.no_safari_extensions")
                         }
                         ForEach(found, id: \.id) { item in
                             Rule()
-                            Line(item.name, "In \(item.app)") {
+                            Line(item.name, Language.shared.format("ui.in_app", fallback: "In %1$@", item.app)) {
                                 if extensions.installed.contains(where: { $0.id == item.id }) {
-                                    Text("Added").font(.system(size: 12)).foregroundStyle(Palette.muted)
+                                    Text("ui.added", bundle: Language.resources).font(.system(size: 12)).foregroundStyle(Palette.muted)
                                 } else {
                                     Pill("Add") { SafariApps.add(item, to: extensions) }
                                 }

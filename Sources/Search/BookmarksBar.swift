@@ -88,7 +88,7 @@ struct BookmarksBar: View {
         .clipped()
         .overlay(alignment: .trailing) {
             if !hidden.isEmpty {
-                More { BookmarkMenu.shared.popUp(hidden, title: "More Bookmarks") }
+                More { BookmarkMenu.shared.popUp(hidden, title: Language.shared.text("ui.more_bookmarks", fallback: "More Bookmarks")) }
                     .padding(.trailing, BookmarksBar.air - 4)
             }
         }
@@ -133,8 +133,8 @@ struct BookmarksBar: View {
                 .contentShape(Rectangle())
                 .onTapGesture(perform: act)
                 .onHover { hovering = $0 }
-                .help("More bookmarks")
-                .accessibilityLabel("More Bookmarks")
+                .help(Language.shared.text("ui.more_bookmarks", fallback: "More Bookmarks"))
+                .accessibilityLabel(Text("ui.more_bookmarks", bundle: Language.resources))
                 .accessibilityAddTraits(.isButton)
         }
     }

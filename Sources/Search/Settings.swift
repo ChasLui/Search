@@ -423,7 +423,6 @@ struct SettingsPanel: View {
         if all.isEmpty {
             Card { Nothing("ui.no_setting_called_that_try_other_words_like_dark_tabs_o") }
         }
-        }
         // What is always there and has nothing to set comes apart, after
         // the settings: among them its row with no switch read as a setting
         // gone missing (idea 483).

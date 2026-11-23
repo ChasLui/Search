@@ -998,7 +998,7 @@ final class Extensions: NSObject, ObservableObject {
                 }
                 if original.fromApp != nil {
                     guard await Task.detached(priority: .userInitiated, operation: { SafariApps.still(source) }).value else {
-                        browser?.announce("\(original.name) wasn't reloaded — its app's signature doesn't check out")
+                        browser?.announce("\(original.name) wasn't reloaded — its app's signature doesn't check out", localizedKey: "announcement.extension_signature_failed", arguments: [original.name])
                         return
                     }
                 }

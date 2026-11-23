@@ -148,11 +148,11 @@ enum OptIn {
         case tooMany
         case unreachable
 
-        var line: String {
+        @MainActor var line: String {
             switch self {
-            case .notAnEmail: return "That doesn't look like an email address."
-            case .tooMany: return "Too many tries just now. Wait a few minutes."
-            case .unreachable: return "Couldn't reach searchbrowser.app. Try again in a moment."
+            case .notAnEmail: return Language.shared.text("optin.error_not_email", fallback: "That doesn't look like an email address.")
+            case .tooMany: return Language.shared.text("optin.error_too_many", fallback: "Too many tries just now. Wait a few minutes.")
+            case .unreachable: return Language.shared.text("optin.error_unreachable", fallback: "Couldn't reach searchbrowser.app. Try again in a moment.")
             }
         }
     }
@@ -221,9 +221,10 @@ struct OptInForm: View {
     /// with that address sends it as typed.
     @State private var suggestion: String?
     @State private var suggestedFor: String?
+    @ObservedObject private var language = Language.shared
 
     /// `start` and `email`: where the form starts, for pictures.
-    init(source: OptIn.Source, betaOnly: Bool = false, button: String = "Join", offersBeta: Bool = true,
+    init(source: OptIn.Source, betaOnly: Bool = false, button: String = "optin.join", offersBeta: Bool = true,
          store: UserDefaults = Store.settings, compact: Bool = false,
          start: Phase = .idle, email: String = "", beta: Bool = true,
          joined: @escaping (Bool) -> Void = { _ in }) {
@@ -247,7 +248,7 @@ struct OptInForm: View {
             } else {
                 HStack(spacing: 8) {
                     field
-                    Pill(phase == .sending ? "Joining…" : (isFailed ? "Try again" : button), filled: true, action: send)
+                    Pill(phase == .sending ? "optin.joining" : (isFailed ? "Try again" : button), filled: true, action: send)
                         .disabled(phase == .sending || email.trimmingCharacters(in: .whitespaces).isEmpty)
                         .opacity(email.trimmingCharacters(in: .whitespaces).isEmpty ? 0.55 : 1)
                 }
@@ -255,7 +256,7 @@ struct OptInForm: View {
                     hint(suggestion)
                 }
                 if offersBeta && !betaOnly {
-                    Tick(on: $beta, title: "Also send me the iPhone beta")
+                    Tick(on: $beta, title: "optin.also_iphone_beta")
                 }
                 if case .failed(let failure) = phase {
                     Text(failure.line)
@@ -277,12 +278,12 @@ struct OptInForm: View {
     /// One quiet line under the field; the address in it fills the field.
     private func hint(_ better: String) -> some View {
         HStack(spacing: 0) {
-            Text("Did you mean ")
+            Text(language.text("optin.did_you_mean_lead", fallback: "Did you mean "))
             Button { email = better } label: {
                 Text(verbatim: better).underline().foregroundStyle(Palette.ink)
             }
             .buttonStyle(.plain)
-            Text("?")
+            Text(language.text("optin.did_you_mean_tail", fallback: "?"))
         }
         .font(.system(size: 11.5))
         .foregroundStyle(Palette.muted)
@@ -304,7 +305,7 @@ struct OptInForm: View {
                 .textContentType(.emailAddress)
                 .disableAutocorrection(true)
                 .onSubmit(send)
-                .accessibilityLabel("Email address")
+                .accessibilityLabel(Text("optin.email_address", bundle: Language.resources))
         }
         .font(.system(size: 12.5))
         .padding(.horizontal, 10)
@@ -327,10 +328,10 @@ struct OptInForm: View {
     }
 
     private var thanksLine: String {
-        if betaOnly { return "Thanks. We'll email you when your iPhone beta spot opens." }
+        if betaOnly { return language.text("optin.thanks_beta", fallback: "Thanks. We'll email you when your iPhone beta spot opens.") }
         return betaSent
-            ? "Thanks, you're on the list. We'll email you when your iPhone beta spot opens."
-            : "Thanks, you're on the list."
+            ? language.text("optin.thanks_beta_list", fallback: "Thanks, you're on the list. We'll email you when your iPhone beta spot opens.")
+            : language.text("optin.thanks_list", fallback: "Thanks, you're on the list.")
     }
 
     private func send() {
@@ -376,7 +377,7 @@ struct OptInForm: View {
                             }
                         }
                         .frame(width: 14, height: 14)
-                    Text(title)
+                    Text(LocalizedStringKey(title), bundle: Language.resources)
                         .font(.system(size: 12))
                         .foregroundStyle(Palette.ink)
                 }
@@ -384,7 +385,7 @@ struct OptInForm: View {
             }
             .buttonStyle(.plain)
             .accessibilityAddTraits(on ? [.isSelected] : [])
-            .accessibilityLabel(title)
+            .accessibilityLabel(Text(LocalizedStringKey(title), bundle: Language.resources))
         }
     }
 }
@@ -394,9 +395,9 @@ struct OptInFinePrint: View {
     var open: (URL) -> Void
     var body: some View {
         HStack(spacing: 4) {
-            Text("Unsubscribe anytime. Your email is used for nothing else.")
+            Text("optin.fine_print", bundle: Language.resources)
             Button { open(OptIn.privacy) } label: {
-                Text("Privacy").underline()
+                Text("Privacy", bundle: Language.resources).underline()
             }
             .buttonStyle(.plain)
             .help(OptIn.privacy.absoluteString)
@@ -417,10 +418,10 @@ struct OptInBlock: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             VStack(alignment: .leading, spacing: 3) {
-                Text("Get Search for iPhone early")
+                Text("optin.card_title", bundle: Language.resources)
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(Palette.ink)
-                Text("Leave your email for the iPhone beta. After that, rare emails: only useful new features and big updates.")
+                Text("optin.card_detail", bundle: Language.resources)
                     .font(.system(size: 12))
                     .foregroundStyle(Palette.muted)
                     .fixedSize(horizontal: false, vertical: true)
@@ -447,10 +448,10 @@ struct OptInWelcomePage: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 22) {
             VStack(alignment: .leading, spacing: 8) {
-                Text("Search for iPhone, early.")
+                Text("optin.welcome_title", bundle: Language.resources)
                     .font(.system(size: 26, weight: .medium))
                     .foregroundStyle(Palette.ink)
-                Text("Leave your email and get the iPhone beta before everyone else. After that, rare emails: only useful new features and big updates.")
+                Text("optin.welcome_detail", bundle: Language.resources)
                     .font(.system(size: 14))
                     .foregroundStyle(Palette.muted)
                     .lineSpacing(2)
@@ -463,7 +464,7 @@ struct OptInWelcomePage: View {
                     OptInFinePrint(open: open)
                 }
             } else {
-                Text("You're offline. Settings › About has the same field for later.")
+                Text("optin.offline", bundle: Language.resources)
                     .font(.system(size: 13))
                     .foregroundStyle(Palette.faint)
             }
@@ -487,13 +488,13 @@ struct OptInSettingsField: View {
                     Image(systemName: "checkmark")
                         .font(.system(size: 10.5, weight: .semibold))
                         .foregroundStyle(Palette.safe)
-                    Text(betaOnly ? "You've asked for the beta." : "You're on the list.")
+                    Text(betaOnly ? "optin.asked_beta" : "optin.on_list", bundle: Language.resources)
                         .font(.system(size: 12.5))
                         .foregroundStyle(Palette.ink)
-                    Quick(betaOnly ? "Ask for another address" : "Add another address") { another = true }
+                    Quick(betaOnly ? "optin.ask_another" : "optin.add_another") { another = true }
                 }
             } else {
-                OptInForm(source: .settings, betaOnly: betaOnly, button: betaOnly ? "Ask" : "Join", offersBeta: false, compact: true) { _ in
+                OptInForm(source: .settings, betaOnly: betaOnly, button: betaOnly ? "optin.ask" : "optin.join", offersBeta: false, compact: true) { _ in
                     given = true
                 }
                 if !betaOnly { OptInFinePrint(open: open) }

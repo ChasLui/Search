@@ -79,7 +79,7 @@ struct SearchApp: App {
                     .shortcut("file.openAddress")
                 // A page, PDF or picture on this Mac, as Safari's File ›
                 // Open File… (idea 755).
-                Button("Open File…") { browser.openFile() }
+                Button(language.text("Open File…", fallback: "Open File…")) { browser.openFile() }
                     .shortcut("file.openFile")
                 Divider()
                 // Another browser's bookmarks, history, passwords and the
@@ -112,7 +112,7 @@ struct SearchApp: App {
             CommandGroup(after: .pasteboard) {
                 // As Safari's: what ⇧⌘V already does while you type, said
                 // in the menu (idea 814).
-                Button(language.text("ui.paste_and_match_style", fallback: "Paste and Match Style")) { Browser.pasteMatchingStyle() }
+                Button(language.text("Paste and Match Style", fallback: "Paste and Match Style")) { Browser.pasteMatchingStyle() }
                     .shortcut("edit.pasteMatchStyle")
                 Button(language.text("ui.copy_clean_link", fallback: "Copy Clean Link")) { browser.copyCleanLink() }
                     .shortcut("edit.copyCleanLink")

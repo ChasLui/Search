@@ -110,14 +110,14 @@ struct WelcomePanel: View {
     private var devices: some View {
         VStack(alignment: .leading, spacing: 10) {
             VStack(alignment: .leading, spacing: 14) {
-                Choice("Sync with iCloud", "Open tabs, pins, spaces, bookmarks and a few settings, on your iPhone and other Macs. End-to-end encrypted, in your own iCloud.", on: $syncs, plain: true)
+                Choice("welcome.sync", "welcome.sync.detail", on: $syncs, plain: true)
                 Rule(inset: 0)
-                Choice("Handoff", "The page in front shows up on your iPhone and iPad.", on: $handsOff, plain: true)
+                Choice("welcome.handoff", "welcome.handoff.detail", on: $handsOff, plain: true)
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 14)
             .background(Palette.wash, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-            Text("Nothing starts until you leave this welcome. Both are in Settings › General.")
+            Text("welcome.devices_note", bundle: Language.resources)
                 .font(.system(size: 11.5))
                 .foregroundStyle(Palette.muted)
                 .padding(.horizontal, 4)
